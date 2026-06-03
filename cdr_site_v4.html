@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Le Choc des Renards</title>
+
+<!-- Icône onglet / favicon -->
+<link rel="icon" type="image/png" href="cdr-logo-blanc.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@300;400;500;600;700&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --orange: #FF6D00;
+    --orange-light: #FF9200;
+    --orange-dim: rgba(255,109,0,0.15);
+    --dark: #0C0C0C;
+    --dark2: #151515;
+    --dark3: #1E1E1E;
+    --dark4: #2A2A2A;
+    --white: #FFFFFF;
+    --gray: #888;
+    --gray-light: #CCC;
+    --font-display: 'Bebas Neue', sans-serif;
+    --font-heading: 'Barlow Condensed', sans-serif;
+    --font-body: 'Barlow', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--dark);
+    color: var(--white);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: rgba(12,12,12,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--dark4);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 2rem; height: 96px;
+  }
+
+  .nav-logo {
+    display: flex; align-items: center; gap: 12px; text-decoration: none;
+  }
+
+  .nav-logo img {
+    height: 88px;
+    width: auto;
+    object-fit: contain;
+  }
+
+  .nav-logo span {
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    letter-spacing: 0.06em;
+    color: var(--white);
+  }
+
+  .nav-logo span em { color: var(--orange); font-style: normal; }
+
+  .nav-links { display: flex; gap: 4px; }
+
+  .nav-btn {
+    background: none; border: none; cursor: pointer;
+    font-family: var(--font-heading); font-size: 1rem; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--gray); padding: 0.5rem 1rem;
+    border-radius: 6px; transition: all 0.2s;
+    position: relative;
+  }
+
+  .nav-btn:hover { color: var(--white); }
+  .nav-btn.active { color: var(--orange); }
+
+  .nav-btn.active::after {
+    content: '';
+    position: absolute; bottom: 0; left: 1rem; right: 1rem;
+    height: 2px; background: var(--orange); border-radius: 2px;
+  }
+
+  /* ── PAGES ── */
+  .page { display: none; padding-top: 96px; min-height: 100vh; }
+  .page.active { display: block; }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: calc(100vh - 96px);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center;
+    padding: 4rem 2rem;
+    position: relative; overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 80% 60% at 50% 30%, rgba(255,109,0,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero::after {
+    content: '';
+    position: absolute;
+    right: -60px;
+    bottom: -40px;
+    width: 340px;
+    height: 340px;
+    background: url('bondy-badminton-club.png') no-repeat center/contain;
+    opacity: 0.06;
+    pointer-events: none;
+    filter: grayscale(1) brightness(1.2);
+  }
+
+  .hero-logo {
+    width: min(280px, 70vw);
+    margin-bottom: 2rem;
+    filter: drop-shadow(0 0 40px rgba(255,109,0,0.22));
+  }
+
+  .hero-tagline,
+  .hero-desc,
+  .hero-logo {
+    opacity: 0;
+    transform: translateY(30px) scale(.95);
+    transition: all .8s ease;
+  }
+
+  .hero-logo.visible,
+  .hero-tagline.visible,
+  .hero-desc.visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  .hero-tagline {
+    font-family: var(--font-display);
+    font-size: clamp(1.2rem, 3vw, 1.6rem);
+    letter-spacing: 0.2em; color: var(--orange);
+    margin-bottom: 2.5rem;
+    text-transform: uppercase;
+  }
+
+  .hero-desc {
+    max-width: 560px;
+    font-size: 1.1rem; color: var(--gray-light);
+    line-height: 1.75; margin-bottom: 3rem;
+  }
+
+  .hero-stats {
+    display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center;
+    margin-bottom: 3rem;
+  }
+
+  .stat-card {
+    background: var(--dark2); border: 1px solid var(--dark4);
+    border-radius: 12px; padding: 1.25rem 2rem; text-align: center;
+    min-width: 120px;
+  }
+
+  .stat-num {
+    font-family: var(--font-display);
+    font-size: 2.4rem;
+    color: var(--orange);
+    display: inline-block;
+  }
+
+  .stat-label {
+    font-family: var(--font-heading); font-size: 0.75rem;
+    letter-spacing: 0.12em; color: var(--gray); text-transform: uppercase;
+  }
+
+  .cta-btn,
+  .pdf-btn {
+    background: var(--orange);
+    color: #000;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.9rem 2.5rem;
+    border-radius: 8px;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+  }
+
+  .cta-btn:hover,
+  .pdf-btn:hover {
+    background: var(--orange-light);
+    transform: translateY(-2px);
+  }
+
+  /* ── SECTION ── */
+  .section { max-width: 860px; margin: 0 auto; padding: 4rem 2rem; }
+
+  .section-title {
+    font-family: var(--font-display);
+    font-size: clamp(2.2rem, 6vw, 3.5rem);
+    letter-spacing: 0.04em;
+    margin-bottom: 0.4rem;
+  }
+
+  .section-title span { color: var(--orange); }
+
+  .section-subtitle {
+    font-family: var(--font-heading); font-size: 0.85rem;
+    letter-spacing: 0.15em; color: var(--gray); text-transform: uppercase;
+    margin-bottom: 3rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--dark4);
+  }
+
+  .reglement-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    background: var(--dark2);
+    border: 1px solid var(--dark4);
+    border-left: 3px solid var(--orange);
+    border-radius: 12px;
+    padding: 1.2rem 1.25rem;
+    margin-bottom: 2rem;
+  }
+
+  .reglement-tools-text {
+    color: var(--gray-light);
+    font-size: 0.96rem;
+  }
+
+  .reglement-tools-text strong {
+    color: var(--white);
+  }
+
+  /* ── RÈGLEMENT ── */
+  .article {
+    background: var(--dark2);
+    border: 1px solid var(--dark4);
+    border-radius: 12px;
+    padding: 1.75rem 2rem;
+    margin-bottom: 1.25rem;
+    transition: border-color 0.2s;
+  }
+
+  .article:hover { border-color: var(--orange); }
+
+  .article-header {
+    display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; cursor: pointer;
+  }
+
+  .article-num {
+    font-family: var(--font-display); font-size: 1.8rem; color: var(--orange);
+    min-width: 48px;
+  }
+
+  .article-title {
+    font-family: var(--font-heading); font-size: 1.15rem; font-weight: 700;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    flex: 1;
+  }
+
+  .article-chevron {
+    color: var(--gray);
+    transition: transform 0.25s;
+    font-size: 1.2rem;
+  }
+
+  .article.open .article-chevron { transform: rotate(180deg); }
+
+  .article-body {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height .4s ease;
+    display: block;
+  }
+
+  .article.open .article-body {
+    max-height: 1200px;
+  }
+
+  .article-body p {
+    color: var(--gray-light); line-height: 1.75; margin-bottom: 0.75rem; font-size: 0.97rem;
+  }
+
+  .article-body ul { padding-left: 0; list-style: none; }
+
+  .article-body ul li {
+    display: flex; gap: 0.75rem; align-items: flex-start;
+    color: var(--gray-light); font-size: 0.95rem;
+    padding: 0.4rem 0; border-bottom: 1px solid var(--dark4);
+  }
+
+  .article-body ul li:last-child { border-bottom: none; }
+
+  .article-body ul li::before {
+    content: '♦';
+    color: var(--orange);
+    font-size: 0.65rem;
+    margin-top: 0.45rem;
+    flex-shrink: 0;
+  }
+
+  .malus-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.75rem;
+  }
+
+  .malus-item {
+    background: var(--dark3); border: 1px solid var(--dark4); border-radius: 8px;
+    padding: 0.6rem 0.9rem; font-size: 0.88rem; color: var(--gray-light);
+    display: flex; gap: 0.5rem; align-items: flex-start;
+  }
+
+  .malus-item::before { content: '♡'; color: var(--orange); flex-shrink: 0; }
+
+  /* ── CLASSEMENT ── */
+  .phase-tabs {
+    display: flex; gap: 0.5rem; margin-bottom: 2rem; flex-wrap: wrap;
+  }
+
+  .phase-tab {
+    font-family: var(--font-heading); font-size: 0.9rem; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    background: var(--dark2); border: 1px solid var(--dark4);
+    color: var(--gray); padding: 0.55rem 1.25rem; border-radius: 8px;
+    cursor: pointer; transition: all 0.2s;
+  }
+
+  .phase-tab.active { background: var(--orange-dim); border-color: var(--orange); color: var(--orange); }
+  .phase-tab:hover:not(.active) { border-color: var(--gray); color: var(--gray-light); }
+
+  .phase-content { display: none; }
+  .phase-content.active { display: block; }
+
+  .poule-title {
+    font-family: var(--font-heading); font-size: 1.1rem; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--orange); margin-bottom: 0.75rem; margin-top: 1.5rem;
+  }
+
+  .poule-title:first-child { margin-top: 0; }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { border-bottom: 2px solid var(--orange); }
+
+  th {
+    font-family: var(--font-heading); font-size: 0.78rem; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--gray); padding: 0.6rem 0.75rem; text-align: left;
+  }
+
+  th:not(:first-child) { text-align: center; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--dark4);
+    transition:
+      transform 0.7s cubic-bezier(.22,1,.36,1),
+      opacity 0.7s ease,
+      background 0.3s ease;
+    will-change: transform, opacity;
+  }
+
+  tbody tr:hover { background: var(--dark2); }
+
+  tbody tr.sort-enter {
+    opacity: 0;
+    transform: translateY(18px) translateX(var(--row-offset, 0px));
+  }
+
+  tbody tr.sort-show {
+    opacity: 1;
+    transform: translateY(0) translateX(0);
+  }
+
+  td { padding: 0.65rem 0.75rem; font-size: 0.95rem; }
+  td:not(:first-child) { text-align: center; color: var(--gray-light); }
+
+  .rank {
+    font-family: var(--font-display); font-size: 1.1rem; color: var(--gray);
+    width: 36px;
+  }
+
+  .rank.gold { color: #FFD700; }
+  .rank.silver { color: #C0C0C0; }
+  .rank.bronze { color: #CD7F32; }
+
+  .player-name { font-weight: 500; }
+
+  .player-level {
+    display: inline-block; font-family: var(--font-heading); font-size: 0.72rem;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 1px 7px; border-radius: 4px; margin-left: 8px;
+  }
+
+  .level-N { background: rgba(255,109,0,0.2); color: var(--orange); border: 1px solid rgba(255,109,0,0.4); }
+  .level-D { background: rgba(130,180,255,0.15); color: #82B4FF; border: 1px solid rgba(130,180,255,0.3); }
+  .level-R { background: rgba(160,255,130,0.12); color: #A0FF82; border: 1px solid rgba(160,255,130,0.25); }
+  .level-P { background: rgba(200,200,200,0.1); color: var(--gray-light); border: 1px solid var(--dark4); }
+
+  .pts { font-family: var(--font-display); font-size: 1.15rem; color: var(--white); }
+  .winner { background: rgba(255,109,0,0.06); }
+
+  .info-banner {
+    background: var(--dark2); border: 1px solid var(--dark4);
+    border-left: 3px solid var(--orange);
+    border-radius: 8px; padding: 1rem 1.25rem;
+    font-size: 0.9rem; color: var(--gray-light);
+    margin-bottom: 1.5rem;
+  }
+
+  .info-banner strong { color: var(--orange); }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--dark4);
+    padding: 2rem; text-align: center;
+    font-family: var(--font-heading); font-size: 0.82rem;
+    letter-spacing: 0.08em; color: var(--gray);
+  }
+
+  footer span { color: var(--orange); }
+
+  @media (max-width: 600px) {
+    .malus-grid { grid-template-columns: 1fr; }
+    .hero-stats { gap: 1rem; }
+    .stat-card { padding: 1rem 1.25rem; min-width: 90px; }
+    nav { padding: 0 1rem; }
+    .nav-logo span { display: none; }
+    .reglement-tools { flex-direction: column; align-items: flex-start; }
+    .pdf-btn { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#" onclick="showPage('accueil', document.querySelector('.nav-btn')); return false;">
+    <img src="cdr-logo.png" alt="Logo Le Choc des Renards">
+    <span>Le Choc des <em>Renards</em></span>
+  </a>
+  <div class="nav-links">
+    <button class="nav-btn active" onclick="showPage('accueil',this)">Accueil</button>
+    <button class="nav-btn" onclick="showPage('reglement',this)">Règlement</button>
+    <button class="nav-btn" onclick="showPage('classement',this)">Classement</button>
+  </div>
+</nav>
+
+<!-- PAGE ACCUEIL -->
+<div id="page-accueil" class="page active">
+  <div class="hero">
+    <img class="hero-logo" src="bondy-badminton-club.png" alt="Logo Bondy Badminton Club">
+    <p class="hero-tagline">Saison 2026 — 2027</p>
+    <p class="hero-desc">
+      Un tournoi interne au club de Bondy, de fin septembre à juin.
+      Affrontements en simple, cohésion, et quelques malus surprises pour pimenter la compétition.
+    </p>
+    <div class="hero-stats">
+      <div class="stat-card">
+        <div class="stat-num">24</div>
+        <div class="stat-label">Joueurs</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">4</div>
+        <div class="stat-label">Poules</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">2</div>
+        <div class="stat-label">Phases</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">9</div>
+        <div class="stat-label">Mois</div>
+      </div>
+    </div>
+    <button class="cta-btn" onclick="showPage('classement', document.querySelectorAll('.nav-btn')[2])">
+      Voir le classement →
+    </button>
+  </div>
+</div>
+
+<!-- PAGE RÈGLEMENT -->
+<div id="page-reglement" class="page">
+  <div class="section">
+    <h1 class="section-title">Règle<span>ment</span></h1>
+    <p class="section-subtitle">Charte officielle du Choc des Renards &mdash; Club de Bondy</p>
+
+    <div class="reglement-tools">
+      <div class="reglement-tools-text">
+        <strong>Version PDF disponible</strong><br>
+        Téléchargez le règlement complet du Choc des Renards au format PDF.
+      </div>
+      <a class="pdf-btn" href="reglement-choc-des-renards.pdf" target="_blank" rel="noopener">
+        Télécharger le PDF
+      </a>
+    </div>
+
+    <div class="article open" onclick="toggleArticle(this)" id="article-participation">
+      <div class="article-header">
+        <div class="article-num">01</div>
+        <div class="article-title">Participation</div>
+        <div class="article-chevron">▾</div>
+      </div>
+      <div class="article-body">
+        <p>Tout adhérent·e au club de Bondy est libre de s'inscrire gratuitement au Choc des Renards auprès de Yanis.</p>
+        <p>Chaque joueur participant au choc est réputé accepter les termes de cette charte.</p>
+      </div>
+    </div>
+
+    <div class="article" onclick="toggleArticle(this)">
+      <div class="article-header">
+        <div class="article-num">02</div>
+        <div class="article-title">Déroulement</div>
+        <div class="article-chevron">▾</div>
+      </div>
+      <div class="article-body">
+        <p>Le Choc des Renards s'organise en <strong>deux phases</strong> :</p>
+        <ul>
+          <li><strong>Phase 1 — Septembre à Janvier :</strong> l'ensemble des joueurs est réparti dans des poules. À l'issue, les joueurs sont séparés en deux groupes selon leur classement dans leur poule.</li>
+          <li><strong>Phase 2 — Février à Juin :</strong> format phases finales.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="article" onclick="toggleArticle(this)">
+      <div class="article-header">
+        <div class="article-num">03</div>
+        <div class="article-title">Format des affrontements</div>
+        <div class="article-chevron">▾</div>
+      </div>
+      <div class="article-body">
+        <ul>
+          <li>Les joueurs reçoivent par message le numéro de téléphone et le nom de leur adversaire <strong>un dimanche</strong>.</li>
+          <li>Ils ont <strong>deux semaines</strong> à compter de ce jour pour effectuer leur match, en s'organisant librement avec leur adversaire.</li>
+          <li>Le match se déroule en <strong>3 sets gagnants de 11 points secs</strong> (sans points d'écart). Pas de pause pendant le set. Un changement de côté est réalisé à chaque set.</li>
+          <li>Les volants sont fournis par les joueurs ou empruntés dans les caisses. Les autres modalités suivent le règlement officiel de la FFBAD.</li>
+          <li>À l'issue de l'affrontement, le <strong>vainqueur</strong> communique les scores du match à Yanis, par message, avant le dernier samedi de la période des deux semaines.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="article" onclick="toggleArticle(this)">
+      <div class="article-header">
+        <div class="article-num">04</div>
+        <div class="article-title">Bonus &amp; Malus</div>
+        <div class="article-chevron">▾</div>
+      </div>
+      <div class="article-body">
+        <p>Afin d'équilibrer certains affrontements, des <strong>désavantages</strong> seront attribués au joueur le mieux classé dans les cas suivants : <strong>P contre R</strong>, <strong>P contre N</strong> ou <strong>D contre N</strong>.</p>
+        <p>Le malus est tiré au sort parmi la liste suivante :</p>
+        <div class="malus-grid">
+          <div class="malus-item">Interdiction de smasher ou de tendre droit</div>
+          <div class="malus-item">Porter un cache-œil</div>
+          <div class="malus-item">Interdiction de taper le volant au-dessus de la bande</div>
+          <div class="malus-item">Jouer en demi-terrain pour le joueur le moins bien classé</div>
+          <div class="malus-item">Jouer avec une raquette courte</div>
+          <div class="malus-item">Jouer avec une raquette lestée</div>
+          <div class="malus-item">Jouer avec une raquette de précision</div>
+          <div class="malus-item">Jouer avec un bras dans le dos constamment</div>
+          <div class="malus-item">Interdiction de faire un coup droit</div>
+          <div class="malus-item">Interdiction de faire un revers</div>
+          <div class="malus-item">Annoncer chaque coup à voix haute avant de le jouer</div>
+          <div class="malus-item">Les couloirs font partie du terrain du joueur le plus classé</div>
+          <div class="malus-item">Les points du joueur le moins classé comptent double</div>
+          <div class="malus-item">Le point est marqué uniquement si le volant touche le sol avant la raquette adverse</div>
+          <div class="malus-item">Le joueur le moins classé marque le point</div>
+          <div class="malus-item">Zone restrictive changeant à chaque set : rivière, box, couloir du fond</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="article" onclick="toggleArticle(this)">
+      <div class="article-header">
+        <div class="article-num">05</div>
+        <div class="article-title">Exemptions</div>
+        <div class="article-chevron">▾</div>
+      </div>
+      <div class="article-body">
+        <p>Dans des cas rares (voyage, blessure, maladie, décès...), un affrontement peut être annulé. L'organisation sera très reconnaissante d'être prévenue le plus tôt possible par message à Yanis.</p>
+        <p><strong>Aucun affrontement</strong> ne sera réalisé durant les <strong>vacances scolaires</strong>.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE CLASSEMENT -->
+<div id="page-classement" class="page">
+  <div class="section">
+    <h1 class="section-title">Class<span>ement</span></h1>
+    <p class="section-subtitle">Mise à jour — Saison 2026 / 2027</p>
+
+    <div class="info-banner">
+      <strong>Phase 1 en cours</strong> — Septembre 2026 à Janvier 2027 · Les 2 premiers de chaque poule sont qualifiés pour la phase finale.
+    </div>
+
+    <div class="phase-tabs">
+      <button class="phase-tab active" onclick="showPhase('phase1',this)">Phase 1 — Poules</button>
+      <button class="phase-tab" onclick="showPhase('phase2',this)">Phase 2 — Finales</button>
+    </div>
+
+    <div id="phase1" class="phase-content active">
+      <div class="poule-title">🟠 Poule A</div>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Joueur</th><th>J</th><th>V</th><th>D</th><th>Sets +/-</th><th>Pts</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="rank">4</td><td class="player-name">Julien P. <span class="player-level level-R">R</span></td><td>5</td><td>2</td><td>3</td><td>-3</td><td class="pts">9</td></tr>
+          <tr class="winner"><td class="rank gold">1</td><td class="player-name">Théo M. <span class="player-level level-N">N</span></td><td>5</td><td>5</td><td>0</td><td>+12</td><td class="pts">15</td></tr>
+          <tr><td class="rank">6</td><td class="player-name">Sofiane L. <span class="player-level level-P">P</span></td><td>5</td><td>0</td><td>5</td><td>-8</td><td class="pts">5</td></tr>
+          <tr class="winner"><td class="rank silver">2</td><td class="player-name">Romain B. <span class="player-level level-D">D</span></td><td>5</td><td>3</td><td>2</td><td>+4</td><td class="pts">11</td></tr>
+          <tr><td class="rank">5</td><td class="player-name">Camille D. <span class="player-level level-R">R</span></td><td>5</td><td>1</td><td>4</td><td>-7</td><td class="pts">7</td></tr>
+          <tr><td class="rank">3</td><td class="player-name">Alexis F. <span class="player-level level-D">D</span></td><td>5</td><td>3</td><td>2</td><td>+2</td><td class="pts">11</td></tr>
+        </tbody>
+      </table>
+
+      <div class="poule-title">🔵 Poule B</div>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Joueur</th><th>J</th><th>V</th><th>D</th><th>Sets +/-</th><th>Pts</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="rank">4</td><td class="player-name">Lucas V. <span class="player-level level-R">R</span></td><td>5</td><td>2</td><td>3</td><td>-2</td><td class="pts">9</td></tr>
+          <tr class="winner"><td class="rank gold">1</td><td class="player-name">Yanis K. <span class="player-level level-N">N</span></td><td>5</td><td>5</td><td>0</td><td>+15</td><td class="pts">15</td></tr>
+          <tr><td class="rank">6</td><td class="player-name">Nathan C. <span class="player-level level-P">P</span></td><td>4</td><td>0</td><td>4</td><td>-16</td><td class="pts">4</td></tr>
+          <tr class="winner"><td class="rank silver">2</td><td class="player-name">Inès R. <span class="player-level level-D">D</span></td><td>5</td><td>4</td><td>1</td><td>+8</td><td class="pts">13</td></tr>
+          <tr><td class="rank">5</td><td class="player-name">Fatou N. <span class="player-level level-R">R</span></td><td>4</td><td>1</td><td>3</td><td>-6</td><td class="pts">7</td></tr>
+          <tr><td class="rank">3</td><td class="player-name">Mehdi S. <span class="player-level level-D">D</span></td><td>5</td><td>2</td><td>3</td><td>+1</td><td class="pts">9</td></tr>
+        </tbody>
+      </table>
+
+      <div class="poule-title">🟢 Poule C</div>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Joueur</th><th>J</th><th>V</th><th>D</th><th>Sets +/-</th><th>Pts</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="rank">4</td><td class="player-name">Marie-Lou J. <span class="player-level level-R">R</span></td><td>5</td><td>2</td><td>3</td><td>-4</td><td class="pts">9</td></tr>
+          <tr class="winner"><td class="rank gold">1</td><td class="player-name">Omar H. <span class="player-level level-N">N</span></td><td>5</td><td>4</td><td>1</td><td>+9</td><td class="pts">13</td></tr>
+          <tr><td class="rank">6</td><td class="player-name">Priya M. <span class="player-level level-P">P</span></td><td>5</td><td>0</td><td>5</td><td>-7</td><td class="pts">5</td></tr>
+          <tr class="winner"><td class="rank silver">2</td><td class="player-name">Clara T. <span class="player-level level-N">N</span></td><td>5</td><td>4</td><td>1</td><td>+7</td><td class="pts">13</td></tr>
+          <tr><td class="rank">5</td><td class="player-name">Damien O. <span class="player-level level-R">R</span></td><td>5</td><td>1</td><td>4</td><td>-8</td><td class="pts">7</td></tr>
+          <tr><td class="rank">3</td><td class="player-name">Antoine G. <span class="player-level level-D">D</span></td><td>5</td><td>3</td><td>2</td><td>+3</td><td class="pts">11</td></tr>
+        </tbody>
+      </table>
+
+      <div class="poule-title">🔴 Poule D</div>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Joueur</th><th>J</th><th>V</th><th>D</th><th>Sets +/-</th><th>Pts</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="rank">4</td><td class="player-name">Chloé R. <span class="player-level level-R">R</span></td><td>5</td><td>2</td><td>3</td><td>-5</td><td class="pts">9</td></tr>
+          <tr class="winner"><td class="rank gold">1</td><td class="player-name">Lina A. <span class="player-level level-N">N</span></td><td>5</td><td>5</td><td>0</td><td>+14</td><td class="pts">15</td></tr>
+          <tr><td class="rank">6</td><td class="player-name">Amina D. <span class="player-level level-P">P</span></td><td>4</td><td>0</td><td>4</td><td>-7</td><td class="pts">4</td></tr>
+          <tr class="winner"><td class="rank silver">2</td><td class="player-name">Kevin B. <span class="player-level level-D">D</span></td><td>5</td><td>3</td><td>2</td><td>+5</td><td class="pts">11</td></tr>
+          <tr><td class="rank">5</td><td class="player-name">Enzo P. <span class="player-level level-R">R</span></td><td>5</td><td>1</td><td>4</td><td>-9</td><td class="pts">7</td></tr>
+          <tr><td class="rank">3</td><td class="player-name">Samir L. <span class="player-level level-D">D</span></td><td>5</td><td>3</td><td>2</td><td>+2</td><td class="pts">11</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div id="phase2" class="phase-content">
+      <div class="info-banner">
+        <strong>Phase 2 non commencée</strong> — Les phases finales débuteront en Février 2027 avec les qualifiés des poules.
+      </div>
+      <div class="poule-title">Qualifiés Phase 2 — Tableau A (niveaux supérieurs)</div>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Joueur</th><th>Poule</th><th>Statut</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="rank gold">Q1</td><td class="player-name">Théo M. <span class="player-level level-N">N</span></td><td>A</td><td style="color:var(--orange)">Qualifié ✓</td></tr>
+          <tr><td class="rank">Q2</td><td class="player-name">Romain B. <span class="player-level level-D">D</span></td><td>A</td><td style="color:var(--orange)">Qualifié ✓</td></tr>
+          <tr><td class="rank gold">Q3</td><td class="player-name">Yanis K. <span class="player-level level-N">N</span></td><td>B</td><td style="color:var(--orange)">Qualifié ✓</td></tr>
+          <tr><td class="rank">Q4</td><td class="player-name">Inès R. <span class="player-level level-D">D</span></td><td>B</td><td style="color:var(--orange)">Qualifié ✓</td></tr>
+          <tr><td class="rank gold">Q5</td><td class="player-name">Omar H. <span class="player-level level-N">N</span></td><td>C</td><td style="color:var(--orange)">Qualifié ✓</td></tr>
+          <tr><td class="rank">Q6</td><td class="player-name">Clara T. <span class="player-level level-N">N</span></td><td>C</td><td style="color:var(--orange)">Qualifié ✓</td></tr>
+          <tr><td class="rank gold">Q7</td><td class="player-name">Lina A. <span class="player-level level-N">N</span></td><td>D</td><td style="color:var(--orange)">Qualifié ✓</td></tr>
+          <tr><td class="rank">Q8</td><td class="player-name">Kevin B. <span class="player-level level-D">D</span></td><td>D</td><td style="color:var(--orange)">Qualifié ✓</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span>CDR</span> — Le Choc des Renards &mdash; Saison 2026 / 2027
+</footer>
+
+<script>
+  function showPage(id, btn) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('page-' + id).classList.add('active');
+    if (btn) btn.classList.add('active');
+    window.scrollTo(0, 0);
+  }
+
+  function toggleArticle(el) {
+    el.classList.toggle('open');
+  }
+
+  function showPhase(id, btn) {
+    document.querySelectorAll('.phase-content').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.phase-tab').forEach(b => b.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    if (btn) btn.classList.add('active');
+  }
+
+  function animateCounters() {
+    const configs = [900, 1000, 1100, 1200];
+    document.querySelectorAll('.stat-num').forEach((el, i) => {
+      const target = parseInt(el.textContent, 10);
+      const duration = configs[i] || 1000;
+      const start = performance.now();
+
+      function frame(now) {
+        const p = Math.min((now - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = Math.floor(target * eased);
+        if (p < 1) requestAnimationFrame(frame);
+        else el.textContent = target;
+      }
+
+      requestAnimationFrame(frame);
+    });
+  }
+
+  function animateHero() {
+    ['.hero-logo', '.hero-tagline', '.hero-desc'].forEach((s, i) => {
+      setTimeout(() => document.querySelector(s)?.classList.add('visible'), 200 + i * 250);
+    });
+  }
+
+  function sortTables() {
+    document.querySelectorAll('#phase1 table tbody').forEach(tb => {
+      const rows = [...tb.querySelectorAll('tr')];
+
+      rows.forEach(row => {
+        const randomOffset = (Math.random() * 140) - 70;
+        row.style.setProperty('--row-offset', `${randomOffset}px`);
+        row.classList.add('sort-enter');
+      });
+
+      setTimeout(() => {
+        rows.sort((a, b) => {
+          const pa = parseInt(a.querySelector('.pts')?.textContent || 0, 10);
+          const pb = parseInt(b.querySelector('.pts')?.textContent || 0, 10);
+          return pb - pa;
+        });
+
+        rows.forEach((row, i) => {
+          tb.appendChild(row);
+
+          const rank = row.querySelector('.rank');
+          if (rank) {
+            rank.textContent = i + 1;
+            rank.classList.remove('gold', 'silver', 'bronze');
+            if (i === 0) rank.classList.add('gold');
+            else if (i === 1) rank.classList.add('silver');
+            else if (i === 2) rank.classList.add('bronze');
+          }
+
+          row.classList.remove('winner');
+          if (i < 2) row.classList.add('winner');
+        });
+
+        rows.forEach((row, i) => {
+          setTimeout(() => {
+            row.classList.add('sort-show');
+            row.classList.remove('sort-enter');
+          }, i * 90);
+        });
+      }, 120);
+    });
+  }
+
+  let classementAnimated = false;
+  const oldShowPage = showPage;
+  showPage = function(id, btn) {
+    oldShowPage(id, btn);
+    if (id === 'classement' && !classementAnimated) {
+      classementAnimated = true;
+      sortTables();
+    }
+  };
+
+  window.addEventListener('load', () => {
+    animateHero();
+
+    const stats = document.querySelector('.hero-stats');
+    let started = false;
+
+    const obs = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && !started) {
+        started = true;
+        animateCounters();
+      }
+    }, { threshold: 0.4 });
+
+    if (stats) obs.observe(stats);
+  });
+</script>
+</body>
+</html>
