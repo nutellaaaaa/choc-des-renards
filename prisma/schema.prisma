@@ -25,7 +25,23 @@ model User {
 
   role         Role     @default(USER)
 
+  accepted     Boolean  @default(false)
+  banned       Boolean  @default(false)
+
   createdAt    DateTime @default(now())
+
+  loginEvents  LoginEvent[]
+}
+
+model LoginEvent {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ip        String?
+  userAgent String?
+  success   Boolean
+  message   String?
+  createdAt DateTime @default(now())
 }
 
 enum Role {
