@@ -31,6 +31,7 @@ model User {
   createdAt    DateTime @default(now())
 
   loginEvents  LoginEvent[]
+  matches      Match[]
 }
 
 model LoginEvent {
@@ -42,6 +43,48 @@ model LoginEvent {
   success   Boolean
   message   String?
   createdAt DateTime @default(now())
+}
+
+// Chaque match d'un joueur
+model Match {
+  id                 Int        @id @default(autoincrement())
+  userId             Int
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Phase du tournoi au moment du match
+  // "PHASE1" | "PHASE2" (+ roundNumber pour les rondes suisses)
+  phase              String
+  roundNumber        Int?       // null pour Phase 1, 1, 2, 3… pour Phase 2
+
+  matchDate          DateTime
+
+  opponentFirstName  String
+  opponentLastName   String
+
+  note               String?
+
+  sets               MatchSet[]
+
+  createdAt          DateTime   @default(now())
+}
+
+// Score de chaque set d'un match (jusqu'à 5 sets)
+model MatchSet {
+  id             Int   @id @default(autoincrement())
+  matchId        Int
+  match          Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  setNumber      Int   // 1 à 5
+  playerScore    Int
+  opponentScore  Int
+}
+
+// Singleton : état actuel du tournoi (toujours id = 1)
+model TournamentState {
+  id           Int      @id @default(1)
+  currentPhase String   @default("PHASE1")
+  // Pour Phase 2 : numéro de la ronde courante (null = Phase 1)
+  currentRound Int?
+  updatedAt    DateTime @updatedAt
 }
 
 enum Role {

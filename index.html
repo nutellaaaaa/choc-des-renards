@@ -4,10 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Le Choc des Renards</title>
-
-<!-- Icône onglet / favicon -->
 <link rel="icon" type="image/png" href="cdr-logo-blanc.png">
-
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@300;400;500;600;700&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -29,831 +26,212 @@
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
-
-  body {
-    background: var(--dark);
-    color: var(--white);
-    font-family: var(--font-body);
-    font-size: 16px;
-    line-height: 1.6;
-    min-height: 100vh;
-  }
+  body { background: var(--dark); color: var(--white); font-family: var(--font-body); font-size: 16px; line-height: 1.6; min-height: 100vh; }
 
   /* ── NAV ── */
-  nav {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-    background: rgba(12,12,12,0.92);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--dark4);
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0 2rem; height: 96px;
-  }
-
-  .nav-logo {
-    display: flex; align-items: center; gap: 12px; text-decoration: none;
-  }
-
-  .nav-logo img {
-    height: 88px;
-    width: auto;
-    object-fit: contain;
-  }
-
-  .nav-logo span {
-    font-family: var(--font-display);
-    font-size: 1.4rem;
-    letter-spacing: 0.06em;
-    color: var(--white);
-  }
-
+  nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(12,12,12,0.92); backdrop-filter: blur(12px); border-bottom: 1px solid var(--dark4); display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; height: 96px; }
+  .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+  .nav-logo img { height: 88px; width: auto; object-fit: contain; }
+  .nav-logo span { font-family: var(--font-display); font-size: 1.4rem; letter-spacing: 0.06em; color: var(--white); }
   .nav-logo span em { color: var(--orange); font-style: normal; }
-
   .nav-links { display: flex; gap: 4px; }
-
-  .nav-btn {
-    background: none; border: none; cursor: pointer;
-    font-family: var(--font-heading); font-size: 1rem; font-weight: 600;
-    letter-spacing: 0.08em; text-transform: uppercase;
-    color: var(--gray); padding: 0.5rem 1rem;
-    border-radius: 6px; transition: all 0.2s;
-    position: relative;
-  }
-
+  .nav-btn { background: none; border: none; cursor: pointer; font-family: var(--font-heading); font-size: 1rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray); padding: 0.5rem 1rem; border-radius: 6px; transition: all 0.2s; position: relative; }
   .nav-btn:hover { color: var(--white); }
   .nav-btn.active { color: var(--orange); }
-
-  .nav-btn.active::after {
-    content: '';
-    position: absolute; bottom: 0; left: 1rem; right: 1rem;
-    height: 2px; background: var(--orange); border-radius: 2px;
-  }
-
-  /* ── NAV USER ── */
-  .nav-user-info {
-    display: none;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  .nav-user-greeting {
-    font-family: var(--font-heading);
-    font-size: 0.92rem;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    color: var(--gray-light);
-  }
-
-  .nav-user-greeting strong {
-    color: var(--white);
-  }
-
-  .nav-logout-btn {
-    background: none;
-    border: 1px solid var(--dark4);
-    cursor: pointer;
-    font-family: var(--font-heading);
-    font-size: 0.82rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--gray);
-    padding: 0.4rem 0.9rem;
-    border-radius: 6px;
-    transition: all 0.2s;
-  }
-
-  .nav-logout-btn:hover {
-    border-color: var(--orange);
-    color: var(--orange);
-  }
+  .nav-btn.active::after { content: ''; position: absolute; bottom: 0; left: 1rem; right: 1rem; height: 2px; background: var(--orange); border-radius: 2px; }
+  .nav-user-info { display: none; align-items: center; gap: 0.75rem; }
+  .nav-user-greeting { font-family: var(--font-heading); font-size: 0.92rem; font-weight: 600; letter-spacing: 0.06em; color: var(--gray-light); }
+  .nav-user-greeting strong { color: var(--white); }
+  .nav-logout-btn { background: none; border: 1px solid var(--dark4); cursor: pointer; font-family: var(--font-heading); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray); padding: 0.4rem 0.9rem; border-radius: 6px; transition: all 0.2s; }
+  .nav-logout-btn:hover { border-color: var(--orange); color: var(--orange); }
 
   /* ── PAGES ── */
   .page { display: none; padding-top: 96px; min-height: 100vh; }
   .page.active { display: block; }
 
   /* ── HERO ── */
-  .hero {
-    min-height: calc(100vh - 96px);
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    text-align: center;
-    padding: 4rem 2rem;
-    position: relative; overflow: hidden;
-  }
-
-  .hero::before {
-    content: '';
-    position: absolute; inset: 0;
-    background: radial-gradient(ellipse 80% 60% at 50% 30%, rgba(255,109,0,0.08) 0%, transparent 70%);
-    pointer-events: none;
-  }
-
-  .hero::after {
-    content: '';
-    position: absolute;
-    right: -60px;
-    bottom: -40px;
-    width: 340px;
-    height: 340px;
-    background: url('bondy-badminton-club.png') no-repeat center/contain;
-    opacity: 0.06;
-    pointer-events: none;
-    filter: grayscale(1) brightness(1.2);
-  }
-
-  .hero-logo {
-    width: min(280px, 70vw);
-    margin-bottom: 2rem;
-    filter: drop-shadow(0 0 40px rgba(255,109,0,0.22));
-  }
-
-  .hero-tagline,
-  .hero-desc,
-  .hero-logo {
-    opacity: 0;
-    transform: translateY(30px) scale(.95);
-    transition: all .8s ease;
-  }
-
-  .hero-logo.visible,
-  .hero-tagline.visible,
-  .hero-desc.visible {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-
-  .hero-tagline {
-    font-family: var(--font-display);
-    font-size: clamp(1.2rem, 3vw, 1.6rem);
-    letter-spacing: 0.2em; color: var(--orange);
-    margin-bottom: 2.5rem;
-    text-transform: uppercase;
-  }
-
-  .hero-desc {
-    max-width: 560px;
-    font-size: 1.1rem; color: var(--gray-light);
-    line-height: 1.75; margin-bottom: 3rem;
-  }
-
-  .hero-stats {
-    display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center;
-    margin-bottom: 3rem;
-  }
-
-  .stat-card {
-    background: var(--dark2); border: 1px solid var(--dark4);
-    border-radius: 12px; padding: 1.25rem 2rem; text-align: center;
-    min-width: 120px;
-  }
-
-  .stat-num {
-    font-family: var(--font-display);
-    font-size: 2.4rem;
-    color: var(--orange);
-    display: inline-block;
-  }
-
-  .stat-label {
-    font-family: var(--font-heading); font-size: 0.75rem;
-    letter-spacing: 0.12em; color: var(--gray); text-transform: uppercase;
-  }
-
-  .cta-btn,
-  .pdf-btn {
-    background: var(--orange);
-    color: #000;
-    border: none;
-    cursor: pointer;
-    font-family: var(--font-heading);
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    padding: 0.9rem 2.5rem;
-    border-radius: 8px;
-    transition: all 0.2s;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.6rem;
-  }
-
-  .cta-btn:hover,
-  .pdf-btn:hover {
-    background: var(--orange-light);
-    transform: translateY(-2px);
-  }
+  .hero { min-height: calc(100vh - 96px); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 4rem 2rem; position: relative; overflow: hidden; }
+  .hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 80% 60% at 50% 30%, rgba(255,109,0,0.08) 0%, transparent 70%); pointer-events: none; }
+  .hero::after { content: ''; position: absolute; right: -60px; bottom: -40px; width: 340px; height: 340px; background: url('bondy-badminton-club.png') no-repeat center/contain; opacity: 0.06; pointer-events: none; filter: grayscale(1) brightness(1.2); }
+  .hero-logo { width: min(280px, 70vw); margin-bottom: 2rem; filter: drop-shadow(0 0 40px rgba(255,109,0,0.22)); }
+  .hero-tagline, .hero-desc, .hero-logo { opacity: 0; transform: translateY(30px) scale(.95); transition: all .8s ease; }
+  .hero-logo.visible, .hero-tagline.visible, .hero-desc.visible { opacity: 1; transform: translateY(0) scale(1); }
+  .hero-tagline { font-family: var(--font-display); font-size: clamp(1.2rem, 3vw, 1.6rem); letter-spacing: 0.2em; color: var(--orange); margin-bottom: 2.5rem; text-transform: uppercase; }
+  .hero-desc { max-width: 560px; font-size: 1.1rem; color: var(--gray-light); line-height: 1.75; margin-bottom: 3rem; }
+  .hero-stats { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; margin-bottom: 3rem; }
+  .stat-card { background: var(--dark2); border: 1px solid var(--dark4); border-radius: 12px; padding: 1.25rem 2rem; text-align: center; min-width: 120px; }
+  .stat-num { font-family: var(--font-display); font-size: 2.4rem; color: var(--orange); display: inline-block; }
+  .stat-label { font-family: var(--font-heading); font-size: 0.75rem; letter-spacing: 0.12em; color: var(--gray); text-transform: uppercase; }
+  .cta-btn, .pdf-btn { background: var(--orange); color: #000; border: none; cursor: pointer; font-family: var(--font-heading); font-size: 1rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.9rem 2.5rem; border-radius: 8px; transition: all 0.2s; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 0.6rem; }
+  .cta-btn:hover, .pdf-btn:hover { background: var(--orange-light); transform: translateY(-2px); }
 
   /* ── SECTION ── */
   .section { max-width: 860px; margin: 0 auto; padding: 4rem 2rem; }
-
-  .section-title {
-    font-family: var(--font-display);
-    font-size: clamp(2.2rem, 6vw, 3.5rem);
-    letter-spacing: 0.04em;
-    margin-bottom: 0.4rem;
-  }
-
+  .section-title { font-family: var(--font-display); font-size: clamp(2.2rem, 6vw, 3.5rem); letter-spacing: 0.04em; margin-bottom: 0.4rem; }
   .section-title span { color: var(--orange); }
-
-  .section-subtitle {
-    font-family: var(--font-heading); font-size: 0.85rem;
-    letter-spacing: 0.15em; color: var(--gray); text-transform: uppercase;
-    margin-bottom: 3rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 1px solid var(--dark4);
-  }
-
-  .reglement-tools {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    background: var(--dark2);
-    border: 1px solid var(--dark4);
-    border-left: 3px solid var(--orange);
-    border-radius: 12px;
-    padding: 1.2rem 1.25rem;
-    margin-bottom: 2rem;
-  }
-
-  .reglement-tools-text {
-    color: var(--gray-light);
-    font-size: 0.96rem;
-  }
-
-  .reglement-tools-text strong {
-    color: var(--white);
-  }
+  .section-subtitle { font-family: var(--font-heading); font-size: 0.85rem; letter-spacing: 0.15em; color: var(--gray); text-transform: uppercase; margin-bottom: 3rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--dark4); }
+  .reglement-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; background: var(--dark2); border: 1px solid var(--dark4); border-left: 3px solid var(--orange); border-radius: 12px; padding: 1.2rem 1.25rem; margin-bottom: 2rem; }
+  .reglement-tools-text { color: var(--gray-light); font-size: 0.96rem; }
+  .reglement-tools-text strong { color: var(--white); }
 
   /* ── RÈGLEMENT ── */
-  .article {
-    background: var(--dark2);
-    border: 1px solid var(--dark4);
-    border-radius: 12px;
-    padding: 1.75rem 2rem;
-    margin-bottom: 1.25rem;
-    transition: border-color 0.2s;
-  }
-
+  .article { background: var(--dark2); border: 1px solid var(--dark4); border-radius: 12px; padding: 1.75rem 2rem; margin-bottom: 1.25rem; transition: border-color 0.2s; }
   .article:hover { border-color: var(--orange); }
-
-  .article-header {
-    display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; cursor: pointer;
-  }
-
-  .article-num {
-    font-family: var(--font-display); font-size: 1.8rem; color: var(--orange);
-    min-width: 48px;
-  }
-
-  .article-title {
-    font-family: var(--font-heading); font-size: 1.15rem; font-weight: 700;
-    letter-spacing: 0.06em; text-transform: uppercase;
-    flex: 1;
-  }
-
-  .article-chevron {
-    color: var(--gray);
-    transition: transform 0.25s;
-    font-size: 1.2rem;
-  }
-
+  .article-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; cursor: pointer; }
+  .article-num { font-family: var(--font-display); font-size: 1.8rem; color: var(--orange); min-width: 48px; }
+  .article-title { font-family: var(--font-heading); font-size: 1.15rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; flex: 1; }
+  .article-chevron { color: var(--gray); transition: transform 0.25s; font-size: 1.2rem; }
   .article.open .article-chevron { transform: rotate(180deg); }
-
-  .article-body {
-    overflow: hidden;
-    max-height: 0;
-    transition: max-height .4s ease;
-    display: block;
-  }
-
-  .article.open .article-body {
-    max-height: 1200px;
-  }
-
-  .article-body p {
-    color: var(--gray-light); line-height: 1.75; margin-bottom: 0.75rem; font-size: 0.97rem;
-  }
-
+  .article-body { overflow: hidden; max-height: 0; transition: max-height .4s ease; display: block; }
+  .article.open .article-body { max-height: 1200px; }
+  .article-body p { color: var(--gray-light); line-height: 1.75; margin-bottom: 0.75rem; font-size: 0.97rem; }
   .article-body ul { padding-left: 0; list-style: none; }
-
-  .article-body ul li {
-    display: flex; gap: 0.75rem; align-items: flex-start;
-    color: var(--gray-light); font-size: 0.95rem;
-    padding: 0.4rem 0; border-bottom: 1px solid var(--dark4);
-  }
-
+  .article-body ul li { display: flex; gap: 0.75rem; align-items: flex-start; color: var(--gray-light); font-size: 0.95rem; padding: 0.4rem 0; border-bottom: 1px solid var(--dark4); }
   .article-body ul li:last-child { border-bottom: none; }
-
-  .article-body ul li::before {
-    content: '♦';
-    color: var(--orange);
-    font-size: 0.65rem;
-    margin-top: 0.45rem;
-    flex-shrink: 0;
-  }
-
-  .malus-grid {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.75rem;
-  }
-
-  .malus-item {
-    background: var(--dark3); border: 1px solid var(--dark4); border-radius: 8px;
-    padding: 0.6rem 0.9rem; font-size: 0.88rem; color: var(--gray-light);
-    display: flex; gap: 0.5rem; align-items: flex-start;
-  }
-
+  .article-body ul li::before { content: '♦'; color: var(--orange); font-size: 0.65rem; margin-top: 0.45rem; flex-shrink: 0; }
+  .malus-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.75rem; }
+  .malus-item { background: var(--dark3); border: 1px solid var(--dark4); border-radius: 8px; padding: 0.6rem 0.9rem; font-size: 0.88rem; color: var(--gray-light); display: flex; gap: 0.5rem; align-items: flex-start; }
   .malus-item::before { content: '♡'; color: var(--orange); flex-shrink: 0; }
 
   /* ── CLASSEMENT ── */
-  .phase-tabs {
-    display: flex; gap: 0.5rem; margin-bottom: 2rem; flex-wrap: wrap;
-  }
-
-  .phase-tab {
-    font-family: var(--font-heading); font-size: 0.9rem; font-weight: 600;
-    letter-spacing: 0.08em; text-transform: uppercase;
-    background: var(--dark2); border: 1px solid var(--dark4);
-    color: var(--gray); padding: 0.55rem 1.25rem; border-radius: 8px;
-    cursor: pointer; transition: all 0.2s;
-  }
-
+  .phase-tabs { display: flex; gap: 0.5rem; margin-bottom: 2rem; flex-wrap: wrap; }
+  .phase-tab { font-family: var(--font-heading); font-size: 0.9rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; background: var(--dark2); border: 1px solid var(--dark4); color: var(--gray); padding: 0.55rem 1.25rem; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
   .phase-tab.active { background: var(--orange-dim); border-color: var(--orange); color: var(--orange); }
   .phase-tab:hover:not(.active) { border-color: var(--gray); color: var(--gray-light); }
-
   .phase-content { display: none; }
   .phase-content.active { display: block; }
-
-  .poule-title {
-    font-family: var(--font-heading); font-size: 1.1rem; font-weight: 700;
-    letter-spacing: 0.1em; text-transform: uppercase;
-    color: var(--orange); margin-bottom: 0.75rem; margin-top: 1.5rem;
-  }
-
+  .poule-title { font-family: var(--font-heading); font-size: 1.1rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--orange); margin-bottom: 0.75rem; margin-top: 1.5rem; }
   .poule-title:first-child { margin-top: 0; }
-
   table { width: 100%; border-collapse: collapse; }
   thead tr { border-bottom: 2px solid var(--orange); }
-
-  th {
-    font-family: var(--font-heading); font-size: 0.78rem; font-weight: 700;
-    letter-spacing: 0.1em; text-transform: uppercase;
-    color: var(--gray); padding: 0.6rem 0.75rem; text-align: left;
-  }
-
+  th { font-family: var(--font-heading); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gray); padding: 0.6rem 0.75rem; text-align: left; }
   th:not(:first-child) { text-align: center; }
-
-  tbody tr {
-    border-bottom: 1px solid var(--dark4);
-    transition:
-      transform 0.7s cubic-bezier(.22,1,.36,1),
-      opacity 0.7s ease,
-      background 0.3s ease;
-    will-change: transform, opacity;
-  }
-
+  tbody tr { border-bottom: 1px solid var(--dark4); transition: transform 0.7s cubic-bezier(.22,1,.36,1), opacity 0.7s ease, background 0.3s ease; will-change: transform, opacity; }
   tbody tr:hover { background: var(--dark2); }
-
-  tbody tr.sort-enter {
-    opacity: 0;
-    transform: translateY(18px) translateX(var(--row-offset, 0px));
-  }
-
-  tbody tr.sort-show {
-    opacity: 1;
-    transform: translateY(0) translateX(0);
-  }
-
+  tbody tr.sort-enter { opacity: 0; transform: translateY(18px) translateX(var(--row-offset, 0px)); }
+  tbody tr.sort-show { opacity: 1; transform: translateY(0) translateX(0); }
   td { padding: 0.65rem 0.75rem; font-size: 0.95rem; }
   td:not(:first-child) { text-align: center; color: var(--gray-light); }
-
-  .rank {
-    font-family: var(--font-display); font-size: 1.1rem; color: var(--gray);
-    width: 36px;
-  }
-
+  .rank { font-family: var(--font-display); font-size: 1.1rem; color: var(--gray); width: 36px; }
   .rank.gold { color: #FFD700; }
   .rank.silver { color: #C0C0C0; }
   .rank.bronze { color: #CD7F32; }
-
   .player-name { font-weight: 500; }
-
-  .player-level {
-    display: inline-block; font-family: var(--font-heading); font-size: 0.72rem;
-    letter-spacing: 0.08em; text-transform: uppercase;
-    padding: 1px 7px; border-radius: 4px; margin-left: 8px;
-  }
-
+  .player-level { display: inline-block; font-family: var(--font-heading); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 1px 7px; border-radius: 4px; margin-left: 8px; }
   .level-N { background: rgba(255,109,0,0.2); color: var(--orange); border: 1px solid rgba(255,109,0,0.4); }
   .level-D { background: rgba(130,180,255,0.15); color: #82B4FF; border: 1px solid rgba(130,180,255,0.3); }
   .level-R { background: rgba(160,255,130,0.12); color: #A0FF82; border: 1px solid rgba(160,255,130,0.25); }
   .level-P { background: rgba(200,200,200,0.1); color: var(--gray-light); border: 1px solid var(--dark4); }
-
   .pts { font-family: var(--font-display); font-size: 1.15rem; color: var(--white); }
   .winner { background: rgba(255,109,0,0.06); }
-
-  .info-banner {
-    background: var(--dark2); border: 1px solid var(--dark4);
-    border-left: 3px solid var(--orange);
-    border-radius: 8px; padding: 1rem 1.25rem;
-    font-size: 0.9rem; color: var(--gray-light);
-    margin-bottom: 1.5rem;
-  }
-
+  .info-banner { background: var(--dark2); border: 1px solid var(--dark4); border-left: 3px solid var(--orange); border-radius: 8px; padding: 1rem 1.25rem; font-size: 0.9rem; color: var(--gray-light); margin-bottom: 1.5rem; }
   .info-banner strong { color: var(--orange); }
 
-  /* ── FOOTER ── */
-  footer {
-    border-top: 1px solid var(--dark4);
-    padding: 2rem; text-align: center;
-    font-family: var(--font-heading); font-size: 0.82rem;
-    letter-spacing: 0.08em; color: var(--gray);
-  }
+  /* Ligne cliquable classement */
+  .clickable-row { cursor: pointer; }
+  .clickable-row:hover td:first-child { color: var(--orange); }
 
+  /* ── MODAL DÉTAIL JOUEUR ── */
+  .player-modal-bg { display: none; position: fixed; inset: 0; z-index: 3000; background: rgba(0,0,0,0.8); align-items: flex-start; justify-content: center; padding: 5rem 1rem 2rem; overflow-y: auto; }
+  .player-modal-bg.open { display: flex; }
+  .player-modal { background: var(--dark2); border: 1px solid var(--dark4); border-top: 3px solid var(--orange); border-radius: 14px; padding: 2rem; width: 100%; max-width: 640px; }
+  .player-modal-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem; gap: 1rem; }
+  .player-modal-name { font-family: var(--font-display); font-size: 1.8rem; letter-spacing: 0.04em; }
+  .player-modal-name span { color: var(--orange); }
+  .player-modal-close { background: none; border: 1px solid var(--dark4); color: var(--gray); font-size: 1rem; cursor: pointer; padding: 0.3rem 0.7rem; border-radius: 6px; transition: all 0.2s; flex-shrink: 0; }
+  .player-modal-close:hover { border-color: var(--gray); color: var(--white); }
+  .player-stats-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+  .player-stat-card { background: var(--dark3); border: 1px solid var(--dark4); border-radius: 8px; padding: 0.7rem 1.1rem; text-align: center; flex: 1; min-width: 70px; }
+  .player-stat-card .val { font-family: var(--font-display); font-size: 1.5rem; color: var(--orange); }
+  .player-stat-card .lbl { font-family: var(--font-heading); font-size: 0.68rem; letter-spacing: 0.1em; color: var(--gray); text-transform: uppercase; }
+  .matches-list { display: flex; flex-direction: column; gap: 0.75rem; }
+  .match-card { background: var(--dark3); border: 1px solid var(--dark4); border-radius: 10px; padding: 1rem 1.25rem; }
+  .match-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem; }
+  .match-opponent { font-weight: 600; color: var(--white); font-size: 0.97rem; }
+  .match-phase-badge { font-family: var(--font-heading); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; background: var(--orange-dim); color: var(--orange); border: 1px solid rgba(255,109,0,0.3); }
+  .match-date { font-size: 0.78rem; color: var(--gray); }
+  .match-sets { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.4rem; }
+  .set-chip { font-family: var(--font-heading); font-size: 0.8rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .set-win { background: rgba(100,220,100,0.15); color: #6ddc6d; border: 1px solid rgba(100,220,100,0.3); }
+  .set-loss { background: rgba(255,100,100,0.12); color: #ff7070; border: 1px solid rgba(255,100,100,0.3); }
+  .match-result-badge { font-family: var(--font-heading); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; }
+  .result-win  { background: rgba(100,220,100,0.15); color: #6ddc6d; }
+  .result-loss { background: rgba(255,100,100,0.12); color: #ff7070; }
+  .match-note { font-size: 0.82rem; color: var(--gray); margin-top: 0.4rem; font-style: italic; }
+  .no-matches { text-align: center; padding: 2rem; color: var(--gray); font-family: var(--font-heading); font-size: 0.9rem; letter-spacing: 0.06em; }
+
+  /* ── FOOTER ── */
+  footer { border-top: 1px solid var(--dark4); padding: 2rem; text-align: center; font-family: var(--font-heading); font-size: 0.82rem; letter-spacing: 0.08em; color: var(--gray); }
   footer span { color: var(--orange); }
 
-  /* ══════════════════════════════════════
-     AUTH OVERLAY
-  ══════════════════════════════════════ */
-  .auth-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 999;
-    background: var(--dark);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
-    opacity: 1;
-    transition: opacity 0.3s ease;
-  }
-
-  .auth-overlay.fade-out {
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  .auth-card {
-    background: var(--dark2);
-    border: 1px solid var(--dark4);
-    border-top: 3px solid var(--orange);
-    border-radius: 16px;
-    padding: 2.5rem 2rem;
-    width: 100%;
-    max-width: 460px;
-    max-height: 92vh;
-    overflow-y: auto;
-  }
-
-  .auth-brand {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    margin-bottom: 2rem;
-  }
-
-  .auth-brand img {
-    height: 52px;
-    width: auto;
-    object-fit: contain;
-  }
-
-  .auth-brand-text {
-    font-family: var(--font-display);
-    font-size: 1.3rem;
-    letter-spacing: 0.06em;
-    color: var(--white);
-  }
-
-  .auth-brand-text em {
-    color: var(--orange);
-    font-style: normal;
-  }
-
-  /* Onglets Connexion / Inscription */
-  .auth-tabs {
-    display: flex;
-    background: var(--dark3);
-    border-radius: 8px;
-    padding: 3px;
-    margin-bottom: 1.75rem;
-    gap: 3px;
-  }
-
-  .auth-tab {
-    flex: 1;
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-family: var(--font-heading);
-    font-size: 0.9rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--gray);
-    padding: 0.55rem 1rem;
-    border-radius: 6px;
-    transition: all 0.2s;
-  }
-
-  .auth-tab.active {
-    background: var(--dark);
-    color: var(--orange);
-    box-shadow: 0 1px 6px rgba(0,0,0,0.4);
-  }
-
-  .auth-tab:hover:not(.active) {
-    color: var(--gray-light);
-  }
-
-  /* Formulaires */
-  .auth-form {
-    display: none;
-  }
-
-  .auth-form.active {
-    display: block;
-  }
-
-  .form-group {
-    margin-bottom: 1.1rem;
-  }
-
-  .form-group label {
-    display: block;
-    font-family: var(--font-heading);
-    font-size: 0.76rem;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--gray);
-    margin-bottom: 0.4rem;
-  }
-
-  .form-group input,
-  .form-group select {
-    width: 100%;
-    background: var(--dark3);
-    border: 1px solid var(--dark4);
-    border-radius: 8px;
-    color: var(--white);
-    font-family: var(--font-body);
-    font-size: 0.97rem;
-    padding: 0.7rem 1rem;
-    outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
-    -webkit-appearance: none;
-    appearance: none;
-  }
-
-  .form-group input::placeholder {
-    color: var(--gray);
-    opacity: 0.7;
-  }
-
-  .form-group input:focus,
-  .form-group select:focus {
-    border-color: var(--orange);
-    box-shadow: 0 0 0 3px rgba(255,109,0,0.1);
-  }
-
-  .form-group select {
-    cursor: pointer;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 0.9rem center;
-    padding-right: 2.5rem;
-  }
-
-  .form-group select option {
-    background: var(--dark3);
-    color: var(--white);
-  }
-
-  .form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-  }
-
-  .auth-error {
-    font-size: 0.86rem;
-    color: #ff6b6b;
-    margin-bottom: 0.75rem;
-    min-height: 1.25em;
-    line-height: 1.4;
-  }
-
-  .auth-submit {
-    width: 100%;
-    background: var(--orange);
-    color: #000;
-    border: none;
-    cursor: pointer;
-    font-family: var(--font-heading);
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    padding: 0.9rem;
-    border-radius: 8px;
-    transition: all 0.2s;
-    margin-top: 0.5rem;
-  }
-
-  .auth-submit:hover:not(:disabled) {
-    background: var(--orange-light);
-    transform: translateY(-1px);
-  }
-
-  .auth-submit:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-  }
-
-  /* Scrollbar de la carte sur mobile */
+  /* ── AUTH OVERLAY ── */
+  .auth-overlay { position: fixed; inset: 0; z-index: 999; background: var(--dark); display: flex; align-items: center; justify-content: center; padding: 1rem; opacity: 1; transition: opacity 0.3s ease; }
+  .auth-overlay.fade-out { opacity: 0; pointer-events: none; }
+  .auth-card { background: var(--dark2); border: 1px solid var(--dark4); border-top: 3px solid var(--orange); border-radius: 16px; padding: 2.5rem 2rem; width: 100%; max-width: 460px; max-height: 92vh; overflow-y: auto; }
+  .auth-brand { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 2rem; }
+  .auth-brand img { height: 52px; width: auto; object-fit: contain; }
+  .auth-brand-text { font-family: var(--font-display); font-size: 1.3rem; letter-spacing: 0.06em; color: var(--white); }
+  .auth-brand-text em { color: var(--orange); font-style: normal; }
+  .auth-tabs { display: flex; background: var(--dark3); border-radius: 8px; padding: 3px; margin-bottom: 1.75rem; gap: 3px; }
+  .auth-tab { flex: 1; background: none; border: none; cursor: pointer; font-family: var(--font-heading); font-size: 0.9rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray); padding: 0.55rem 1rem; border-radius: 6px; transition: all 0.2s; }
+  .auth-tab.active { background: var(--dark); color: var(--orange); box-shadow: 0 1px 6px rgba(0,0,0,0.4); }
+  .auth-tab:hover:not(.active) { color: var(--gray-light); }
+  .auth-form { display: none; }
+  .auth-form.active { display: block; }
+  .form-group { margin-bottom: 1.1rem; }
+  .form-group label { display: block; font-family: var(--font-heading); font-size: 0.76rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gray); margin-bottom: 0.4rem; }
+  .form-group input, .form-group select, .form-group textarea { width: 100%; background: var(--dark3); border: 1px solid var(--dark4); border-radius: 8px; color: var(--white); font-family: var(--font-body); font-size: 0.97rem; padding: 0.7rem 1rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s; -webkit-appearance: none; appearance: none; }
+  .form-group textarea { resize: vertical; min-height: 70px; }
+  .form-group input::placeholder, .form-group textarea::placeholder { color: var(--gray); opacity: 0.7; }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(255,109,0,0.1); }
+  .form-group select { cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.9rem center; padding-right: 2.5rem; }
+  .form-group select option { background: var(--dark3); color: var(--white); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .auth-error { font-size: 0.86rem; color: #ff6b6b; margin-bottom: 0.75rem; min-height: 1.25em; line-height: 1.4; }
+  .auth-submit { width: 100%; background: var(--orange); color: #000; border: none; cursor: pointer; font-family: var(--font-heading); font-size: 1rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.9rem; border-radius: 8px; transition: all 0.2s; margin-top: 0.5rem; }
+  .auth-submit:hover:not(:disabled) { background: var(--orange-light); transform: translateY(-1px); }
+  .auth-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
   .auth-card::-webkit-scrollbar { width: 4px; }
   .auth-card::-webkit-scrollbar-track { background: var(--dark3); }
   .auth-card::-webkit-scrollbar-thumb { background: var(--dark4); border-radius: 2px; }
 
-  /* ══════════════════════════════════════
-     MESSAGE EN ATTENTE (après inscription)
-  ══════════════════════════════════════ */
-  .auth-pending {
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    gap: 1rem;
-    padding: 1rem 0;
-  }
+  /* Auth pending */
+  .auth-pending { display: none; flex-direction: column; align-items: center; text-align: center; gap: 1rem; padding: 1rem 0; }
   .auth-pending.active { display: flex; }
   .auth-pending-icon { font-size: 3rem; }
-  .auth-pending h3 {
-    font-family: var(--font-heading);
-    font-size: 1.2rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    color: var(--white);
-  }
+  .auth-pending h3 { font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; letter-spacing: 0.06em; color: var(--white); }
   .auth-pending p { font-size: 0.92rem; color: var(--gray-light); line-height: 1.6; }
-  .auth-pending-back {
-    margin-top: 0.5rem;
-    background: none;
-    border: 1px solid var(--dark4);
-    color: var(--gray);
-    font-family: var(--font-heading);
-    font-size: 0.85rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    padding: 0.5rem 1.2rem;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
+  .auth-pending-back { margin-top: 0.5rem; background: none; border: 1px solid var(--dark4); color: var(--gray); font-family: var(--font-heading); font-size: 0.85rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.5rem 1.2rem; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
   .auth-pending-back:hover { border-color: var(--orange); color: var(--orange); }
 
-  /* ══════════════════════════════════════
-     INACTIVITÉ — TOAST
-  ══════════════════════════════════════ */
-  #inactivity-toast {
-    display: none;
-    position: fixed;
-    bottom: 1.5rem;
-    right: 1.5rem;
-    z-index: 9999;
-    background: var(--dark3);
-    border: 1px solid var(--orange);
-    border-radius: 10px;
-    padding: 0.9rem 1.25rem;
-    font-family: var(--font-heading);
-    font-size: 0.88rem;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    color: var(--gray-light);
-    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
-  }
+  /* Inactivité toast */
+  #inactivity-toast { display: none; position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999; background: var(--dark3); border: 1px solid var(--orange); border-radius: 10px; padding: 0.9rem 1.25rem; font-family: var(--font-heading); font-size: 0.88rem; font-weight: 600; letter-spacing: 0.06em; color: var(--gray-light); box-shadow: 0 4px 24px rgba(0,0,0,0.5); }
   #inactivity-toast span { color: var(--orange); }
 
   /* ══════════════════════════════════════
      PANNEAU ADMIN
   ══════════════════════════════════════ */
-  #admin-panel {
-    display: none;
-    padding-top: 96px;
-    min-height: 100vh;
-  }
+  #admin-panel { display: none; padding-top: 96px; min-height: 100vh; }
   #admin-panel.active { display: block; }
-
-  .admin-wrap {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 2.5rem 2rem;
-  }
-
-  .admin-title {
-    font-family: var(--font-display);
-    font-size: 2.2rem;
-    letter-spacing: 0.04em;
-    margin-bottom: 0.25rem;
-  }
+  .admin-wrap { max-width: 1100px; margin: 0 auto; padding: 2.5rem 2rem; }
+  .admin-title { font-family: var(--font-display); font-size: 2.2rem; letter-spacing: 0.04em; margin-bottom: 0.25rem; }
   .admin-title span { color: var(--orange); }
-  .admin-subtitle {
-    font-family: var(--font-heading);
-    font-size: 0.8rem;
-    letter-spacing: 0.15em;
-    color: var(--gray);
-    text-transform: uppercase;
-    margin-bottom: 2rem;
-    padding-bottom: 1.25rem;
-    border-bottom: 1px solid var(--dark4);
-  }
-
-  .admin-tabs {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 2rem;
-    flex-wrap: wrap;
-  }
-  .admin-tab {
-    font-family: var(--font-heading);
-    font-size: 0.88rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    background: var(--dark2);
-    border: 1px solid var(--dark4);
-    color: var(--gray);
-    padding: 0.55rem 1.25rem;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
-    position: relative;
-  }
-  .admin-tab .badge {
-    display: inline-block;
-    background: var(--orange);
-    color: #000;
-    font-size: 0.68rem;
-    font-weight: 700;
-    padding: 1px 5px;
-    border-radius: 10px;
-    margin-left: 6px;
-    vertical-align: middle;
-  }
+  .admin-subtitle { font-family: var(--font-heading); font-size: 0.8rem; letter-spacing: 0.15em; color: var(--gray); text-transform: uppercase; margin-bottom: 2rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--dark4); }
+  .admin-tabs { display: flex; gap: 0.5rem; margin-bottom: 2rem; flex-wrap: wrap; }
+  .admin-tab { font-family: var(--font-heading); font-size: 0.88rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; background: var(--dark2); border: 1px solid var(--dark4); color: var(--gray); padding: 0.55rem 1.25rem; border-radius: 8px; cursor: pointer; transition: all 0.2s; position: relative; }
+  .admin-tab .badge { display: inline-block; background: var(--orange); color: #000; font-size: 0.68rem; font-weight: 700; padding: 1px 5px; border-radius: 10px; margin-left: 6px; vertical-align: middle; }
   .admin-tab.active { background: var(--orange-dim); border-color: var(--orange); color: var(--orange); }
   .admin-tab:hover:not(.active) { border-color: var(--gray); color: var(--gray-light); }
-
   .admin-section { display: none; }
   .admin-section.active { display: block; }
-
-  /* Tables admin */
   .admin-table-wrap { overflow-x: auto; }
-  .admin-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.91rem;
-  }
+  .admin-table { width: 100%; border-collapse: collapse; font-size: 0.91rem; }
   .admin-table thead tr { border-bottom: 2px solid var(--orange); }
-  .admin-table th {
-    font-family: var(--font-heading);
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--gray);
-    padding: 0.6rem 0.75rem;
-    text-align: left;
-    white-space: nowrap;
-  }
-  .admin-table td {
-    padding: 0.6rem 0.75rem;
-    border-bottom: 1px solid var(--dark4);
-    color: var(--gray-light);
-    vertical-align: middle;
-  }
+  .admin-table th { font-family: var(--font-heading); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gray); padding: 0.6rem 0.75rem; text-align: left; white-space: nowrap; }
+  .admin-table td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--dark4); color: var(--gray-light); vertical-align: middle; }
   .admin-table tbody tr:hover { background: var(--dark2); }
-
   .admin-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
-  .btn-sm {
-    font-family: var(--font-heading);
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    padding: 0.3rem 0.75rem;
-    border-radius: 5px;
-    border: 1px solid transparent;
-    cursor: pointer;
-    transition: all 0.15s;
-    white-space: nowrap;
-  }
+  .btn-sm { font-family: var(--font-heading); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.3rem 0.75rem; border-radius: 5px; border: 1px solid transparent; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
   .btn-accept  { background: rgba(100,220,100,0.15); color: #6ddc6d; border-color: rgba(100,220,100,0.3); }
   .btn-accept:hover  { background: rgba(100,220,100,0.25); }
   .btn-refuse  { background: rgba(255,100,100,0.12); color: #ff7070; border-color: rgba(255,100,100,0.3); }
@@ -861,109 +239,51 @@
   .btn-ban     { background: rgba(255,150,0,0.12); color: var(--orange-light); border-color: rgba(255,150,0,0.3); }
   .btn-ban:hover     { background: rgba(255,150,0,0.22); }
   .btn-unban   { background: rgba(130,180,255,0.12); color: #82B4FF; border-color: rgba(130,180,255,0.3); }
-  .btn-unban:hover   { background: rgba(130,180,255,0.22); }
+  .btn-unban:hover   { background: rgba(130,180,255,0.22); }\
   .btn-edit    { background: var(--dark3); color: var(--gray-light); border-color: var(--dark4); }
   .btn-edit:hover    { border-color: var(--gray); color: var(--white); }
-
-  .status-badge {
-    display: inline-block;
-    font-family: var(--font-heading);
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    padding: 2px 8px;
-    border-radius: 4px;
-  }
+  .btn-match   { background: rgba(255,109,0,0.12); color: var(--orange); border-color: rgba(255,109,0,0.3); }
+  .btn-match:hover   { background: var(--orange-dim); }
+  .status-badge { display: inline-block; font-family: var(--font-heading); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; }
   .status-ok     { background: rgba(100,220,100,0.15); color: #6ddc6d; }
   .status-wait   { background: rgba(255,220,50,0.15);  color: #ffd700; }
   .status-banned { background: rgba(255,100,100,0.15); color: #ff7070; }
-
   .log-success { color: #6ddc6d; }
   .log-fail    { color: #ff7070; }
 
-  /* Modal édition */
-  .admin-modal-bg {
-    display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 2000;
-    background: rgba(0,0,0,0.7);
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
-  }
+  /* Modal base */
+  .admin-modal-bg { display: none; position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; padding: 1rem; }
   .admin-modal-bg.open { display: flex; }
-  .admin-modal {
-    background: var(--dark2);
-    border: 1px solid var(--dark4);
-    border-top: 3px solid var(--orange);
-    border-radius: 14px;
-    padding: 2rem;
-    width: 100%;
-    max-width: 480px;
-    max-height: 90vh;
-    overflow-y: auto;
-  }
-  .admin-modal h3 {
-    font-family: var(--font-display);
-    font-size: 1.4rem;
-    letter-spacing: 0.04em;
-    margin-bottom: 1.5rem;
-  }
+  .admin-modal { background: var(--dark2); border: 1px solid var(--dark4); border-top: 3px solid var(--orange); border-radius: 14px; padding: 2rem; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
+  .admin-modal h3 { font-family: var(--font-display); font-size: 1.4rem; letter-spacing: 0.04em; margin-bottom: 1.5rem; }
   .admin-modal h3 span { color: var(--orange); }
-  .modal-error {
-    font-size: 0.85rem;
-    color: #ff6b6b;
-    margin-bottom: 0.75rem;
-    min-height: 1.2em;
-  }
-  .modal-actions {
-    display: flex;
-    gap: 0.75rem;
-    margin-top: 1.25rem;
-  }
-  .btn-modal-save {
-    flex: 1;
-    background: var(--orange);
-    color: #000;
-    border: none;
-    cursor: pointer;
-    font-family: var(--font-heading);
-    font-size: 0.95rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    padding: 0.75rem;
-    border-radius: 8px;
-    transition: all 0.2s;
-  }
-  .btn-modal-save:hover { background: var(--orange-light); }
-  .btn-modal-cancel {
-    flex: 1;
-    background: none;
-    border: 1px solid var(--dark4);
-    color: var(--gray);
-    cursor: pointer;
-    font-family: var(--font-heading);
-    font-size: 0.95rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    padding: 0.75rem;
-    border-radius: 8px;
-    transition: all 0.2s;
-  }
+  .modal-error { font-size: 0.85rem; color: #ff6b6b; margin-bottom: 0.75rem; min-height: 1.2em; }
+  .modal-actions { display: flex; gap: 0.75rem; margin-top: 1.25rem; }
+  .btn-modal-save { flex: 1; background: var(--orange); color: #000; border: none; cursor: pointer; font-family: var(--font-heading); font-size: 0.95rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.75rem; border-radius: 8px; transition: all 0.2s; }
+  .btn-modal-save:hover:not(:disabled) { background: var(--orange-light); }
+  .btn-modal-save:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-modal-cancel { flex: 1; background: none; border: 1px solid var(--dark4); color: var(--gray); cursor: pointer; font-family: var(--font-heading); font-size: 0.95rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.75rem; border-radius: 8px; transition: all 0.2s; }
   .btn-modal-cancel:hover { border-color: var(--gray); color: var(--gray-light); }
+  .admin-empty { text-align: center; padding: 3rem 1rem; color: var(--gray); font-family: var(--font-heading); font-size: 0.9rem; letter-spacing: 0.06em; }
 
-  .admin-empty {
-    text-align: center;
-    padding: 3rem 1rem;
-    color: var(--gray);
-    font-family: var(--font-heading);
-    font-size: 0.9rem;
-    letter-spacing: 0.06em;
-  }
+  /* Modal match — sets dynamiques */
+  .sets-container { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.5rem; }
+  .set-row { display: flex; align-items: center; gap: 0.5rem; background: var(--dark3); border: 1px solid var(--dark4); border-radius: 8px; padding: 0.5rem 0.75rem; }
+  .set-row label { font-family: var(--font-heading); font-size: 0.75rem; letter-spacing: 0.08em; color: var(--gray); text-transform: uppercase; min-width: 52px; }
+  .set-row input[type=number] { width: 60px; background: var(--dark); border: 1px solid var(--dark4); border-radius: 6px; color: var(--white); font-family: var(--font-heading); font-size: 0.95rem; font-weight: 700; padding: 0.3rem 0.5rem; text-align: center; outline: none; }
+  .set-row input[type=number]:focus { border-color: var(--orange); }
+  .set-row .set-sep { color: var(--gray); font-weight: 700; }
+  .set-row .btn-remove-set { background: none; border: none; color: var(--gray); cursor: pointer; font-size: 1rem; padding: 0 0.25rem; line-height: 1; transition: color 0.15s; }
+  .set-row .btn-remove-set:hover { color: #ff7070; }
+  .btn-add-set { background: none; border: 1px dashed var(--dark4); color: var(--gray); font-family: var(--font-heading); font-size: 0.8rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.45rem 1rem; border-radius: 6px; cursor: pointer; transition: all 0.2s; width: 100%; margin-bottom: 0.75rem; }
+  .btn-add-set:hover { border-color: var(--orange); color: var(--orange); }
+
+  /* Section phase admin */
+  .phase-admin-card { background: var(--dark3); border: 1px solid var(--dark4); border-radius: 12px; padding: 1.5rem; max-width: 480px; }
+  .phase-admin-card h4 { font-family: var(--font-heading); font-size: 1rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--white); margin-bottom: 1rem; }
+  .phase-current-display { background: var(--dark2); border: 1px solid var(--orange); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-family: var(--font-heading); font-size: 0.9rem; color: var(--gray-light); }
+  .phase-current-display strong { color: var(--orange); }
+  #phase-round-group { display: none; }
 
   @media (max-width: 600px) {
     .malus-grid { grid-template-columns: 1fr; }
@@ -976,48 +296,35 @@
     .auth-card { padding: 2rem 1.25rem; }
     .form-row { grid-template-columns: 1fr; gap: 0; }
     .nav-user-greeting { display: none; }
+    .player-stats-row { gap: 0.5rem; }
   }
 </style>
 </head>
 <body>
 
-<!-- ══════════════════════════════════════
-     AUTH OVERLAY — masqué dès que connecté
-══════════════════════════════════════ -->
+<!-- AUTH OVERLAY -->
 <div id="auth-overlay" class="auth-overlay">
   <div class="auth-card">
-
-    <!-- Branding -->
     <div class="auth-brand">
       <img src="cdr-logo.png" alt="Logo Le Choc des Renards">
       <span class="auth-brand-text">Le Choc des <em>Renards</em></span>
     </div>
-
-    <!-- Onglets -->
     <div class="auth-tabs">
       <button class="auth-tab active" id="tab-login"    onclick="switchAuthTab('login')">Connexion</button>
       <button class="auth-tab"        id="tab-register" onclick="switchAuthTab('register')">Inscription</button>
     </div>
-
-    <!-- ── FORMULAIRE CONNEXION ── -->
     <div id="form-login" class="auth-form active">
       <div class="form-group">
         <label for="login-username">Pseudo</label>
-        <input type="text" id="login-username" placeholder="votre_pseudo"
-               autocomplete="username" spellcheck="false">
+        <input type="text" id="login-username" placeholder="votre_pseudo" autocomplete="username" spellcheck="false">
       </div>
       <div class="form-group">
         <label for="login-password">Mot de passe</label>
-        <input type="password" id="login-password" placeholder="••••••••"
-               autocomplete="current-password">
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
       </div>
       <div id="login-error" class="auth-error"></div>
-      <button class="auth-submit" id="login-btn" onclick="handleLogin()">
-        Se connecter
-      </button>
+      <button class="auth-submit" id="login-btn" onclick="handleLogin()">Se connecter</button>
     </div>
-
-    <!-- ── FORMULAIRE INSCRIPTION ── -->
     <div id="form-register" class="auth-form">
       <div class="form-row">
         <div class="form-group">
@@ -1031,8 +338,7 @@
       </div>
       <div class="form-group">
         <label for="reg-username">Pseudo</label>
-        <input type="text" id="reg-username" placeholder="votre_pseudo"
-               autocomplete="username" spellcheck="false">
+        <input type="text" id="reg-username" placeholder="votre_pseudo" autocomplete="username" spellcheck="false">
       </div>
       <div class="form-group">
         <label for="reg-phone">Téléphone</label>
@@ -1050,32 +356,23 @@
       </div>
       <div class="form-group">
         <label for="reg-password">Mot de passe</label>
-        <input type="password" id="reg-password" placeholder="8 caractères minimum"
-               autocomplete="new-password">
+        <input type="password" id="reg-password" placeholder="8 caractères minimum" autocomplete="new-password">
       </div>
       <div class="form-group">
         <label for="reg-confirm">Confirmer le mot de passe</label>
-        <input type="password" id="reg-confirm" placeholder="••••••••"
-               autocomplete="new-password">
+        <input type="password" id="reg-confirm" placeholder="••••••••" autocomplete="new-password">
       </div>
       <div id="reg-error" class="auth-error"></div>
-      <button class="auth-submit" id="reg-btn" onclick="handleRegister()">
-        Créer mon compte
-      </button>
+      <button class="auth-submit" id="reg-btn" onclick="handleRegister()">Créer mon compte</button>
     </div>
-
-    <!-- Message en attente après inscription -->
     <div id="auth-pending" class="auth-pending">
       <div class="auth-pending-icon">⏳</div>
       <h3>Demande envoyée !</h3>
-      <p>Votre demande d'inscription a bien été reçue.<br>
-         L'administrateur doit valider votre compte avant que vous puissiez vous connecter.</p>
+      <p>Votre demande d'inscription a bien été reçue.<br>L'administrateur doit valider votre compte avant que vous puissiez vous connecter.</p>
       <button class="auth-pending-back" onclick="showPendingBack()">← Retour à la connexion</button>
     </div>
-
   </div>
 </div>
-<!-- /AUTH OVERLAY -->
 
 <!-- TOAST INACTIVITÉ -->
 <div id="inactivity-toast">⏱ Déconnexion dans <span id="inactivity-countdown">60</span>s pour inactivité</div>
@@ -1084,17 +381,20 @@
 <div id="admin-panel">
   <div class="admin-wrap">
     <h1 class="admin-title">Panneau <span>Admin</span></h1>
-    <p class="admin-subtitle">Gestion des utilisateurs — Choc des Renards</p>
+    <p class="admin-subtitle">Gestion des utilisateurs &amp; du tournoi — Choc des Renards</p>
 
     <div class="admin-tabs">
       <button class="admin-tab active" onclick="adminTab('users',this)">
         Utilisateurs <span class="badge" id="badge-users">–</span>
       </button>
       <button class="admin-tab" onclick="adminTab('pending',this)">
-        Inscriptions en attente <span class="badge" id="badge-pending">–</span>
+        En attente <span class="badge" id="badge-pending">–</span>
       </button>
       <button class="admin-tab" onclick="adminTab('history',this)">
-        Historique connexions
+        Connexions
+      </button>
+      <button class="admin-tab" onclick="adminTab('phase',this)">
+        Phase du tournoi
       </button>
     </div>
 
@@ -1135,13 +435,36 @@
       <div class="admin-table-wrap">
         <table class="admin-table">
           <thead>
-            <tr>
-              <th>Date</th><th>Pseudo</th><th>Résultat</th><th>Message</th><th>IP</th>
-            </tr>
+            <tr><th>Date</th><th>Pseudo</th><th>Résultat</th><th>Message</th><th>IP</th></tr>
           </thead>
           <tbody id="tbl-history"></tbody>
         </table>
         <div id="history-empty" class="admin-empty" style="display:none">Aucun événement.</div>
+      </div>
+    </div>
+
+    <!-- Section : Phase du tournoi -->
+    <div id="admin-phase" class="admin-section">
+      <div class="phase-admin-card">
+        <h4>Phase actuelle</h4>
+        <div class="phase-current-display" id="phase-current-display">
+          Chargement…
+        </div>
+        <div class="form-group">
+          <label>Nouvelle phase</label>
+          <select id="phase-select" onchange="onPhaseSelectChange()">
+            <option value="PHASE1">Phase 1 — Poules</option>
+            <option value="PHASE2">Phase 2 — Finales (ronde suisse)</option>
+          </select>
+        </div>
+        <div class="form-group" id="phase-round-group">
+          <label>Numéro de ronde (Phase 2)</label>
+          <input type="number" id="phase-round" min="1" value="1" placeholder="1">
+        </div>
+        <div id="phase-error" class="modal-error"></div>
+        <button class="btn-modal-save" style="width:100%" id="phase-save-btn" onclick="savePhase()">
+          Enregistrer la phase
+        </button>
       </div>
     </div>
 
@@ -1153,22 +476,10 @@
   <div class="admin-modal">
     <h3>Modifier <span id="modal-title-name"></span></h3>
     <input type="hidden" id="modal-user-id">
-    <div class="form-group">
-      <label>Prénom</label>
-      <input type="text" id="modal-firstname">
-    </div>
-    <div class="form-group">
-      <label>Nom</label>
-      <input type="text" id="modal-lastname">
-    </div>
-    <div class="form-group">
-      <label>Pseudo</label>
-      <input type="text" id="modal-username">
-    </div>
-    <div class="form-group">
-      <label>Téléphone</label>
-      <input type="tel" id="modal-phone">
-    </div>
+    <div class="form-group"><label>Prénom</label><input type="text" id="modal-firstname"></div>
+    <div class="form-group"><label>Nom</label><input type="text" id="modal-lastname"></div>
+    <div class="form-group"><label>Pseudo</label><input type="text" id="modal-username"></div>
+    <div class="form-group"><label>Téléphone</label><input type="tel" id="modal-phone"></div>
     <div class="form-group">
       <label>Catégorie fédérale</label>
       <select id="modal-category">
@@ -1186,6 +497,70 @@
   </div>
 </div>
 
+<!-- MODAL AJOUTER MATCH -->
+<div id="match-modal" class="admin-modal-bg">
+  <div class="admin-modal" style="max-width:520px">
+    <h3>Match — <span id="match-modal-player-name"></span></h3>
+    <input type="hidden" id="match-modal-user-id">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Prénom adversaire</label>
+        <input type="text" id="match-opp-firstname" placeholder="Prénom">
+      </div>
+      <div class="form-group">
+        <label>Nom adversaire</label>
+        <input type="text" id="match-opp-lastname" placeholder="Nom">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Phase</label>
+        <select id="match-phase" onchange="onMatchPhaseChange()">
+          <option value="PHASE1">Phase 1 — Poules</option>
+          <option value="PHASE2">Phase 2 — Finales</option>
+        </select>
+      </div>
+      <div class="form-group" id="match-round-group" style="display:none">
+        <label>Ronde n°</label>
+        <input type="number" id="match-round" min="1" value="1">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Date du match</label>
+      <input type="date" id="match-date">
+    </div>
+    <div class="form-group">
+      <label>Sets (score joueur – adversaire)</label>
+      <div class="sets-container" id="sets-container"></div>
+      <button class="btn-add-set" onclick="addSetRow()" id="btn-add-set">+ Ajouter un set</button>
+    </div>
+    <div class="form-group">
+      <label>Note (optionnelle)</label>
+      <textarea id="match-note" placeholder="Contexte, malus, remarques…"></textarea>
+    </div>
+    <div id="match-modal-error" class="modal-error"></div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeMatchModal()">Annuler</button>
+      <button class="btn-modal-save" id="match-save-btn" onclick="saveMatch()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DÉTAIL JOUEUR -->
+<div id="player-detail-modal" class="player-modal-bg" onclick="closePlayerDetailOutside(event)">
+  <div class="player-modal">
+    <div class="player-modal-header">
+      <div>
+        <div class="player-modal-name" id="pdm-name"></div>
+        <div style="font-size:0.85rem;color:var(--gray);margin-top:0.2rem" id="pdm-username"></div>
+      </div>
+      <button class="player-modal-close" onclick="closePlayerDetail()">✕ Fermer</button>
+    </div>
+    <div class="player-stats-row" id="pdm-stats"></div>
+    <div class="matches-list" id="pdm-matches"></div>
+  </div>
+</div>
+
 <!-- NAV -->
 <nav>
   <a class="nav-logo" href="#" onclick="showPage('accueil', document.querySelector('.nav-btn')); return false;">
@@ -1197,12 +572,8 @@
     <button class="nav-btn" onclick="showPage('reglement',this)">Règlement</button>
     <button class="nav-btn" onclick="showPage('classement',this)">Classement</button>
   </div>
-  <!-- Zone utilisateur connecté -->
   <div class="nav-user-info" id="nav-user">
-    <span class="nav-user-greeting">
-      Bonjour, <strong id="nav-user-name"></strong>
-      <span id="nav-user-badge" class="player-level"></span>
-    </span>
+    <span class="nav-user-greeting">Bonjour, <strong id="nav-user-name"></strong> <span id="nav-user-badge" class="player-level"></span></span>
     <button class="nav-logout-btn" onclick="logout()">Déconnexion</button>
   </div>
 </nav>
@@ -1212,31 +583,14 @@
   <div class="hero">
     <img class="hero-logo" src="bondy-badminton-club.png" alt="Logo Bondy Badminton Club">
     <p class="hero-tagline">Saison 2026 — 2027</p>
-    <p class="hero-desc">
-      Un tournoi interne au club de Bondy, de fin septembre à juin.
-      Affrontements en simple, cohésion, et quelques malus surprises pour pimenter la compétition.
-    </p>
+    <p class="hero-desc">Un tournoi interne au club de Bondy, de fin septembre à juin. Affrontements en simple, cohésion, et quelques malus surprises pour pimenter la compétition.</p>
     <div class="hero-stats">
-      <div class="stat-card">
-        <div class="stat-num">24</div>
-        <div class="stat-label">Joueurs</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-num">4</div>
-        <div class="stat-label">Poules</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-num">2</div>
-        <div class="stat-label">Phases</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-num">9</div>
-        <div class="stat-label">Mois</div>
-      </div>
+      <div class="stat-card"><div class="stat-num">24</div><div class="stat-label">Joueurs</div></div>
+      <div class="stat-card"><div class="stat-num">4</div><div class="stat-label">Poules</div></div>
+      <div class="stat-card"><div class="stat-num">2</div><div class="stat-label">Phases</div></div>
+      <div class="stat-card"><div class="stat-num">9</div><div class="stat-label">Mois</div></div>
     </div>
-    <button class="cta-btn" onclick="showPage('classement', document.querySelectorAll('.nav-btn')[2])">
-      Voir le classement →
-    </button>
+    <button class="cta-btn" onclick="showPage('classement', document.querySelectorAll('.nav-btn')[2])">Voir le classement →</button>
   </div>
 </div>
 
@@ -1245,101 +599,29 @@
   <div class="section">
     <h1 class="section-title">Règle<span>ment</span></h1>
     <p class="section-subtitle">Charte officielle du Choc des Renards &mdash; Club de Bondy</p>
-
     <div class="reglement-tools">
-      <div class="reglement-tools-text">
-        <strong>Version PDF disponible</strong><br>
-        Téléchargez le règlement complet du Choc des Renards au format PDF.
-      </div>
-      <a class="pdf-btn" href="reglement-choc-des-renards.pdf" target="_blank" rel="noopener">
-        Télécharger le PDF
-      </a>
+      <div class="reglement-tools-text"><strong>Version PDF disponible</strong><br>Téléchargez le règlement complet du Choc des Renards au format PDF.</div>
+      <a class="pdf-btn" href="reglement-choc-des-renards.pdf" target="_blank" rel="noopener">Télécharger le PDF</a>
     </div>
-
-    <div class="article open" onclick="toggleArticle(this)" id="article-participation">
-      <div class="article-header">
-        <div class="article-num">01</div>
-        <div class="article-title">Participation</div>
-        <div class="article-chevron">▾</div>
-      </div>
-      <div class="article-body">
-        <p>Tout adhérent·e au club de Bondy est libre de s'inscrire gratuitement au Choc des Renards auprès de Yanis.</p>
-        <p>Chaque joueur participant au choc est réputé accepter les termes de cette charte.</p>
-      </div>
+    <div class="article open" onclick="toggleArticle(this)">
+      <div class="article-header"><div class="article-num">01</div><div class="article-title">Participation</div><div class="article-chevron">▾</div></div>
+      <div class="article-body"><p>Tout adhérent·e au club de Bondy est libre de s'inscrire gratuitement au Choc des Renards auprès de Yanis.</p><p>Chaque joueur participant au choc est réputé accepter les termes de cette charte.</p></div>
     </div>
-
     <div class="article" onclick="toggleArticle(this)">
-      <div class="article-header">
-        <div class="article-num">02</div>
-        <div class="article-title">Déroulement</div>
-        <div class="article-chevron">▾</div>
-      </div>
-      <div class="article-body">
-        <p>Le Choc des Renards s'organise en <strong>deux phases</strong> :</p>
-        <ul>
-          <li><strong>Phase 1 — Septembre à Janvier :</strong> l'ensemble des joueurs est réparti dans des poules. À l'issue, les joueurs sont séparés en deux groupes selon leur classement dans leur poule.</li>
-          <li><strong>Phase 2 — Février à Juin :</strong> format phases finales.</li>
-        </ul>
-      </div>
+      <div class="article-header"><div class="article-num">02</div><div class="article-title">Déroulement</div><div class="article-chevron">▾</div></div>
+      <div class="article-body"><p>Le Choc des Renards s'organise en <strong>deux phases</strong> :</p><ul><li><strong>Phase 1 — Septembre à Janvier :</strong> l'ensemble des joueurs est réparti dans des poules. À l'issue, les joueurs sont séparés en deux groupes selon leur classement dans leur poule.</li><li><strong>Phase 2 — Février à Juin :</strong> format phases finales.</li></ul></div>
     </div>
-
     <div class="article" onclick="toggleArticle(this)">
-      <div class="article-header">
-        <div class="article-num">03</div>
-        <div class="article-title">Format des affrontements</div>
-        <div class="article-chevron">▾</div>
-      </div>
-      <div class="article-body">
-        <ul>
-          <li>Les joueurs reçoivent par message le numéro de téléphone et le nom de leur adversaire <strong>un dimanche</strong>.</li>
-          <li>Ils ont <strong>deux semaines</strong> à compter de ce jour pour effectuer leur match, en s'organisant librement avec leur adversaire.</li>
-          <li>Le match se déroule en <strong>3 sets gagnants de 11 points secs</strong> (sans points d'écart). Pas de pause pendant le set. Un changement de côté est réalisé à chaque set.</li>
-          <li>Les volants sont fournis par les joueurs ou empruntés dans les caisses. Les autres modalités suivent le règlement officiel de la FFBAD.</li>
-          <li>À l'issue de l'affrontement, le <strong>vainqueur</strong> communique les scores du match à Yanis, par message, avant le dernier samedi de la période des deux semaines.</li>
-        </ul>
-      </div>
+      <div class="article-header"><div class="article-num">03</div><div class="article-title">Format des affrontements</div><div class="article-chevron">▾</div></div>
+      <div class="article-body"><ul><li>Les joueurs reçoivent par message le numéro de téléphone et le nom de leur adversaire <strong>un dimanche</strong>.</li><li>Ils ont <strong>deux semaines</strong> à compter de ce jour pour effectuer leur match, en s'organisant librement avec leur adversaire.</li><li>Le match se déroule en <strong>3 sets gagnants de 11 points secs</strong> (sans points d'écart). Pas de pause pendant le set. Un changement de côté est réalisé à chaque set.</li><li>Les volants sont fournis par les joueurs ou empruntés dans les caisses. Les autres modalités suivent le règlement officiel de la FFBAD.</li><li>À l'issue de l'affrontement, le <strong>vainqueur</strong> communique les scores du match à Yanis, par message, avant le dernier samedi de la période des deux semaines.</li></ul></div>
     </div>
-
     <div class="article" onclick="toggleArticle(this)">
-      <div class="article-header">
-        <div class="article-num">04</div>
-        <div class="article-title">Bonus &amp; Malus</div>
-        <div class="article-chevron">▾</div>
-      </div>
-      <div class="article-body">
-        <p>Afin d'équilibrer certains affrontements, des <strong>désavantages</strong> seront attribués au joueur le mieux classé dans les cas suivants : <strong>P contre R</strong>, <strong>P contre N</strong> ou <strong>D contre N</strong>.</p>
-        <p>Le malus est tiré au sort parmi la liste suivante :</p>
-        <div class="malus-grid">
-          <div class="malus-item">Interdiction de smasher ou de tendre droit</div>
-          <div class="malus-item">Porter un cache-œil</div>
-          <div class="malus-item">Interdiction de taper le volant au-dessus de la bande</div>
-          <div class="malus-item">Jouer en demi-terrain pour le joueur le moins bien classé</div>
-          <div class="malus-item">Jouer avec une raquette courte</div>
-          <div class="malus-item">Jouer avec une raquette lestée</div>
-          <div class="malus-item">Jouer avec une raquette de précision</div>
-          <div class="malus-item">Jouer avec un bras dans le dos constamment</div>
-          <div class="malus-item">Interdiction de faire un coup droit</div>
-          <div class="malus-item">Interdiction de faire un revers</div>
-          <div class="malus-item">Annoncer chaque coup à voix haute avant de le jouer</div>
-          <div class="malus-item">Les couloirs font partie du terrain du joueur le plus classé</div>
-          <div class="malus-item">Les points du joueur le moins classé comptent double</div>
-          <div class="malus-item">Le point est marqué uniquement si le volant touche le sol avant la raquette adverse</div>
-          <div class="malus-item">Le joueur le moins classé marque le point</div>
-          <div class="malus-item">Zone restrictive changeant à chaque set : rivière, box, couloir du fond</div>
-        </div>
-      </div>
+      <div class="article-header"><div class="article-num">04</div><div class="article-title">Bonus &amp; Malus</div><div class="article-chevron">▾</div></div>
+      <div class="article-body"><p>Afin d'équilibrer certains affrontements, des <strong>désavantages</strong> seront attribués au joueur le mieux classé dans les cas suivants : <strong>P contre R</strong>, <strong>P contre N</strong> ou <strong>D contre N</strong>.</p><p>Le malus est tiré au sort parmi la liste suivante :</p><div class="malus-grid"><div class="malus-item">Interdiction de smasher ou de tendre droit</div><div class="malus-item">Porter un cache-œil</div><div class="malus-item">Interdiction de taper le volant au-dessus de la bande</div><div class="malus-item">Jouer en demi-terrain pour le joueur le moins bien classé</div><div class="malus-item">Jouer avec une raquette courte</div><div class="malus-item">Jouer avec une raquette lestée</div><div class="malus-item">Jouer avec une raquette de précision</div><div class="malus-item">Jouer avec un bras dans le dos constamment</div><div class="malus-item">Interdiction de faire un coup droit</div><div class="malus-item">Interdiction de faire un revers</div><div class="malus-item">Annoncer chaque coup à voix haute avant de le jouer</div><div class="malus-item">Les couloirs font partie du terrain du joueur le plus classé</div><div class="malus-item">Les points du joueur le moins classé comptent double</div><div class="malus-item">Le point est marqué uniquement si le volant touche le sol avant la raquette adverse</div><div class="malus-item">Le joueur le moins classé marque le point</div><div class="malus-item">Zone restrictive changeant à chaque set : rivière, box, couloir du fond</div></div></div>
     </div>
-
     <div class="article" onclick="toggleArticle(this)">
-      <div class="article-header">
-        <div class="article-num">05</div>
-        <div class="article-title">Exemptions</div>
-        <div class="article-chevron">▾</div>
-      </div>
-      <div class="article-body">
-        <p>Dans des cas rares (voyage, blessure, maladie, décès...), un affrontement peut être annulé. L'organisation sera très reconnaissante d'être prévenue le plus tôt possible par message à Yanis.</p>
-        <p><strong>Aucun affrontement</strong> ne sera réalisé durant les <strong>vacances scolaires</strong>.</p>
-      </div>
+      <div class="article-header"><div class="article-num">05</div><div class="article-title">Exemptions</div><div class="article-chevron">▾</div></div>
+      <div class="article-body"><p>Dans des cas rares (voyage, blessure, maladie, décès...), un affrontement peut être annulé. L'organisation sera très reconnaissante d'être prévenue le plus tôt possible par message à Yanis.</p><p><strong>Aucun affrontement</strong> ne sera réalisé durant les <strong>vacances scolaires</strong>.</p></div>
     </div>
   </div>
 </div>
@@ -1348,101 +630,13 @@
 <div id="page-classement" class="page">
   <div class="section">
     <h1 class="section-title">Class<span>ement</span></h1>
-    <p class="section-subtitle">Mise à jour — Saison 2026 / 2027</p>
-
-    <div class="info-banner">
-      <strong>Phase 1 en cours</strong> — Septembre 2026 à Janvier 2027 · Les 2 premiers de chaque poule sont qualifiés pour la phase finale.
+    <p class="section-subtitle" id="classement-subtitle">Mise à jour — Saison 2026 / 2027</p>
+    <div class="info-banner" id="classement-banner">
+      <strong id="banner-phase-label">Chargement…</strong> <span id="banner-phase-desc"></span>
     </div>
-
-    <div class="phase-tabs">
-      <button class="phase-tab active" onclick="showPhase('phase1',this)">Phase 1 — Poules</button>
-      <button class="phase-tab" onclick="showPhase('phase2',this)">Phase 2 — Finales</button>
-    </div>
-
-    <div id="phase1" class="phase-content active">
-      <div class="poule-title">🟠 Poule A</div>
-      <table>
-        <thead>
-          <tr>
-            <th>#</th><th>Joueur</th><th>J</th><th>V</th><th>D</th><th>Sets +/-</th><th>Pts</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td class="rank">4</td><td class="player-name">Julien P. <span class="player-level level-R">R</span></td><td>5</td><td>2</td><td>3</td><td>-3</td><td class="pts">9</td></tr>
-          <tr class="winner"><td class="rank gold">1</td><td class="player-name">Théo M. <span class="player-level level-N">N</span></td><td>5</td><td>5</td><td>0</td><td>+12</td><td class="pts">15</td></tr>
-          <tr><td class="rank">6</td><td class="player-name">Sofiane L. <span class="player-level level-P">P</span></td><td>5</td><td>0</td><td>5</td><td>-8</td><td class="pts">5</td></tr>
-          <tr class="winner"><td class="rank silver">2</td><td class="player-name">Romain B. <span class="player-level level-D">D</span></td><td>5</td><td>3</td><td>2</td><td>+4</td><td class="pts">11</td></tr>
-          <tr><td class="rank">5</td><td class="player-name">Camille D. <span class="player-level level-R">R</span></td><td>5</td><td>1</td><td>4</td><td>-7</td><td class="pts">7</td></tr>
-          <tr><td class="rank">3</td><td class="player-name">Alexis F. <span class="player-level level-D">D</span></td><td>5</td><td>3</td><td>2</td><td>+2</td><td class="pts">11</td></tr>
-        </tbody>
-      </table>
-
-      <div class="poule-title">🔵 Poule B</div>
-      <table>
-        <thead>
-          <tr><th>#</th><th>Joueur</th><th>J</th><th>V</th><th>D</th><th>Sets +/-</th><th>Pts</th></tr>
-        </thead>
-        <tbody>
-          <tr><td class="rank">4</td><td class="player-name">Lucas V. <span class="player-level level-R">R</span></td><td>5</td><td>2</td><td>3</td><td>-2</td><td class="pts">9</td></tr>
-          <tr class="winner"><td class="rank gold">1</td><td class="player-name">Yanis K. <span class="player-level level-N">N</span></td><td>5</td><td>5</td><td>0</td><td>+15</td><td class="pts">15</td></tr>
-          <tr><td class="rank">6</td><td class="player-name">Nathan C. <span class="player-level level-P">P</span></td><td>4</td><td>0</td><td>4</td><td>-16</td><td class="pts">4</td></tr>
-          <tr class="winner"><td class="rank silver">2</td><td class="player-name">Inès R. <span class="player-level level-D">D</span></td><td>5</td><td>4</td><td>1</td><td>+8</td><td class="pts">13</td></tr>
-          <tr><td class="rank">5</td><td class="player-name">Fatou N. <span class="player-level level-R">R</span></td><td>4</td><td>1</td><td>3</td><td>-6</td><td class="pts">7</td></tr>
-          <tr><td class="rank">3</td><td class="player-name">Mehdi S. <span class="player-level level-D">D</span></td><td>5</td><td>2</td><td>3</td><td>+1</td><td class="pts">9</td></tr>
-        </tbody>
-      </table>
-
-      <div class="poule-title">🟢 Poule C</div>
-      <table>
-        <thead>
-          <tr><th>#</th><th>Joueur</th><th>J</th><th>V</th><th>D</th><th>Sets +/-</th><th>Pts</th></tr>
-        </thead>
-        <tbody>
-          <tr><td class="rank">4</td><td class="player-name">Marie-Lou J. <span class="player-level level-R">R</span></td><td>5</td><td>2</td><td>3</td><td>-4</td><td class="pts">9</td></tr>
-          <tr class="winner"><td class="rank gold">1</td><td class="player-name">Omar H. <span class="player-level level-N">N</span></td><td>5</td><td>4</td><td>1</td><td>+9</td><td class="pts">13</td></tr>
-          <tr><td class="rank">6</td><td class="player-name">Priya M. <span class="player-level level-P">P</span></td><td>5</td><td>0</td><td>5</td><td>-7</td><td class="pts">5</td></tr>
-          <tr class="winner"><td class="rank silver">2</td><td class="player-name">Clara T. <span class="player-level level-N">N</span></td><td>5</td><td>4</td><td>1</td><td>+7</td><td class="pts">13</td></tr>
-          <tr><td class="rank">5</td><td class="player-name">Damien O. <span class="player-level level-R">R</span></td><td>5</td><td>1</td><td>4</td><td>-8</td><td class="pts">7</td></tr>
-          <tr><td class="rank">3</td><td class="player-name">Antoine G. <span class="player-level level-D">D</span></td><td>5</td><td>3</td><td>2</td><td>+3</td><td class="pts">11</td></tr>
-        </tbody>
-      </table>
-
-      <div class="poule-title">🔴 Poule D</div>
-      <table>
-        <thead>
-          <tr><th>#</th><th>Joueur</th><th>J</th><th>V</th><th>D</th><th>Sets +/-</th><th>Pts</th></tr>
-        </thead>
-        <tbody>
-          <tr><td class="rank">4</td><td class="player-name">Chloé R. <span class="player-level level-R">R</span></td><td>5</td><td>2</td><td>3</td><td>-5</td><td class="pts">9</td></tr>
-          <tr class="winner"><td class="rank gold">1</td><td class="player-name">Lina A. <span class="player-level level-N">N</span></td><td>5</td><td>5</td><td>0</td><td>+14</td><td class="pts">15</td></tr>
-          <tr><td class="rank">6</td><td class="player-name">Amina D. <span class="player-level level-P">P</span></td><td>4</td><td>0</td><td>4</td><td>-7</td><td class="pts">4</td></tr>
-          <tr class="winner"><td class="rank silver">2</td><td class="player-name">Kevin B. <span class="player-level level-D">D</span></td><td>5</td><td>3</td><td>2</td><td>+5</td><td class="pts">11</td></tr>
-          <tr><td class="rank">5</td><td class="player-name">Enzo P. <span class="player-level level-R">R</span></td><td>5</td><td>1</td><td>4</td><td>-9</td><td class="pts">7</td></tr>
-          <tr><td class="rank">3</td><td class="player-name">Samir L. <span class="player-level level-D">D</span></td><td>5</td><td>3</td><td>2</td><td>+2</td><td class="pts">11</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div id="phase2" class="phase-content">
-      <div class="info-banner">
-        <strong>Phase 2 non commencée</strong> — Les phases finales débuteront en Février 2027 avec les qualifiés des poules.
-      </div>
-      <div class="poule-title">Qualifiés Phase 2 — Tableau A (niveaux supérieurs)</div>
-      <table>
-        <thead>
-          <tr><th>#</th><th>Joueur</th><th>Poule</th><th>Statut</th></tr>
-        </thead>
-        <tbody>
-          <tr><td class="rank gold">Q1</td><td class="player-name">Théo M. <span class="player-level level-N">N</span></td><td>A</td><td style="color:var(--orange)">Qualifié ✓</td></tr>
-          <tr><td class="rank">Q2</td><td class="player-name">Romain B. <span class="player-level level-D">D</span></td><td>A</td><td style="color:var(--orange)">Qualifié ✓</td></tr>
-          <tr><td class="rank gold">Q3</td><td class="player-name">Yanis K. <span class="player-level level-N">N</span></td><td>B</td><td style="color:var(--orange)">Qualifié ✓</td></tr>
-          <tr><td class="rank">Q4</td><td class="player-name">Inès R. <span class="player-level level-D">D</span></td><td>B</td><td style="color:var(--orange)">Qualifié ✓</td></tr>
-          <tr><td class="rank gold">Q5</td><td class="player-name">Omar H. <span class="player-level level-N">N</span></td><td>C</td><td style="color:var(--orange)">Qualifié ✓</td></tr>
-          <tr><td class="rank">Q6</td><td class="player-name">Clara T. <span class="player-level level-N">N</span></td><td>C</td><td style="color:var(--orange)">Qualifié ✓</td></tr>
-          <tr><td class="rank gold">Q7</td><td class="player-name">Lina A. <span class="player-level level-N">N</span></td><td>D</td><td style="color:var(--orange)">Qualifié ✓</td></tr>
-          <tr><td class="rank">Q8</td><td class="player-name">Kevin B. <span class="player-level level-D">D</span></td><td>D</td><td style="color:var(--orange)">Qualifié ✓</td></tr>
-        </tbody>
-      </table>
+    <!-- Tableau dynamique -->
+    <div id="classement-content">
+      <div class="admin-empty">Chargement du classement…</div>
     </div>
   </div>
 </div>
@@ -1452,600 +646,647 @@
 </footer>
 
 <script>
-  /* ══════════════════════════════════════
-     NAVIGATION
-  ══════════════════════════════════════ */
-  function showPage(id, btn) {
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('page-' + id).classList.add('active');
-    if (btn) btn.classList.add('active');
-    window.scrollTo(0, 0);
+/* ══════════════════════════════════════
+   NAVIGATION
+══════════════════════════════════════ */
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'))
+  document.getElementById('page-' + id).classList.add('active')
+  if (btn) btn.classList.add('active')
+  window.scrollTo(0, 0)
+  if (id === 'classement' && !classementLoaded) loadClassement()
+}
+function toggleArticle(el) { el.classList.toggle('open') }
+
+/* ══════════════════════════════════════
+   AUTH
+══════════════════════════════════════ */
+let currentUser = null
+
+function isTokenValid(token) {
+  if (!token) return false
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
+    return payload.exp * 1000 > Date.now()
+  } catch { return false }
+}
+
+function initAuth() {
+  const token = localStorage.getItem('cdr_token')
+  const userStr = localStorage.getItem('cdr_user')
+  if (isTokenValid(token) && userStr) {
+    try { currentUser = JSON.parse(userStr); showApp(); return } catch {}
   }
+  localStorage.removeItem('cdr_token')
+  localStorage.removeItem('cdr_user')
+  showAuthOverlay()
+}
 
-  function toggleArticle(el) {
-    el.classList.toggle('open');
+function showApp() {
+  const overlay = document.getElementById('auth-overlay')
+  overlay.classList.add('fade-out')
+  setTimeout(() => { overlay.style.display = 'none' }, 300)
+  const navUser = document.getElementById('nav-user')
+  navUser.style.display = 'flex'
+  if (currentUser) {
+    document.getElementById('nav-user-name').textContent = currentUser.firstName || currentUser.username
+    const badge = document.getElementById('nav-user-badge')
+    if (currentUser.role === 'ADMIN') { badge.textContent = 'ADMIN'; badge.className = 'player-level level-N' }
+    else { badge.textContent = currentUser.category; badge.className = 'player-level level-' + currentUser.category }
   }
-
-  function showPhase(id, btn) {
-    document.querySelectorAll('.phase-content').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.phase-tab').forEach(b => b.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-    if (btn) btn.classList.add('active');
-  }
-
-  /* ══════════════════════════════════════
-     AUTHENTIFICATION
-  ══════════════════════════════════════ */
-  let currentUser = null
-
-  /** Vérifie si le JWT est encore valide (sans appel serveur) */
-  function isTokenValid(token) {
-    if (!token) return false
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
-      return payload.exp * 1000 > Date.now()
-    } catch {
-      return false
-    }
-  }
-
-  /** Initialisation : on vérifie le token au chargement */
-  function initAuth() {
-    const token = localStorage.getItem('cdr_token')
-    const userStr = localStorage.getItem('cdr_user')
-
-    if (isTokenValid(token) && userStr) {
-      try {
-        currentUser = JSON.parse(userStr)
-        showApp()
-        return
-      } catch { /* JSON corrompu */ }
-    }
-
-    // Nettoyage et affichage de l'overlay
-    localStorage.removeItem('cdr_token')
-    localStorage.removeItem('cdr_user')
-    showAuthOverlay()
-  }
-
-  /** Affiche l'application (cache l'overlay) */
-  function showApp() {
-    const overlay = document.getElementById('auth-overlay')
-    overlay.classList.add('fade-out')
-    setTimeout(() => { overlay.style.display = 'none' }, 300)
-
-    const navUser = document.getElementById('nav-user')
-    navUser.style.display = 'flex'
-
-    if (currentUser) {
-      document.getElementById('nav-user-name').textContent = currentUser.firstName || currentUser.username
-      const badge = document.getElementById('nav-user-badge')
-      if (currentUser.role === 'ADMIN') {
-        badge.textContent = 'ADMIN'
-        badge.className = 'player-level level-N'
-      } else {
-        badge.textContent = currentUser.category
-        badge.className = 'player-level level-' + currentUser.category
-      }
-    }
-
-    // Redirection selon le rôle
-    if (currentUser && currentUser.role === 'ADMIN') {
-      // Masquer le site normal, afficher le panneau admin
-      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
-      document.getElementById('admin-panel').classList.add('active')
-      document.querySelectorAll('.nav-btn').forEach(b => b.style.display = 'none')
-      startInactivityTimer()
-      loadAdminData()
-    } else {
-      // Utilisateur normal : masquer le panneau admin, afficher le site
-      document.getElementById('admin-panel').classList.remove('active')
-      document.querySelectorAll('.nav-btn').forEach(b => b.style.display = '')
-      startInactivityTimer()
-    }
-  }
-
-  /** Affiche l'overlay d'authentification */
-  function showAuthOverlay() {
-    const overlay = document.getElementById('auth-overlay')
-    overlay.style.display = 'flex'
-    overlay.classList.remove('fade-out')
-    document.getElementById('nav-user').style.display = 'none'
-    // Masquer le panneau admin si visible
+  if (currentUser && currentUser.role === 'ADMIN') {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
+    document.getElementById('admin-panel').classList.add('active')
+    document.querySelectorAll('.nav-btn').forEach(b => b.style.display = 'none')
+    startInactivityTimer()
+    loadAdminData()
+  } else {
     document.getElementById('admin-panel').classList.remove('active')
     document.querySelectorAll('.nav-btn').forEach(b => b.style.display = '')
-    stopInactivityTimer()
-    // Réafficher la vue login par défaut
-    switchAuthTab('login')
+    startInactivityTimer()
   }
+}
 
-  /** Déconnexion */
-  function logout() {
-    localStorage.removeItem('cdr_token')
-    localStorage.removeItem('cdr_user')
-    currentUser = null
-    showAuthOverlay()
-  }
+function showAuthOverlay() {
+  const overlay = document.getElementById('auth-overlay')
+  overlay.style.display = 'flex'
+  overlay.classList.remove('fade-out')
+  document.getElementById('nav-user').style.display = 'none'
+  document.getElementById('admin-panel').classList.remove('active')
+  document.querySelectorAll('.nav-btn').forEach(b => b.style.display = '')
+  stopInactivityTimer()
+  switchAuthTab('login')
+}
 
-  /** Bascule entre les onglets Connexion / Inscription */
-  function switchAuthTab(tab) {
-    document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'))
-    document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'))
-    document.getElementById('tab-' + tab).classList.add('active')
-    document.getElementById('form-' + tab).classList.add('active')
-    document.getElementById('login-error').textContent = ''
-    document.getElementById('reg-error').textContent = ''
-  }
+function logout() {
+  localStorage.removeItem('cdr_token')
+  localStorage.removeItem('cdr_user')
+  currentUser = null
+  classementLoaded = false
+  showAuthOverlay()
+}
 
-  /** Connexion */
-  async function handleLogin() {
-    const username = document.getElementById('login-username').value.trim()
-    const password = document.getElementById('login-password').value
-    const errorEl = document.getElementById('login-error')
-    const btn     = document.getElementById('login-btn')
+function switchAuthTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'))
+  document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'))
+  document.getElementById('tab-' + tab).classList.add('active')
+  document.getElementById('form-' + tab).classList.add('active')
+  document.getElementById('login-error').textContent = ''
+  document.getElementById('reg-error').textContent = ''
+}
 
-    errorEl.textContent = ''
+async function handleLogin() {
+  const username = document.getElementById('login-username').value.trim()
+  const password = document.getElementById('login-password').value
+  const errorEl = document.getElementById('login-error')
+  const btn = document.getElementById('login-btn')
+  errorEl.textContent = ''
+  if (!username || !password) { errorEl.textContent = 'Veuillez remplir tous les champs.'; return }
+  btn.disabled = true; btn.textContent = 'Connexion…'
+  try {
+    const res  = await fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username, password}) })
+    const data = await res.json()
+    if (!res.ok) { errorEl.textContent = data.error || 'Erreur de connexion.'; return }
+    localStorage.setItem('cdr_token', data.token)
+    localStorage.setItem('cdr_user', JSON.stringify(data.user))
+    currentUser = data.user
+    showApp()
+  } catch { errorEl.textContent = 'Erreur réseau. Réessayez.' }
+  finally { btn.disabled = false; btn.textContent = 'Se connecter' }
+}
 
-    if (!username || !password) {
-      errorEl.textContent = 'Veuillez remplir tous les champs.'
+async function handleRegister() {
+  const firstName = document.getElementById('reg-firstname').value.trim()
+  const lastName  = document.getElementById('reg-lastname').value.trim()
+  const username  = document.getElementById('reg-username').value.trim()
+  const phone     = document.getElementById('reg-phone').value.trim()
+  const category  = document.getElementById('reg-category').value
+  const password  = document.getElementById('reg-password').value
+  const confirm   = document.getElementById('reg-confirm').value
+  const errorEl   = document.getElementById('reg-error')
+  const btn       = document.getElementById('reg-btn')
+  errorEl.textContent = ''
+  if (!firstName || !lastName || !username || !phone || !category || !password || !confirm) { errorEl.textContent = 'Veuillez remplir tous les champs.'; return }
+  if (password !== confirm) { errorEl.textContent = 'Les mots de passe ne correspondent pas.'; return }
+  if (password.length < 8) { errorEl.textContent = 'Le mot de passe doit contenir au moins 8 caractères.'; return }
+  btn.disabled = true; btn.textContent = 'Création…'
+  try {
+    const res  = await fetch('/api/register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username, password, confirmPassword: confirm, firstName, lastName, phone, category}) })
+    const data = await res.json()
+    if (!res.ok) { errorEl.textContent = data.error || "Erreur lors de l'inscription."; return }
+    showPendingMessage()
+  } catch { errorEl.textContent = 'Erreur réseau. Réessayez.' }
+  finally { btn.disabled = false; btn.textContent = 'Créer mon compte' }
+}
+
+function showPendingMessage() {
+  document.querySelectorAll('.auth-tab, .auth-form').forEach(el => el.style.display = 'none')
+  document.getElementById('auth-pending').classList.add('active')
+}
+function showPendingBack() {
+  document.getElementById('auth-pending').classList.remove('active')
+  document.querySelectorAll('.auth-tab').forEach(el => el.style.display = '')
+  document.querySelectorAll('.auth-form').forEach(el => el.style.display = '')
+  switchAuthTab('login')
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('login-username').addEventListener('keydown', e => { if (e.key==='Enter') document.getElementById('login-password').focus() })
+  document.getElementById('login-password').addEventListener('keydown', e => { if (e.key==='Enter') handleLogin() })
+  document.getElementById('reg-confirm').addEventListener('keydown', e => { if (e.key==='Enter') handleRegister() })
+  initAuth()
+})
+
+/* ══════════════════════════════════════
+   TIMER INACTIVITÉ
+══════════════════════════════════════ */
+const INACTIVITY_MS  = 15 * 60 * 1000
+const WARN_BEFORE_MS = 60 * 1000
+let inactivityTimer = null, warnTimer = null, warnCountdown = null
+
+function resetInactivityTimer() {
+  clearTimeout(inactivityTimer); clearTimeout(warnTimer); clearInterval(warnCountdown)
+  document.getElementById('inactivity-toast').style.display = 'none'
+  warnTimer = setTimeout(() => {
+    const toast = document.getElementById('inactivity-toast')
+    const span = document.getElementById('inactivity-countdown')
+    toast.style.display = 'block'
+    let secs = 60; span.textContent = secs
+    warnCountdown = setInterval(() => { secs--; span.textContent = secs; if (secs <= 0) clearInterval(warnCountdown) }, 1000)
+  }, INACTIVITY_MS - WARN_BEFORE_MS)
+  inactivityTimer = setTimeout(() => { logout() }, INACTIVITY_MS)
+}
+function startInactivityTimer() {
+  ['mousemove','keydown','click','scroll','touchstart'].forEach(evt => document.addEventListener(evt, resetInactivityTimer, {passive:true}))
+  resetInactivityTimer()
+}
+function stopInactivityTimer() {
+  clearTimeout(inactivityTimer); clearTimeout(warnTimer); clearInterval(warnCountdown)
+  document.getElementById('inactivity-toast').style.display = 'none'
+  ;['mousemove','keydown','click','scroll','touchstart'].forEach(evt => document.removeEventListener(evt, resetInactivityTimer))
+}
+
+/* ══════════════════════════════════════
+   CLASSEMENT — CHARGEMENT DYNAMIQUE
+══════════════════════════════════════ */
+let classementLoaded = false
+
+function phaseLabel(phase, round) {
+  if (phase === 'PHASE1') return 'Phase 1 — Poules'
+  if (phase === 'PHASE2') return round ? `Phase 2 — Finales · Ronde ${round}` : 'Phase 2 — Finales'
+  return phase
+}
+
+async function loadClassement() {
+  classementLoaded = true
+  const container = document.getElementById('classement-content')
+  container.innerHTML = '<div class="admin-empty">Chargement…</div>'
+  try {
+    const res = await fetch('/api/matches', { headers: authHeaders() })
+    if (!res.ok) { container.innerHTML = '<div class="admin-empty">Impossible de charger le classement.</div>'; return }
+    const { phase, round, players } = await res.json()
+
+    // Bannière
+    document.getElementById('banner-phase-label').textContent = phaseLabel(phase, round)
+    document.getElementById('banner-phase-desc').textContent = ''
+
+    if (!players || players.length === 0) {
+      container.innerHTML = '<div class="admin-empty">Aucun joueur inscrit pour l\'instant.</div>'
       return
     }
 
-    btn.disabled = true
-    btn.textContent = 'Connexion…'
+    // Trier par points décroissants, puis diff sets
+    const sorted = [...players].sort((a,b) => b.points - a.points || b.setDiff - a.setDiff)
 
-    try {
-      const res  = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      })
-      const data = await res.json()
-
-      if (!res.ok) {
-        errorEl.textContent = data.error || 'Erreur de connexion.'
-        return
-      }
-
-      localStorage.setItem('cdr_token', data.token)
-      localStorage.setItem('cdr_user',  JSON.stringify(data.user))
-      currentUser = data.user
-      showApp()
-    } catch {
-      errorEl.textContent = 'Erreur réseau. Réessayez.'
-    } finally {
-      btn.disabled = false
-      btn.textContent = 'Se connecter'
-    }
-  }
-
-  /** Inscription */
-  async function handleRegister() {
-    const firstName = document.getElementById('reg-firstname').value.trim()
-    const lastName  = document.getElementById('reg-lastname').value.trim()
-    const username  = document.getElementById('reg-username').value.trim()
-    const phone     = document.getElementById('reg-phone').value.trim()
-    const category  = document.getElementById('reg-category').value
-    const password  = document.getElementById('reg-password').value
-    const confirm   = document.getElementById('reg-confirm').value
-    const errorEl   = document.getElementById('reg-error')
-    const btn       = document.getElementById('reg-btn')
-
-    errorEl.textContent = ''
-
-    if (!firstName || !lastName || !username || !phone || !category || !password || !confirm) {
-      errorEl.textContent = 'Veuillez remplir tous les champs.'
-      return
-    }
-    if (password !== confirm) {
-      errorEl.textContent = 'Les mots de passe ne correspondent pas.'
-      return
-    }
-    if (password.length < 8) {
-      errorEl.textContent = 'Le mot de passe doit contenir au moins 8 caractères.'
-      return
-    }
-
-    btn.disabled = true
-    btn.textContent = 'Création…'
-
-    try {
-      const res  = await fetch('/api/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, confirmPassword: confirm, firstName, lastName, phone, category }),
-      })
-      const data = await res.json()
-
-      if (!res.ok) {
-        errorEl.textContent = data.error || "Erreur lors de l'inscription."
-        return
-      }
-
-      // Inscription réussie → afficher message d'attente (pas d'auto-login)
-      showPendingMessage()
-
-    } catch {
-      errorEl.textContent = 'Erreur réseau. Réessayez.'
-    } finally {
-      btn.disabled = false
-      btn.textContent = 'Créer mon compte'
-    }
-  }
-
-  /** Affiche le message "en attente de validation" dans l'overlay */
-  function showPendingMessage() {
-    document.querySelectorAll('.auth-tab, .auth-form').forEach(el => el.style.display = 'none')
-    document.getElementById('auth-pending').classList.add('active')
-  }
-
-  /** Retour à l'onglet connexion depuis le message d'attente */
-  function showPendingBack() {
-    document.getElementById('auth-pending').classList.remove('active')
-    document.querySelectorAll('.auth-tab').forEach(el => el.style.display = '')
-    document.querySelectorAll('.auth-form').forEach(el => el.style.display = '')
-    switchAuthTab('login')
-  }
-
-  /* Soumission au clavier (Entrée) */
-  window.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('login-username').addEventListener('keydown', e => {
-      if (e.key === 'Enter') document.getElementById('login-password').focus()
-    })
-    document.getElementById('login-password').addEventListener('keydown', e => {
-      if (e.key === 'Enter') handleLogin()
-    })
-    document.getElementById('reg-confirm').addEventListener('keydown', e => {
-      if (e.key === 'Enter') handleRegister()
-    })
-
-    // Vérification du token dès le chargement
-    initAuth()
-  })
-
-  /* ══════════════════════════════════════
-     TIMER D'INACTIVITÉ (15 min)
-  ══════════════════════════════════════ */
-  const INACTIVITY_MS   = 15 * 60 * 1000   // 15 minutes
-  const WARN_BEFORE_MS  = 60 * 1000         // avertissement 60s avant
-  let inactivityTimer   = null
-  let warnTimer         = null
-  let warnCountdown     = null
-
-  function resetInactivityTimer() {
-    clearTimeout(inactivityTimer)
-    clearTimeout(warnTimer)
-    clearInterval(warnCountdown)
-    document.getElementById('inactivity-toast').style.display = 'none'
-
-    warnTimer = setTimeout(() => {
-      // Afficher le toast de compte à rebours
-      const toast = document.getElementById('inactivity-toast')
-      const span  = document.getElementById('inactivity-countdown')
-      toast.style.display = 'block'
-      let secs = 60
-      span.textContent = secs
-      warnCountdown = setInterval(() => {
-        secs--
-        span.textContent = secs
-        if (secs <= 0) clearInterval(warnCountdown)
-      }, 1000)
-    }, INACTIVITY_MS - WARN_BEFORE_MS)
-
-    inactivityTimer = setTimeout(() => {
-      logout()
-    }, INACTIVITY_MS)
-  }
-
-  function startInactivityTimer() {
-    ['mousemove','keydown','click','scroll','touchstart'].forEach(evt =>
-      document.addEventListener(evt, resetInactivityTimer, { passive: true })
-    )
-    resetInactivityTimer()
-  }
-
-  function stopInactivityTimer() {
-    clearTimeout(inactivityTimer)
-    clearTimeout(warnTimer)
-    clearInterval(warnCountdown)
-    document.getElementById('inactivity-toast').style.display = 'none'
-    ;['mousemove','keydown','click','scroll','touchstart'].forEach(evt =>
-      document.removeEventListener(evt, resetInactivityTimer)
-    )
-  }
-
-  /* ══════════════════════════════════════
-     PANNEAU ADMIN — LOGIQUE
-  ══════════════════════════════════════ */
-  function adminTab(name, btn) {
-    document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'))
-    document.querySelectorAll('.admin-tab').forEach(b => b.classList.remove('active'))
-    document.getElementById('admin-' + name).classList.add('active')
-    btn.classList.add('active')
-  }
-
-  function authHeaders() {
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + localStorage.getItem('cdr_token'),
-    }
-  }
-
-  async function loadAdminData() {
-    await Promise.all([loadUsers(), loadHistory()])
-  }
-
-  /* ── Chargement des utilisateurs ── */
-  async function loadUsers() {
-    try {
-      const res = await fetch('/api/admin/users', { headers: authHeaders() })
-      if (!res.ok) return
-      const { users } = await res.json()
-
-      const accepted = users.filter(u => u.accepted && !u.banned)
-      const pending  = users.filter(u => !u.accepted && !u.banned)
-      const banned   = users.filter(u => u.banned)
-
-      // Badge compteurs
-      document.getElementById('badge-users').textContent   = accepted.length + banned.length
-      document.getElementById('badge-pending').textContent = pending.length
-
-      // Table utilisateurs (acceptés + bannis)
-      const tblU = document.getElementById('tbl-users')
-      const allActive = [...accepted, ...banned]
-      if (allActive.length === 0) {
-        tblU.innerHTML = ''
-        document.getElementById('users-empty').style.display = 'block'
-      } else {
-        document.getElementById('users-empty').style.display = 'none'
-        tblU.innerHTML = allActive.map(u => `
+    let html = `
+      <table>
+        <thead>
           <tr>
-            <td><strong style="color:var(--white)">${esc(u.username)}</strong></td>
-            <td>${esc(u.lastName)}</td>
-            <td>${esc(u.firstName)}</td>
-            <td>${esc(u.phone)}</td>
-            <td><span class="player-level level-${u.category}">${u.category}</span></td>
-            <td>${u.banned
-              ? '<span class="status-badge status-banned">Banni</span>'
-              : '<span class="status-badge status-ok">Actif</span>'}</td>
-            <td style="color:var(--gray);font-size:0.82rem">${fmtDate(u.createdAt)}</td>
-            <td>
-              <div class="admin-actions">
-                <button class="btn-sm btn-edit" onclick="openEditModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">Modifier</button>
-                ${u.banned
-                  ? `<button class="btn-sm btn-unban" onclick="adminAction('unban',${u.id})">Débannir</button>`
-                  : `<button class="btn-sm btn-ban"   onclick="adminAction('ban',${u.id})">Bannir</button>`}
-              </div>
-            </td>
-          </tr>`).join('')
-      }
+            <th>#</th>
+            <th>Joueur</th>
+            <th>J</th>
+            <th>V</th>
+            <th>D</th>
+            <th>Sets +/−</th>
+            <th>Pts</th>
+          </tr>
+        </thead>
+        <tbody>`
 
-      // Table en attente
-      const tblP = document.getElementById('tbl-pending')
-      if (pending.length === 0) {
-        tblP.innerHTML = ''
-        document.getElementById('pending-empty').style.display = 'block'
-      } else {
-        document.getElementById('pending-empty').style.display = 'none'
-        tblP.innerHTML = pending.map(u => `
-          <tr>
-            <td><strong style="color:var(--white)">${esc(u.username)}</strong></td>
-            <td>${esc(u.lastName)}</td>
-            <td>${esc(u.firstName)}</td>
-            <td>${esc(u.phone)}</td>
-            <td><span class="player-level level-${u.category}">${u.category}</span></td>
-            <td style="color:var(--gray);font-size:0.82rem">${fmtDate(u.createdAt)}</td>
-            <td>
-              <div class="admin-actions">
-                <button class="btn-sm btn-accept" onclick="adminAction('accept',${u.id})">✓ Accepter</button>
-                <button class="btn-sm btn-refuse" onclick="adminAction('refuse',${u.id})">✗ Refuser</button>
-              </div>
-            </td>
-          </tr>`).join('')
-      }
-    } catch (e) { console.error('[loadUsers]', e) }
+    sorted.forEach((p, i) => {
+      const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : ''
+      const winnerClass = i < 2 ? 'winner' : ''
+      const diff = p.setDiff > 0 ? '+' + p.setDiff : p.setDiff
+      html += `
+        <tr class="clickable-row ${winnerClass}" onclick="showPlayerDetail(${JSON.stringify(p).replace(/"/g,'&quot;')})">
+          <td class="rank ${rankClass}">${i+1}</td>
+          <td class="player-name">${esc(p.firstName)} ${esc(p.lastName)} <span class="player-level level-${p.category}">${p.category}</span></td>
+          <td>${p.played}</td>
+          <td>${p.wins}</td>
+          <td>${p.losses}</td>
+          <td>${diff}</td>
+          <td class="pts">${p.points}</td>
+        </tr>`
+    })
+    html += '</tbody></table>'
+    html += `<p style="font-size:0.78rem;color:var(--gray);margin-top:1rem;text-align:right">Cliquez sur un joueur pour voir le détail de ses matchs.</p>`
+    container.innerHTML = html
+
+  } catch (e) {
+    console.error('[loadClassement]', e)
+    container.innerHTML = '<div class="admin-empty">Erreur de chargement.</div>'
   }
+}
 
-  /* ── Chargement de l'historique ── */
-  async function loadHistory() {
-    try {
-      const res = await fetch('/api/admin/history', { headers: authHeaders() })
-      if (!res.ok) return
-      const { events } = await res.json()
-      const tbl = document.getElementById('tbl-history')
-      if (events.length === 0) {
-        tbl.innerHTML = ''
-        document.getElementById('history-empty').style.display = 'block'
-        return
-      }
-      document.getElementById('history-empty').style.display = 'none'
-      tbl.innerHTML = events.map(e => `
+/* ── Détail d'un joueur ── */
+function showPlayerDetail(player) {
+  document.getElementById('pdm-name').innerHTML = `${esc(player.firstName)} <span>${esc(player.lastName)}</span>`
+  document.getElementById('pdm-username').textContent = '@' + player.username + ' · ' + player.category
+
+  const diff = player.setDiff > 0 ? '+' + player.setDiff : player.setDiff
+  document.getElementById('pdm-stats').innerHTML = `
+    <div class="player-stat-card"><div class="val">${player.played}</div><div class="lbl">Matchs</div></div>
+    <div class="player-stat-card"><div class="val">${player.wins}</div><div class="lbl">Victoires</div></div>
+    <div class="player-stat-card"><div class="val">${player.losses}</div><div class="lbl">Défaites</div></div>
+    <div class="player-stat-card"><div class="val">${diff}</div><div class="lbl">Sets ±</div></div>
+    <div class="player-stat-card"><div class="val">${player.points}</div><div class="lbl">Points</div></div>`
+
+  const matchesEl = document.getElementById('pdm-matches')
+  if (!player.matches || player.matches.length === 0) {
+    matchesEl.innerHTML = '<div class="no-matches">Aucun match enregistré.</div>'
+  } else {
+    matchesEl.innerHTML = player.matches.map(m => {
+      const setsWon   = m.sets.filter(s => s.playerScore > s.opponentScore).length
+      const setsLost  = m.sets.filter(s => s.opponentScore > s.playerScore).length
+      const won       = setsWon > setsLost
+      const setChips  = m.sets.sort((a,b)=>a.setNumber-b.setNumber).map(s => {
+        const cls = s.playerScore > s.opponentScore ? 'set-win' : 'set-loss'
+        return `<span class="set-chip ${cls}">${s.playerScore}–${s.opponentScore}</span>`
+      }).join('')
+      const phaseTxt  = m.phase === 'PHASE1' ? 'Phase 1' : m.roundNumber ? `Phase 2 · R${m.roundNumber}` : 'Phase 2'
+      return `
+        <div class="match-card">
+          <div class="match-card-header">
+            <span class="match-opponent">vs ${esc(m.opponentFirstName)} ${esc(m.opponentLastName)}</span>
+            <span class="match-result-badge ${won ? 'result-win' : 'result-loss'}">${won ? 'Victoire' : 'Défaite'}</span>
+            <span class="match-phase-badge">${phaseTxt}</span>
+          </div>
+          <div class="match-date">${fmtDateOnly(m.matchDate)}</div>
+          <div class="match-sets">${setChips}</div>
+          ${m.note ? `<div class="match-note">📝 ${esc(m.note)}</div>` : ''}
+        </div>`
+    }).join('')
+  }
+  document.getElementById('player-detail-modal').classList.add('open')
+}
+
+function closePlayerDetail() { document.getElementById('player-detail-modal').classList.remove('open') }
+function closePlayerDetailOutside(e) { if (e.target === document.getElementById('player-detail-modal')) closePlayerDetail() }
+
+/* ══════════════════════════════════════
+   PANNEAU ADMIN — LOGIQUE
+══════════════════════════════════════ */
+function adminTab(name, btn) {
+  document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'))
+  document.querySelectorAll('.admin-tab').forEach(b => b.classList.remove('active'))
+  document.getElementById('admin-' + name).classList.add('active')
+  btn.classList.add('active')
+  if (name === 'phase') loadPhase()
+}
+
+function authHeaders() {
+  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('cdr_token') }
+}
+
+async function loadAdminData() {
+  await Promise.all([loadUsers(), loadHistory()])
+}
+
+/* ── Chargement utilisateurs ── */
+async function loadUsers() {
+  try {
+    const res = await fetch('/api/admin/users', { headers: authHeaders() })
+    if (!res.ok) return
+    const { users } = await res.json()
+    const accepted = users.filter(u => u.accepted && !u.banned)
+    const pending  = users.filter(u => !u.accepted && !u.banned)
+    const banned   = users.filter(u => u.banned)
+
+    document.getElementById('badge-users').textContent   = accepted.length + banned.length
+    document.getElementById('badge-pending').textContent = pending.length
+
+    const tblU = document.getElementById('tbl-users')
+    const allActive = [...accepted, ...banned]
+    if (allActive.length === 0) {
+      tblU.innerHTML = ''
+      document.getElementById('users-empty').style.display = 'block'
+    } else {
+      document.getElementById('users-empty').style.display = 'none'
+      tblU.innerHTML = allActive.map(u => `
         <tr>
-          <td style="color:var(--gray);font-size:0.82rem;white-space:nowrap">${fmtDate(e.createdAt)}</td>
-          <td><strong style="color:var(--white)">${esc(e.user?.username || '—')}</strong><br>
-              <span style="font-size:0.78rem;color:var(--gray)">${esc(e.user?.firstName||'')} ${esc(e.user?.lastName||'')}</span></td>
-          <td>${e.success
-            ? '<span class="log-success">✓ Succès</span>'
-            : '<span class="log-fail">✗ Échec</span>'}</td>
-          <td style="font-size:0.85rem;color:var(--gray-light)">${esc(e.message || '—')}</td>
-          <td style="font-size:0.78rem;color:var(--gray)">${esc(e.ip || '—')}</td>
+          <td><strong style="color:var(--white)">${esc(u.username)}</strong></td>
+          <td>${esc(u.lastName)}</td>
+          <td>${esc(u.firstName)}</td>
+          <td>${esc(u.phone)}</td>
+          <td><span class="player-level level-${u.category}">${u.category}</span></td>
+          <td>${u.banned ? '<span class="status-badge status-banned">Banni</span>' : '<span class="status-badge status-ok">Actif</span>'}</td>
+          <td style="color:var(--gray);font-size:0.82rem">${fmtDate(u.createdAt)}</td>
+          <td>
+            <div class="admin-actions">
+              <button class="btn-sm btn-edit"  onclick="openEditModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">Modifier</button>
+              <button class="btn-sm btn-match" onclick="openMatchModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">+ Match</button>
+              ${u.banned
+                ? `<button class="btn-sm btn-unban" onclick="adminAction('unban',${u.id})">Débannir</button>`
+                : `<button class="btn-sm btn-ban"   onclick="adminAction('ban',${u.id})">Bannir</button>`}
+            </div>
+          </td>
         </tr>`).join('')
-    } catch (e) { console.error('[loadHistory]', e) }
-  }
-
-  /* ── Action admin (accept / refuse / ban / unban) ── */
-  async function adminAction(action, userId) {
-    const labels = { accept:'Accepter', refuse:'Refuser et supprimer', ban:'Bannir', unban:'Débannir' }
-    if (!confirm(`${labels[action] || action} cet utilisateur ?`)) return
-    try {
-      const res = await fetch('/api/admin/action', {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({ action, userId }),
-      })
-      const data = await res.json()
-      if (!res.ok) { alert(data.error || 'Erreur.'); return }
-      await loadUsers()
-    } catch (e) { alert('Erreur réseau.') }
-  }
-
-  /* ── Modal édition ── */
-  function openEditModal(user) {
-    document.getElementById('modal-user-id').value    = user.id
-    document.getElementById('modal-title-name').textContent = user.username
-    document.getElementById('modal-firstname').value  = user.firstName
-    document.getElementById('modal-lastname').value   = user.lastName
-    document.getElementById('modal-username').value   = user.username
-    document.getElementById('modal-phone').value      = user.phone
-    document.getElementById('modal-category').value   = user.category
-    document.getElementById('modal-error').textContent = ''
-    document.getElementById('edit-modal').classList.add('open')
-  }
-
-  function closeEditModal() {
-    document.getElementById('edit-modal').classList.remove('open')
-  }
-
-  async function saveEditModal() {
-    const userId   = parseInt(document.getElementById('modal-user-id').value, 10)
-    const errorEl  = document.getElementById('modal-error')
-    errorEl.textContent = ''
-    const data = {
-      firstName : document.getElementById('modal-firstname').value.trim(),
-      lastName  : document.getElementById('modal-lastname').value.trim(),
-      username  : document.getElementById('modal-username').value.trim(),
-      phone     : document.getElementById('modal-phone').value.trim(),
-      category  : document.getElementById('modal-category').value,
     }
-    if (!data.firstName || !data.lastName || !data.username || !data.phone || !data.category) {
-      errorEl.textContent = 'Tous les champs sont requis.'
-      return
-    }
-    try {
-      const res = await fetch('/api/admin/action', {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({ action: 'update', userId, data }),
-      })
-      const json = await res.json()
-      if (!res.ok) { errorEl.textContent = json.error || 'Erreur.'; return }
-      closeEditModal()
-      await loadUsers()
-    } catch (e) { errorEl.textContent = 'Erreur réseau.' }
-  }
 
-  // Fermer le modal en cliquant à l'extérieur
-  document.getElementById('edit-modal').addEventListener('click', function(e) {
-    if (e.target === this) closeEditModal()
+    const tblP = document.getElementById('tbl-pending')
+    if (pending.length === 0) {
+      tblP.innerHTML = ''
+      document.getElementById('pending-empty').style.display = 'block'
+    } else {
+      document.getElementById('pending-empty').style.display = 'none'
+      tblP.innerHTML = pending.map(u => `
+        <tr>
+          <td><strong style="color:var(--white)">${esc(u.username)}</strong></td>
+          <td>${esc(u.lastName)}</td>
+          <td>${esc(u.firstName)}</td>
+          <td>${esc(u.phone)}</td>
+          <td><span class="player-level level-${u.category}">${u.category}</span></td>
+          <td style="color:var(--gray);font-size:0.82rem">${fmtDate(u.createdAt)}</td>
+          <td>
+            <div class="admin-actions">
+              <button class="btn-sm btn-accept" onclick="adminAction('accept',${u.id})">✓ Accepter</button>
+              <button class="btn-sm btn-refuse" onclick="adminAction('refuse',${u.id})">✗ Refuser</button>
+            </div>
+          </td>
+        </tr>`).join('')
+    }
+  } catch(e) { console.error('[loadUsers]', e) }
+}
+
+/* ── Chargement historique ── */
+async function loadHistory() {
+  try {
+    const res = await fetch('/api/admin/history', { headers: authHeaders() })
+    if (!res.ok) return
+    const { events } = await res.json()
+    const tbl = document.getElementById('tbl-history')
+    if (events.length === 0) { tbl.innerHTML = ''; document.getElementById('history-empty').style.display = 'block'; return }
+    document.getElementById('history-empty').style.display = 'none'
+    tbl.innerHTML = events.map(e => `
+      <tr>
+        <td style="color:var(--gray);font-size:0.82rem;white-space:nowrap">${fmtDate(e.createdAt)}</td>
+        <td><strong style="color:var(--white)">${esc(e.user?.username||'—')}</strong><br><span style="font-size:0.78rem;color:var(--gray)">${esc(e.user?.firstName||'')} ${esc(e.user?.lastName||'')}</span></td>
+        <td>${e.success ? '<span class="log-success">✓ Succès</span>' : '<span class="log-fail">✗ Échec</span>'}</td>
+        <td style="font-size:0.85rem;color:var(--gray-light)">${esc(e.message||'—')}</td>
+        <td style="font-size:0.78rem;color:var(--gray)">${esc(e.ip||'—')}</td>
+      </tr>`).join('')
+  } catch(e) { console.error('[loadHistory]', e) }
+}
+
+/* ── Actions admin ── */
+async function adminAction(action, userId) {
+  const labels = { accept:'Accepter', refuse:'Refuser et supprimer', ban:'Bannir', unban:'Débannir' }
+  if (!confirm(`${labels[action]||action} cet utilisateur ?`)) return
+  try {
+    const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({action, userId}) })
+    const data = await res.json()
+    if (!res.ok) { alert(data.error||'Erreur.'); return }
+    await loadUsers()
+  } catch { alert('Erreur réseau.') }
+}
+
+/* ── Modal édition ── */
+function openEditModal(user) {
+  document.getElementById('modal-user-id').value    = user.id
+  document.getElementById('modal-title-name').textContent = user.username
+  document.getElementById('modal-firstname').value  = user.firstName
+  document.getElementById('modal-lastname').value   = user.lastName
+  document.getElementById('modal-username').value   = user.username
+  document.getElementById('modal-phone').value      = user.phone
+  document.getElementById('modal-category').value   = user.category
+  document.getElementById('modal-error').textContent = ''
+  document.getElementById('edit-modal').classList.add('open')
+}
+function closeEditModal() { document.getElementById('edit-modal').classList.remove('open') }
+async function saveEditModal() {
+  const userId = parseInt(document.getElementById('modal-user-id').value, 10)
+  const errorEl = document.getElementById('modal-error')
+  errorEl.textContent = ''
+  const data = {
+    firstName: document.getElementById('modal-firstname').value.trim(),
+    lastName:  document.getElementById('modal-lastname').value.trim(),
+    username:  document.getElementById('modal-username').value.trim(),
+    phone:     document.getElementById('modal-phone').value.trim(),
+    category:  document.getElementById('modal-category').value,
+  }
+  if (!data.firstName || !data.lastName || !data.username || !data.phone || !data.category) { errorEl.textContent = 'Tous les champs sont requis.'; return }
+  try {
+    const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({action:'update', userId, data}) })
+    const json = await res.json()
+    if (!res.ok) { errorEl.textContent = json.error||'Erreur.'; return }
+    closeEditModal()
+    await loadUsers()
+  } catch { errorEl.textContent = 'Erreur réseau.' }
+}
+document.getElementById('edit-modal').addEventListener('click', function(e) { if (e.target===this) closeEditModal() })
+
+/* ── Phase du tournoi ── */
+async function loadPhase() {
+  try {
+    const res = await fetch('/api/admin/phase', { headers: authHeaders() })
+    if (!res.ok) return
+    const { phase, round } = await res.json()
+    document.getElementById('phase-current-display').innerHTML =
+      `Phase actuelle : <strong>${phaseLabel(phase, round)}</strong>`
+    document.getElementById('phase-select').value = phase
+    document.getElementById('phase-round').value  = round || 1
+    document.getElementById('phase-round-group').style.display = phase === 'PHASE2' ? 'block' : 'none'
+  } catch(e) { console.error('[loadPhase]', e) }
+}
+
+function onPhaseSelectChange() {
+  const v = document.getElementById('phase-select').value
+  document.getElementById('phase-round-group').style.display = v === 'PHASE2' ? 'block' : 'none'
+}
+
+async function savePhase() {
+  const phase = document.getElementById('phase-select').value
+  const round = parseInt(document.getElementById('phase-round').value, 10)
+  const errorEl = document.getElementById('phase-error')
+  const btn = document.getElementById('phase-save-btn')
+  errorEl.textContent = ''
+  if (phase === 'PHASE2' && (!round || round < 1)) { errorEl.textContent = 'Numéro de ronde requis.'; return }
+  btn.disabled = true; btn.textContent = 'Enregistrement…'
+  try {
+    const res = await fetch('/api/admin/phase', {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ phase, round: phase === 'PHASE2' ? round : undefined })
+    })
+    const data = await res.json()
+    if (!res.ok) { errorEl.textContent = data.error||'Erreur.'; return }
+    document.getElementById('phase-current-display').innerHTML =
+      `Phase actuelle : <strong>${phaseLabel(data.phase, data.round)}</strong>`
+    errorEl.style.color = '#6ddc6d'
+    errorEl.textContent = '✓ Phase mise à jour.'
+    setTimeout(() => { errorEl.textContent = ''; errorEl.style.color = '' }, 3000)
+  } catch { errorEl.textContent = 'Erreur réseau.' }
+  finally { btn.disabled = false; btn.textContent = 'Enregistrer la phase' }
+}
+
+/* ── Modal ajout match ── */
+let setCount = 0
+
+function onMatchPhaseChange() {
+  const v = document.getElementById('match-phase').value
+  document.getElementById('match-round-group').style.display = v === 'PHASE2' ? 'block' : 'none'
+}
+
+function addSetRow() {
+  if (setCount >= 5) return
+  setCount++
+  const num = setCount
+  const row = document.createElement('div')
+  row.className = 'set-row'
+  row.id = 'set-row-' + num
+  row.innerHTML = `
+    <label>Set ${num}</label>
+    <input type="number" id="set-player-${num}" min="0" max="99" value="0" title="Score joueur">
+    <span class="set-sep">–</span>
+    <input type="number" id="set-opp-${num}" min="0" max="99" value="0" title="Score adversaire">
+    <button class="btn-remove-set" onclick="removeSetRow(${num})" title="Supprimer ce set">✕</button>`
+  document.getElementById('sets-container').appendChild(row)
+  if (setCount >= 5) document.getElementById('btn-add-set').style.display = 'none'
+}
+
+function removeSetRow(num) {
+  const row = document.getElementById('set-row-' + num)
+  if (row) row.remove()
+  setCount = document.querySelectorAll('#sets-container .set-row').length
+  // Renuméroter les labels
+  document.querySelectorAll('#sets-container .set-row').forEach((r, i) => {
+    r.querySelector('label').textContent = 'Set ' + (i+1)
   })
+  document.getElementById('btn-add-set').style.display = ''
+}
 
-  /* ── Utilitaires ── */
-  function esc(str) {
-    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
-  }
-  function fmtDate(iso) {
-    if (!iso) return '—'
-    const d = new Date(iso)
-    return d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' })
-  }
+function openMatchModal(user) {
+  document.getElementById('match-modal-user-id').value = user.id
+  document.getElementById('match-modal-player-name').textContent = user.firstName + ' ' + user.lastName
+  document.getElementById('match-opp-firstname').value = ''
+  document.getElementById('match-opp-lastname').value  = ''
+  document.getElementById('match-phase').value = 'PHASE1'
+  document.getElementById('match-round-group').style.display = 'none'
+  document.getElementById('match-round').value = '1'
+  document.getElementById('match-date').value = new Date().toISOString().slice(0,10)
+  document.getElementById('match-note').value = ''
+  document.getElementById('match-modal-error').textContent = ''
+  // Reset sets
+  document.getElementById('sets-container').innerHTML = ''
+  setCount = 0
+  document.getElementById('btn-add-set').style.display = ''
+  addSetRow() // Commencer avec 1 set
+  document.getElementById('match-modal').classList.add('open')
+}
 
-  /* ══════════════════════════════════════
-     ANIMATIONS & CLASSEMENT
-  ══════════════════════════════════════ */
-  function animateCounters() {
-    const configs = [900, 1000, 1100, 1200];
-    document.querySelectorAll('.stat-num').forEach((el, i) => {
-      const target = parseInt(el.textContent, 10);
-      const duration = configs[i] || 1000;
-      const start = performance.now();
+function closeMatchModal() { document.getElementById('match-modal').classList.remove('open') }
 
-      function frame(now) {
-        const p = Math.min((now - start) / duration, 1);
-        const eased = 1 - Math.pow(1 - p, 3);
-        el.textContent = Math.floor(target * eased);
-        if (p < 1) requestAnimationFrame(frame);
-        else el.textContent = target;
-      }
+async function saveMatch() {
+  const userId = parseInt(document.getElementById('match-modal-user-id').value, 10)
+  const phase  = document.getElementById('match-phase').value
+  const round  = parseInt(document.getElementById('match-round').value, 10)
+  const matchDate = document.getElementById('match-date').value
+  const oppFn  = document.getElementById('match-opp-firstname').value.trim()
+  const oppLn  = document.getElementById('match-opp-lastname').value.trim()
+  const note   = document.getElementById('match-note').value.trim()
+  const errorEl= document.getElementById('match-modal-error')
+  const btn    = document.getElementById('match-save-btn')
+  errorEl.textContent = ''
 
-      requestAnimationFrame(frame);
-    });
-  }
+  if (!oppFn || !oppLn) { errorEl.textContent = 'Prénom et nom de l\'adversaire requis.'; return }
+  if (!matchDate) { errorEl.textContent = 'Date du match requise.'; return }
 
-  function animateHero() {
-    ['.hero-logo', '.hero-tagline', '.hero-desc'].forEach((s, i) => {
-      setTimeout(() => document.querySelector(s)?.classList.add('visible'), 200 + i * 250);
-    });
-  }
+  // Collecter les sets
+  const setRows = document.querySelectorAll('#sets-container .set-row')
+  if (setRows.length === 0) { errorEl.textContent = 'Ajoutez au moins un set.'; return }
 
-  function sortTables() {
-    document.querySelectorAll('#phase1 table tbody').forEach(tb => {
-      const rows = [...tb.querySelectorAll('tr')];
+  const sets = []
+  let valid = true
+  setRows.forEach((row, i) => {
+    const ps = parseInt(row.querySelector('input:nth-of-type(1)').value, 10)
+    const os = parseInt(row.querySelector('input:nth-of-type(2)').value, 10)
+    if (isNaN(ps) || isNaN(os) || ps < 0 || os < 0) { valid = false; return }
+    sets.push({ setNumber: i+1, playerScore: ps, opponentScore: os })
+  })
+  if (!valid) { errorEl.textContent = 'Scores invalides.'; return }
 
-      rows.forEach(row => {
-        const randomOffset = (Math.random() * 140) - 70;
-        row.style.setProperty('--row-offset', `${randomOffset}px`);
-        row.classList.add('sort-enter');
-      });
+  btn.disabled = true; btn.textContent = 'Enregistrement…'
+  try {
+    const body = { action:'add', userId, phase, matchDate, opponentFirstName: oppFn, opponentLastName: oppLn, note: note||undefined, sets }
+    if (phase === 'PHASE2') body.round = round
+    const res = await fetch('/api/admin/match', { method:'POST', headers: authHeaders(), body: JSON.stringify(body) })
+    const data = await res.json()
+    if (!res.ok) { errorEl.textContent = data.error||'Erreur.'; return }
+    closeMatchModal()
+    classementLoaded = false // Forcer rechargement du classement
+  } catch { errorEl.textContent = 'Erreur réseau.' }
+  finally { btn.disabled = false; btn.textContent = 'Enregistrer' }
+}
 
-      setTimeout(() => {
-        rows.sort((a, b) => {
-          const pa = parseInt(a.querySelector('.pts')?.textContent || 0, 10);
-          const pb = parseInt(b.querySelector('.pts')?.textContent || 0, 10);
-          return pb - pa;
-        });
+document.getElementById('match-modal').addEventListener('click', function(e) { if (e.target===this) closeMatchModal() })
 
-        rows.forEach((row, i) => {
-          tb.appendChild(row);
+/* ── Utilitaires ── */
+function esc(str) {
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+}
+function fmtDate(iso) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})
+}
+function fmtDateOnly(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('fr-FR', {day:'2-digit', month:'long', year:'numeric'})
+}
 
-          const rank = row.querySelector('.rank');
-          if (rank) {
-            rank.textContent = i + 1;
-            rank.classList.remove('gold', 'silver', 'bronze');
-            if (i === 0) rank.classList.add('gold');
-            else if (i === 1) rank.classList.add('silver');
-            else if (i === 2) rank.classList.add('bronze');
-          }
-
-          row.classList.remove('winner');
-          if (i < 2) row.classList.add('winner');
-        });
-
-        rows.forEach((row, i) => {
-          setTimeout(() => {
-            row.classList.add('sort-show');
-            row.classList.remove('sort-enter');
-          }, i * 90);
-        });
-      }, 120);
-    });
-  }
-
-  let classementAnimated = false;
-  const oldShowPage = showPage;
-  showPage = function(id, btn) {
-    oldShowPage(id, btn);
-    if (id === 'classement' && !classementAnimated) {
-      classementAnimated = true;
-      sortTables();
+/* ══════════════════════════════════════
+   ANIMATIONS HERO
+══════════════════════════════════════ */
+function animateCounters() {
+  const configs = [900, 1000, 1100, 1200]
+  document.querySelectorAll('.stat-num').forEach((el, i) => {
+    const target = parseInt(el.textContent, 10)
+    const duration = configs[i]||1000
+    const start = performance.now()
+    function frame(now) {
+      const p = Math.min((now - start) / duration, 1)
+      const eased = 1 - Math.pow(1 - p, 3)
+      el.textContent = Math.floor(target * eased)
+      if (p < 1) requestAnimationFrame(frame)
+      else el.textContent = target
     }
-  };
-
-  window.addEventListener('load', () => {
-    animateHero();
-
-    const stats = document.querySelector('.hero-stats');
-    let started = false;
-
-    const obs = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && !started) {
-        started = true;
-        animateCounters();
-      }
-    }, { threshold: 0.4 });
-
-    if (stats) obs.observe(stats);
-  });
+    requestAnimationFrame(frame)
+  })
+}
+function animateHero() {
+  ['.hero-logo', '.hero-tagline', '.hero-desc'].forEach((s, i) => {
+    setTimeout(() => document.querySelector(s)?.classList.add('visible'), 200 + i * 250)
+  })
+}
+window.addEventListener('load', () => {
+  animateHero()
+  const stats = document.querySelector('.hero-stats')
+  let started = false
+  const obs = new IntersectionObserver(entries => {
+    if (entries[0].isIntersecting && !started) { started = true; animateCounters() }
+  }, {threshold: 0.4})
+  if (stats) obs.observe(stats)
+})
 </script>
 </body>
 </html>
