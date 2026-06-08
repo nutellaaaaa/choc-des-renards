@@ -161,3 +161,4 @@ module.exports = async function handler(req, res) {
     error: 'Erreur serveur. Réessayez.'
   })
 }
+}
