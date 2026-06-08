@@ -1,6 +1,5 @@
 const { PrismaClient } = require('@prisma/client')
 const argon2 = require('argon2')
-const jwt = require('jsonwebtoken')
 const { Resend } = require('resend')
 
 // Prisma singleton (important sur Vercel)
@@ -21,9 +20,7 @@ module.exports = async function handler(req, res) {
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({
-      error: 'Méthode non autorisée',
-    })
+    return res.status(405).json({ error: 'Méthode non autorisée' })
   }
 
   const {
@@ -36,51 +33,32 @@ module.exports = async function handler(req, res) {
     category,
   } = req.body || {}
 
-  if (
-    !username ||
-    !password ||
-    !confirmPassword ||
-    !firstName ||
-    !lastName ||
-    !phone ||
-    !category
-  ) {
-    return res.status(400).json({
-      error: 'Tous les champs sont requis.',
-    })
+  if (!username || !password || !confirmPassword || !firstName || !lastName || !phone || !category) {
+    return res.status(400).json({ error: 'Tous les champs sont requis.' })
   }
 
   if (password !== confirmPassword) {
-    return res.status(400).json({
-      error: 'Les mots de passe ne correspondent pas.',
-    })
+    return res.status(400).json({ error: 'Les mots de passe ne correspondent pas.' })
   }
 
   if (password.length < 8) {
-    return res.status(400).json({
-      error: 'Le mot de passe doit contenir au moins 8 caractères.',
-    })
+    return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 8 caractères.' })
   }
 
   const validCategories = ['N', 'R', 'D', 'P']
-
   if (!validCategories.includes(category)) {
-    return res.status(400).json({
-      error: 'Catégorie invalide.',
-    })
+    return res.status(400).json({ error: 'Catégorie invalide.' })
+  }
+
+  // Bloquer l'inscription avec les pseudos réservés aux admins
+  if (['admin', 'root'].includes(username.toLowerCase())) {
+    return res.status(400).json({ error: 'Ce pseudo est réservé.' })
   }
 
   try {
-    const existing = await prisma.user.findUnique({
-      where: {
-        username,
-      },
-    })
-
+    const existing = await prisma.user.findUnique({ where: { username } })
     if (existing) {
-      return res.status(409).json({
-        error: 'Ce pseudo est déjà utilisé.',
-      })
+      return res.status(409).json({ error: 'Ce pseudo est déjà utilisé.' })
     }
 
     const passwordHash = await argon2.hash(password, {
@@ -90,7 +68,8 @@ module.exports = async function handler(req, res) {
       parallelism: 1,
     })
 
-    const user = await prisma.user.create({
+    // accepted=false par défaut (défini dans le schema Prisma)
+    await prisma.user.create({
       data: {
         username,
         passwordHash,
@@ -98,6 +77,7 @@ module.exports = async function handler(req, res) {
         lastName,
         phone,
         category,
+        // accepted reste false (default), banned reste false (default)
       },
     })
 
@@ -106,54 +86,30 @@ module.exports = async function handler(req, res) {
       await resend.emails.send({
         from: 'onboarding@resend.dev',
         to: process.env.ADMIN_EMAIL,
-        subject: '🔔 Nouvelle inscription - Choc des Renards',
+        subject: '🔔 Nouvelle demande d\'inscription - Choc des Renards',
         html: `
-          <h2>Nouvelle inscription</h2>
-
+          <h2>Nouvelle demande d'inscription</h2>
           <p><strong>Pseudo :</strong> ${username}</p>
           <p><strong>Nom :</strong> ${lastName}</p>
           <p><strong>Prénom :</strong> ${firstName}</p>
           <p><strong>Téléphone :</strong> ${phone}</p>
           <p><strong>Catégorie :</strong> ${category}</p>
-
           <br>
-
-          <p>En attente de validation...</p>
+          <p>⏳ En attente de validation dans le panneau d'administration.</p>
         `,
       })
     } catch (mailError) {
       console.error('[EMAIL]', mailError)
-      // On ne bloque pas l'inscription si l'email échoue
     }
 
-    const token = jwt.sign(
-      {
-        userId: user.id,
-        username: user.username,
-        role: user.role,
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: '7d',
-      }
-    )
-
+    // On ne renvoie PAS de token : l'utilisateur doit attendre la validation
     return res.status(201).json({
-      token,
-      user: {
-        id: user.id,
-        username: user.username,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        category: user.category,
-      },
+      pending: true,
+      message: 'Votre demande d\'inscription a été envoyée. Elle sera validée par l\'administrateur avant de pouvoir vous connecter.',
     })
+
   } catch (err) {
     console.error('[REGISTER]', err)
-
-    return res.status(500).json({
-      error: 'Erreur serveur. Réessayez.',
-    })
+    return res.status(500).json({ error: 'Erreur serveur. Réessayez.' })
   }
 }
