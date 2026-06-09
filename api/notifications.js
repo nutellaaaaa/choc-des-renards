@@ -17,7 +17,7 @@
  *   → marquer une notification comme lue (+ log dans l'historique de connexion)
  */
 const { PrismaClient } = require('@prisma/client')
-const { requireAdmin } = require('../_auth')
+const { requireAdmin } = require('./_auth')
 const jwt = require('jsonwebtoken')
 
 if (!global._prisma) global._prisma = new PrismaClient()
