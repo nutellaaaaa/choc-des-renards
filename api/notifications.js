@@ -232,4 +232,4 @@ async function userHandler(req, res) {
   return res.status(400).json({ error: 'Action invalide.' })
 }
 
-module.exports = adminHandler
+module.exports = userHandler
