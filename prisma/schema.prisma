@@ -30,8 +30,11 @@ model User {
 
   createdAt    DateTime @default(now())
 
-  loginEvents  LoginEvent[]
-  matches      Match[]
+  loginEvents       LoginEvent[]
+  matches           Match[]
+  notifications     Notification[]
+  pouleMembers      PouleMember[]
+  phase2GroupMember Phase2GroupMember?
 }
 
 model LoginEvent {
@@ -51,10 +54,8 @@ model Match {
   userId             Int
   user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Phase du tournoi au moment du match
-  // "PHASE1" | "PHASE2" (+ roundNumber pour les rondes suisses)
   phase              String
-  roundNumber        Int?       // null pour Phase 1, 1, 2, 3… pour Phase 2
+  roundNumber        Int?
 
   matchDate          DateTime
 
@@ -62,6 +63,13 @@ model Match {
   opponentLastName   String
 
   note               String?
+
+  // Publication différée : false = en attente de publication, true = visible
+  published          Boolean    @default(false)
+
+  // Lien optionnel vers la rencontre spéciale qui a généré ce match
+  specialMatchId     Int?
+  specialMatch       SpecialMatch? @relation(fields: [specialMatchId], references: [id], onDelete: SetNull)
 
   sets               MatchSet[]
 
@@ -73,7 +81,7 @@ model MatchSet {
   id             Int   @id @default(autoincrement())
   matchId        Int
   match          Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  setNumber      Int   // 1 à 5
+  setNumber      Int
   playerScore    Int
   opponentScore  Int
 }
@@ -82,9 +90,92 @@ model MatchSet {
 model TournamentState {
   id           Int      @id @default(1)
   currentPhase String   @default("PHASE1")
-  // Pour Phase 2 : numéro de la ronde courante (null = Phase 1)
   currentRound Int?
+  // Snapshot figé du classement (JSON sérialisé), null = recalcul à la volée
+  rankingSnapshot String?
   updatedAt    DateTime @updatedAt
+}
+
+// ── Notifications admin → joueur ──────────────────────────────────────────────
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // "message" = notification simple, "special_match" = rencontre spéciale
+  type      String   @default("message")
+
+  title     String
+  message   String
+
+  // Pour les rencontres spéciales
+  opponentName   String?   // Nom affiché de l'adversaire
+  startDate      DateTime? // À partir de
+  endDate        DateTime? // Avant le
+  reason         String?   // Motif
+
+  read      Boolean  @default(false)
+  readAt    DateTime?
+
+  createdAt DateTime @default(now())
+}
+
+// ── Rencontres spéciales (section publique "en cours") ────────────────────────
+model SpecialMatch {
+  id             Int      @id @default(autoincrement())
+
+  // Les deux joueurs
+  player1Id      Int
+  player2Id      Int
+
+  // Infos affichées
+  startDate      DateTime
+  endDate        DateTime
+  reason         String
+  note           String?
+
+  // false = en cours, true = résultats enregistrés (disparaît de la section publique)
+  resolved       Boolean  @default(false)
+
+  createdAt      DateTime @default(now())
+
+  matches        Match[]
+}
+
+// ── Poules (Phase 1) ──────────────────────────────────────────────────────────
+model Poule {
+  id        Int      @id @default(autoincrement())
+  name      String
+  phase     String   @default("PHASE1")
+  createdAt DateTime @default(now())
+
+  members   PouleMember[]
+}
+
+model PouleMember {
+  id      Int  @id @default(autoincrement())
+  pouleId Int
+  poule   Poule @relation(fields: [pouleId], references: [id], onDelete: Cascade)
+  userId  Int  @unique  // un joueur = une seule poule
+  user    User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ── Groupes Phase 2 ───────────────────────────────────────────────────────────
+model Phase2Group {
+  id        Int      @id @default(autoincrement())
+  // "choquants" ou "choques"
+  name      String
+  createdAt DateTime @default(now())
+
+  members   Phase2GroupMember[]
+}
+
+model Phase2GroupMember {
+  id      Int  @id @default(autoincrement())
+  groupId Int
+  group   Phase2Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId  Int  @unique
+  user    User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 enum Role {
