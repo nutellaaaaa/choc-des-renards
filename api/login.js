@@ -10,10 +10,13 @@ const prisma = global._prisma
 
 async function logLogin(userId, req, success, message) {
   try {
+    const rawIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null
+    const ip = rawIp ? rawIp.split(',')[0].trim() : null
+
     await prisma.loginEvent.create({
       data: {
         userId,
-        ip: req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null,
+        ip,
         userAgent: req.headers['user-agent'] || null,
         success,
         message: message || null,
@@ -97,7 +100,8 @@ module.exports = async function handler(req, res) {
           from: 'onboarding@resend.dev',
           to: process.env.ADMIN_EMAIL,
           subject: '✅ Connexion ADMIN réussie',
-          html: `<h2>Connexion ADMIN réussie</h2><p><strong>Pseudo :</strong> ${user.username}</p><p><strong>IP :</strong> ${req.headers['x-forwarded-for'] || req.socket?.remoteAddress}</p>`,
+          html: `<h2>Connexion ADMIN réussie</h2><p><strong>Pseudo :</strong> ${user.username}</p>`<p><strong>IP :</strong> ${(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim()}</p>,`
+
         })
       } catch (mailErr) { console.error('[EMAIL ADMIN]', mailErr) }
     }
