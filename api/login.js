@@ -63,8 +63,7 @@ module.exports = async function handler(req, res) {
             from: 'onboarding@resend.dev',
             to: process.env.ADMIN_EMAIL,
             subject: '⚠️ Tentative de connexion ADMIN',
-            html: `<h2>Tentative de connexion ADMIN</h2><p><strong>Résultat :</strong> mauvais mot de passe</p><p><strong>IP :</strong> ${req.headers['x-forwarded-for'] || req.socket?.remoteAddress}</p>`,
-          })
+			html: `<h2>Tentative de connexion ADMIN</h2><p><strong>Résultat :</strong> mauvais mot de passe</p><p><strong>IP :</strong> ${(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim()}</p>`,          })
         } catch (mailErr) { console.error('[EMAIL ADMIN]', mailErr) }
       }
       await logLogin(user.id, req, false, 'Mot de passe incorrect')
@@ -95,16 +94,15 @@ module.exports = async function handler(req, res) {
     }
 
     if (isAdmin) {
-      try {
-        await resend.emails.send({
-          from: 'onboarding@resend.dev',
-          to: process.env.ADMIN_EMAIL,
-          subject: '✅ Connexion ADMIN réussie',
-          html: `<h2>Connexion ADMIN réussie</h2><p><strong>Pseudo :</strong> ${user.username}</p>`<p><strong>IP :</strong> ${(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim()}</p>,`
-
-        })
-      } catch (mailErr) { console.error('[EMAIL ADMIN]', mailErr) }
-    }
+		try {
+			await resend.emails.send({
+			from: 'onboarding@resend.dev',
+			to: process.env.ADMIN_EMAIL,
+			subject: '✅ Connexion ADMIN réussie',
+			html: `<h2>Connexion ADMIN réussie</h2><p><strong>Pseudo :</strong> ${user.username}</p><p><strong>IP :</strong> ${(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim()}</p>`,
+			})
+		} catch (mailErr) { console.error('[EMAIL ADMIN]', mailErr) }
+	}
 
     await logLogin(user.id, req, true, 'Connexion réussie')
 
