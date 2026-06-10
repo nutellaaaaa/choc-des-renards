@@ -1,8 +1,4 @@
-/**
- * api/admin/history.js
- * GET /api/admin/history?limit=100
- * Retourne l'historique des connexions (succès et échecs)
- */
+// api/admin/history.js
 const { PrismaClient } = require('@prisma/client')
 const { requireAdmin } = require('../_auth')
 
@@ -17,19 +13,20 @@ module.exports = async function handler(req, res) {
 
   const payload = requireAdmin(req, res)
   if (!payload) return
-
   if (req.method !== 'GET') return res.status(405).json({ error: 'Méthode non autorisée' })
 
   const limit = Math.min(parseInt(req.query?.limit || '200', 10), 500)
+  const filterUserId = req.query?.userId ? parseInt(req.query.userId, 10) : null
 
   try {
+    const where = filterUserId && !isNaN(filterUserId) ? { userId: filterUserId } : {}
+
     const events = await prisma.loginEvent.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       take: limit,
       include: {
-        user: {
-          select: { username: true, firstName: true, lastName: true },
-        },
+        user: { select: { id: true, username: true, firstName: true, lastName: true } },
       },
     })
 

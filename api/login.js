@@ -1,16 +1,14 @@
+// api/login.js
 const { PrismaClient } = require('@prisma/client')
 const argon2 = require('argon2')
 const jwt = require('jsonwebtoken')
 const { Resend } = require('resend')
 
 const resend = new Resend(process.env.RESEND_API_KEY)
-
-if (!global._prisma) {
-  global._prisma = new PrismaClient()
-}
+if (!global._prisma) global._prisma = new PrismaClient()
 const prisma = global._prisma
 
-async function logLogin(prisma, userId, req, success, message) {
+async function logLogin(userId, req, success, message) {
   try {
     await prisma.loginEvent.create({
       data: {
@@ -21,48 +19,42 @@ async function logLogin(prisma, userId, req, success, message) {
         message: message || null,
       },
     })
-  } catch (e) {
-    console.error('[LOGIN_LOG]', e)
-  }
+  } catch (e) { console.error('[LOGIN_LOG]', e) }
 }
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-
   if (req.method === 'OPTIONS') return res.status(200).end()
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Méthode non autorisée' })
-  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' })
 
-  const { username, password } = req.body || {}
+  const { firstName, lastName, password } = req.body || {}
 
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Pseudo et mot de passe requis.' })
+  if (!firstName || !lastName || !password) {
+    return res.status(400).json({ error: 'Prénom, nom et mot de passe requis.' })
   }
 
   try {
-    const user = await prisma.user.findUnique({ where: { username } })
+    // Vérifier suspension du site
+    const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
+    const isAdminLogin = false // on déterminera ça après
+
+    // Rechercher par prénom + nom (insensible à la casse)
+    const user = await prisma.user.findFirst({
+      where: {
+        firstName: { equals: firstName.trim(), mode: 'insensitive' },
+        lastName:  { equals: lastName.trim(),  mode: 'insensitive' },
+      },
+    })
 
     if (!user) {
-      if (username.toLowerCase() === 'admin') {
-        try {
-          await resend.emails.send({
-            from: 'onboarding@resend.dev',
-            to: process.env.ADMIN_EMAIL,
-            subject: '⚠️ Tentative de connexion ADMIN',
-            html: `<h2>Tentative de connexion ADMIN</h2><p><strong>Résultat :</strong> utilisateur introuvable</p><p><strong>IP :</strong> ${req.headers['x-forwarded-for'] || req.socket?.remoteAddress}</p>`,
-          })
-        } catch (mailErr) { console.error('[EMAIL ADMIN]', mailErr) }
-      }
       return res.status(401).json({ error: 'Identifiants incorrects.' })
     }
 
     const valid = await argon2.verify(user.passwordHash, password)
-
     if (!valid) {
-      if (user.username.toLowerCase() === 'admin') {
+      if (['admin', 'root'].includes(user.username.toLowerCase())) {
         try {
           await resend.emails.send({
             from: 'onboarding@resend.dev',
@@ -72,22 +64,34 @@ module.exports = async function handler(req, res) {
           })
         } catch (mailErr) { console.error('[EMAIL ADMIN]', mailErr) }
       }
-      await logLogin(prisma, user.id, req, false, 'Mot de passe incorrect')
+      await logLogin(user.id, req, false, 'Mot de passe incorrect')
       return res.status(401).json({ error: 'Identifiants incorrects.' })
     }
 
+    const isAdmin = ['admin', 'root'].includes(user.username.toLowerCase()) || user.role === 'ADMIN'
+
+    // Vérif suspension site (les admins passent toujours)
+    if (!isAdmin && state?.siteSuspended) {
+      await logLogin(user.id, req, false, 'Site suspendu')
+      return res.status(403).json({ error: 'Le site est temporairement suspendu. Revenez plus tard.' })
+    }
+
     if (user.banned) {
-      await logLogin(prisma, user.id, req, false, 'Compte banni')
+      await logLogin(user.id, req, false, 'Compte banni')
       return res.status(403).json({ error: 'Votre compte a été banni. Contactez l\'administrateur.' })
     }
 
     if (!user.accepted) {
-      await logLogin(prisma, user.id, req, false, 'Compte en attente de validation')
+      await logLogin(user.id, req, false, 'Compte en attente de validation')
       return res.status(403).json({ error: 'Votre demande d\'inscription est en attente de validation par l\'administrateur.' })
     }
 
-    // Notification admin sur connexion admin réussie
-    if (['admin', 'root'].includes(user.username.toLowerCase())) {
+    // Réinitialiser forceLogout si actif
+    if (user.forceLogout) {
+      await prisma.user.update({ where: { id: user.id }, data: { forceLogout: false } })
+    }
+
+    if (isAdmin) {
       try {
         await resend.emails.send({
           from: 'onboarding@resend.dev',
@@ -98,9 +102,7 @@ module.exports = async function handler(req, res) {
       } catch (mailErr) { console.error('[EMAIL ADMIN]', mailErr) }
     }
 
-    await logLogin(prisma, user.id, req, true, 'Connexion réussie')
-
-    const isAdmin = ['admin', 'root'].includes(user.username.toLowerCase()) || user.role === 'ADMIN'
+    await logLogin(user.id, req, true, 'Connexion réussie')
 
     const token = jwt.sign(
       { userId: user.id, username: user.username, role: isAdmin ? 'ADMIN' : user.role },
@@ -108,7 +110,6 @@ module.exports = async function handler(req, res) {
       { expiresIn: '24h' }
     )
 
-    // Vérifier les notifications en attente (seulement pour les joueurs non-admin)
     let pendingNotifications = []
     if (!isAdmin) {
       pendingNotifications = await prisma.notification.findMany({
@@ -126,10 +127,10 @@ module.exports = async function handler(req, res) {
         lastName: user.lastName,
         role: isAdmin ? 'ADMIN' : user.role,
         category: user.category,
+        active: user.active,
       },
       pendingNotifications,
     })
-
   } catch (err) {
     console.error('[login]', err)
     return res.status(500).json({ error: 'Erreur serveur. Réessayez.' })

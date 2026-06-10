@@ -1,5 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// schema.prisma — Choc des Renards
 
 generator client {
   provider = "prisma-client-js"
@@ -8,174 +7,6 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-}
-
-model User {
-  id           Int      @id @default(autoincrement())
-
-  username     String   @unique
-  passwordHash String
-
-  firstName    String
-  lastName     String
-
-  phone        String
-
-  category     Category
-
-  role         Role     @default(USER)
-
-  accepted     Boolean  @default(false)
-  banned       Boolean  @default(false)
-
-  createdAt    DateTime @default(now())
-
-  loginEvents       LoginEvent[]
-  matches           Match[]
-  notifications     Notification[]
-  pouleMembers      PouleMember[]
-  phase2GroupMember Phase2GroupMember?
-}
-
-model LoginEvent {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ip        String?
-  userAgent String?
-  success   Boolean
-  message   String?
-  createdAt DateTime @default(now())
-}
-
-// Chaque match d'un joueur
-model Match {
-  id                 Int        @id @default(autoincrement())
-  userId             Int
-  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  phase              String
-  roundNumber        Int?
-
-  matchDate          DateTime
-
-  opponentFirstName  String
-  opponentLastName   String
-
-  note               String?
-
-  // Publication différée : false = en attente de publication, true = visible
-  published          Boolean    @default(false)
-
-  // Lien optionnel vers la rencontre spéciale qui a généré ce match
-  specialMatchId     Int?
-  specialMatch       SpecialMatch? @relation(fields: [specialMatchId], references: [id], onDelete: SetNull)
-
-  sets               MatchSet[]
-
-  createdAt          DateTime   @default(now())
-}
-
-// Score de chaque set d'un match (jusqu'à 5 sets)
-model MatchSet {
-  id             Int   @id @default(autoincrement())
-  matchId        Int
-  match          Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  setNumber      Int
-  playerScore    Int
-  opponentScore  Int
-}
-
-// Singleton : état actuel du tournoi (toujours id = 1)
-model TournamentState {
-  id           Int      @id @default(1)
-  currentPhase String   @default("PHASE1")
-  currentRound Int?
-  // Snapshot figé du classement (JSON sérialisé), null = recalcul à la volée
-  rankingSnapshot String?
-  updatedAt    DateTime @updatedAt
-}
-
-// ── Notifications admin → joueur ──────────────────────────────────────────────
-model Notification {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // "message" = notification simple, "special_match" = rencontre spéciale
-  type      String   @default("message")
-
-  title     String
-  message   String
-
-  // Pour les rencontres spéciales
-  opponentName   String?   // Nom affiché de l'adversaire
-  startDate      DateTime? // À partir de
-  endDate        DateTime? // Avant le
-  reason         String?   // Motif
-
-  read      Boolean  @default(false)
-  readAt    DateTime?
-
-  createdAt DateTime @default(now())
-}
-
-// ── Rencontres spéciales (section publique "en cours") ────────────────────────
-model SpecialMatch {
-  id             Int      @id @default(autoincrement())
-
-  // Les deux joueurs
-  player1Id      Int
-  player2Id      Int
-
-  // Infos affichées
-  startDate      DateTime
-  endDate        DateTime
-  reason         String
-  note           String?
-
-  // false = en cours, true = résultats enregistrés (disparaît de la section publique)
-  resolved       Boolean  @default(false)
-
-  createdAt      DateTime @default(now())
-
-  matches        Match[]
-}
-
-// ── Poules (Phase 1) ──────────────────────────────────────────────────────────
-model Poule {
-  id        Int      @id @default(autoincrement())
-  name      String
-  phase     String   @default("PHASE1")
-  createdAt DateTime @default(now())
-
-  members   PouleMember[]
-}
-
-model PouleMember {
-  id      Int  @id @default(autoincrement())
-  pouleId Int
-  poule   Poule @relation(fields: [pouleId], references: [id], onDelete: Cascade)
-  userId  Int  @unique  // un joueur = une seule poule
-  user    User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-// ── Groupes Phase 2 ───────────────────────────────────────────────────────────
-model Phase2Group {
-  id        Int      @id @default(autoincrement())
-  // "choquants" ou "choques"
-  name      String
-  createdAt DateTime @default(now())
-
-  members   Phase2GroupMember[]
-}
-
-model Phase2GroupMember {
-  id      Int  @id @default(autoincrement())
-  groupId Int
-  group   Phase2Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  userId  Int  @unique
-  user    User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 enum Role {
@@ -188,4 +19,154 @@ enum Category {
   R
   D
   P
+  NC
+}
+
+enum Phase {
+  PHASE0
+  PHASE1
+  PHASE2
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  phone        String
+  category     Category @default(NC)
+  role         Role     @default(USER)
+  accepted     Boolean  @default(false)
+  banned       Boolean  @default(false)
+  active       Boolean  @default(true)
+  forceLogout  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  matches        Match[]
+  pouleMembers   PouleMember[]
+  phase2Members  Phase2GroupMember[]
+  notifications  Notification[]
+  loginEvents    LoginEvent[]
+  specialMatches1 SpecialMatch[] @relation("Player1")
+  specialMatches2 SpecialMatch[] @relation("Player2")
+}
+
+model LoginEvent {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  ip        String?
+  userAgent String?
+  success   Boolean
+  message   String?
+  createdAt DateTime @default(now())
+  logoutAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TournamentState {
+  id              Int     @id @default(autoincrement())
+  currentPhase    Phase   @default(PHASE0)
+  currentRound    Int?
+  rankingSnapshot String?
+  siteSuspended   Boolean @default(false)
+}
+
+model Poule {
+  id        Int      @id @default(autoincrement())
+  name      String
+  phase     Phase    @default(PHASE1)
+  createdAt DateTime @default(now())
+  members   PouleMember[]
+}
+
+model PouleMember {
+  id      Int  @id @default(autoincrement())
+  pouleId Int
+  userId  Int
+
+  poule Poule @relation(fields: [pouleId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([pouleId, userId])
+}
+
+model Phase2Group {
+  id        Int      @id @default(autoincrement())
+  name      String
+  createdAt DateTime @default(now())
+  members   Phase2GroupMember[]
+}
+
+model Phase2GroupMember {
+  id      Int @id @default(autoincrement())
+  groupId Int
+  userId  Int
+
+  group Phase2Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+}
+
+model Match {
+  id                Int      @id @default(autoincrement())
+  userId            Int
+  phase             Phase
+  roundNumber       Int?
+  matchDate         DateTime
+  opponentFirstName String
+  opponentLastName  String
+  note              String?
+  published         Boolean  @default(false)
+  specialMatchId    Int?
+  createdAt         DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sets         MatchSet[]
+  specialMatch SpecialMatch? @relation(fields: [specialMatchId], references: [id])
+}
+
+model MatchSet {
+  id            Int @id @default(autoincrement())
+  matchId       Int
+  setNumber     Int
+  playerScore   Int
+  opponentScore Int
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+}
+
+model SpecialMatch {
+  id        Int      @id @default(autoincrement())
+  player1Id Int
+  player2Id Int
+  startDate DateTime
+  endDate   DateTime
+  reason    String
+  note      String?
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  player1  User    @relation("Player1", fields: [player1Id], references: [id])
+  player2  User    @relation("Player2", fields: [player2Id], references: [id])
+  matches  Match[]
+}
+
+model Notification {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  type         String   // 'message' | 'special_match'
+  title        String
+  message      String
+  opponentName String?
+  startDate    DateTime?
+  endDate      DateTime?
+  reason       String?
+  read         Boolean  @default(false)
+  readAt       DateTime?
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

@@ -1,7 +1,4 @@
-/**
- * api/admin/users.js
- * GET  /api/admin/users  — liste tous les utilisateurs acceptés (non en attente, non bannis)
- */
+// api/admin/users.js
 const { PrismaClient } = require('@prisma/client')
 const { requireAdmin } = require('../_auth')
 
@@ -16,7 +13,6 @@ module.exports = async function handler(req, res) {
 
   const payload = requireAdmin(req, res)
   if (!payload) return
-
   if (req.method !== 'GET') return res.status(405).json({ error: 'Méthode non autorisée' })
 
   try {
@@ -25,7 +21,7 @@ module.exports = async function handler(req, res) {
       select: {
         id: true, username: true, firstName: true, lastName: true,
         phone: true, category: true, role: true,
-        accepted: true, banned: true, createdAt: true,
+        accepted: true, banned: true, active: true, createdAt: true,
       },
     })
     return res.status(200).json({ users })

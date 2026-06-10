@@ -1,9 +1,4 @@
-/**
- * api/admin/action.js
- *
- * POST /api/admin/action
- * Body: { action: 'accept'|'refuse'|'ban'|'unban'|'update', userId: number, data?: {...} }
- */
+// api/admin/action.js
 const { PrismaClient } = require('@prisma/client')
 const { requireAdmin } = require('../_auth')
 
@@ -20,11 +15,9 @@ module.exports = async function handler(req, res) {
 
   const payload = requireAdmin(req, res)
   if (!payload) return
-
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' })
 
   const { action, userId, data } = req.body || {}
-
   if (!action || !userId) return res.status(400).json({ error: 'action et userId requis.' })
 
   const id = parseInt(userId, 10)
@@ -43,22 +36,43 @@ module.exports = async function handler(req, res) {
         await prisma.user.update({ where: { id }, data: { accepted: true, banned: false } })
         return res.status(200).json({ ok: true, message: 'Utilisateur accepté.' })
       }
+
       case 'refuse': {
         await prisma.user.delete({ where: { id } })
         return res.status(200).json({ ok: true, message: 'Demande refusée, compte supprimé.' })
       }
+
       case 'ban': {
-        await prisma.user.update({ where: { id }, data: { banned: true, accepted: false } })
-        return res.status(200).json({ ok: true, message: 'Utilisateur banni.' })
+        // Forcer déconnexion
+        await prisma.user.update({ where: { id }, data: { banned: true, accepted: false, forceLogout: true } })
+        return res.status(200).json({ ok: true, message: 'Utilisateur banni et déconnecté.' })
       }
+
       case 'unban': {
-        await prisma.user.update({ where: { id }, data: { banned: false, accepted: true } })
+        await prisma.user.update({ where: { id }, data: { banned: false, accepted: true, forceLogout: false } })
         return res.status(200).json({ ok: true, message: 'Bannissement levé.' })
       }
+
+      case 'delete_banned': {
+        if (!user.banned) return res.status(400).json({ error: 'Cet utilisateur n\'est pas banni.' })
+        await prisma.user.delete({ where: { id } })
+        return res.status(200).json({ ok: true, message: 'Utilisateur banni supprimé définitivement.' })
+      }
+
+      case 'activate': {
+        await prisma.user.update({ where: { id }, data: { active: true } })
+        return res.status(200).json({ ok: true, message: 'Utilisateur activé.' })
+      }
+
+      case 'deactivate': {
+        await prisma.user.update({ where: { id }, data: { active: false } })
+        return res.status(200).json({ ok: true, message: 'Utilisateur désactivé.' })
+      }
+
       case 'update': {
         if (!data) return res.status(400).json({ error: 'Données de mise à jour manquantes.' })
         const { firstName, lastName, username, phone, category } = data
-        const validCategories = ['N', 'R', 'D', 'P']
+        const validCategories = ['N', 'R', 'D', 'P', 'NC']
         if (category && !validCategories.includes(category))
           return res.status(400).json({ error: 'Catégorie invalide.' })
         if (username && username !== user.username) {
@@ -75,10 +89,11 @@ module.exports = async function handler(req, res) {
         if (category)  updateData.category  = category
         const updated = await prisma.user.update({
           where: { id }, data: updateData,
-          select: { id: true, username: true, firstName: true, lastName: true, phone: true, category: true, role: true, accepted: true, banned: true, createdAt: true },
+          select: { id: true, username: true, firstName: true, lastName: true, phone: true, category: true, role: true, accepted: true, banned: true, active: true, createdAt: true },
         })
         return res.status(200).json({ ok: true, user: updated })
       }
+
       default:
         return res.status(400).json({ error: `Action inconnue : ${action}` })
     }
