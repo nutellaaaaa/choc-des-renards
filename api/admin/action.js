@@ -1,4 +1,9 @@
 // api/admin/action.js
+// ─ Actions sur un utilisateur (accept, refuse, ban, unban, activate, deactivate, update, delete_banned)
+// ─ Actions globales (suspend_site, unsuspend_site, force_logout_all, reset_all_matches,
+//                     reset_all_notifications, deactivate_all_players)
+//   → anciennement dans api/admin/other_actions.js, maintenant fusionné ici
+// ─ GET → liste de tous les utilisateurs (anciennement api/admin/users.js)
 const { PrismaClient } = require('@prisma/client')
 const { requireAdmin } = require('../_auth')
 
@@ -9,16 +14,116 @@ const ADMIN_USERNAMES = ['admin', 'root']
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
   if (req.method === 'OPTIONS') return res.status(200).end()
 
   const payload = requireAdmin(req, res)
   if (!payload) return
+
+  // ── GET : liste de tous les utilisateurs ────────────────────────────────────
+  if (req.method === 'GET') {
+    try {
+      const users = await prisma.user.findMany({
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true, username: true, firstName: true, lastName: true,
+          phone: true, category: true, role: true,
+          accepted: true, banned: true, active: true, createdAt: true,
+        },
+      })
+      return res.status(200).json({ users })
+    } catch (err) {
+      console.error('[admin/action GET]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' })
 
   const { action, userId, data } = req.body || {}
-  if (!action || !userId) return res.status(400).json({ error: 'action et userId requis.' })
+  if (!action) return res.status(400).json({ error: 'action requis.' })
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // Actions GLOBALES (pas de userId requis)
+  // ══════════════════════════════════════════════════════════════════════════════
+  const globalActions = [
+    'suspend_site', 'unsuspend_site', 'force_logout_all',
+    'reset_all_matches', 'reset_all_notifications', 'deactivate_all_players',
+  ]
+
+  if (globalActions.includes(action)) {
+    try {
+      switch (action) {
+        case 'suspend_site': {
+          await prisma.tournamentState.upsert({
+            where: { id: 1 },
+            update: { siteSuspended: true },
+            create: { id: 1, currentPhase: 'PHASE0', siteSuspended: true },
+          })
+          await prisma.user.updateMany({
+            where: { role: 'USER', banned: false },
+            data: { forceLogout: true },
+          })
+          return res.status(200).json({ ok: true, message: 'Site suspendu. Tous les joueurs ont été déconnectés.' })
+        }
+
+        case 'unsuspend_site': {
+          await prisma.tournamentState.upsert({
+            where: { id: 1 },
+            update: { siteSuspended: false },
+            create: { id: 1, currentPhase: 'PHASE0', siteSuspended: false },
+          })
+          return res.status(200).json({ ok: true, message: 'Site réactivé.' })
+        }
+
+        case 'force_logout_all': {
+          await prisma.user.updateMany({
+            where: { role: 'USER' },
+            data: { forceLogout: true },
+          })
+          return res.status(200).json({ ok: true, message: 'Déconnexion forcée pour tous les joueurs.' })
+        }
+
+        case 'reset_all_matches': {
+          await prisma.matchSet.deleteMany({})
+          await prisma.match.deleteMany({})
+          await prisma.pouleMember.deleteMany({})
+          await prisma.poule.deleteMany({})
+          await prisma.phase2GroupMember.deleteMany({})
+          await prisma.phase2Group.deleteMany({})
+          await prisma.specialMatch.deleteMany({})
+          await prisma.tournamentState.upsert({
+            where: { id: 1 },
+            update: { rankingSnapshot: null, currentPhase: 'PHASE0', currentRound: null },
+            create: { id: 1, currentPhase: 'PHASE0' },
+          })
+          return res.status(200).json({ ok: true, message: 'Tous les matchs, scores, poules et groupes ont été supprimés. Tournoi réinitialisé.' })
+        }
+
+        case 'reset_all_notifications': {
+          await prisma.notification.deleteMany({})
+          return res.status(200).json({ ok: true, message: 'Toutes les notifications ont été supprimées.' })
+        }
+
+        case 'deactivate_all_players': {
+          await prisma.user.updateMany({
+            where: { role: 'USER', username: { notIn: ADMIN_USERNAMES } },
+            data: { active: false },
+          })
+          return res.status(200).json({ ok: true, message: 'Tous les joueurs ont été mis en inactif.' })
+        }
+      }
+    } catch (err) {
+      console.error('[admin/action global]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // Actions sur un utilisateur précis (userId requis)
+  // ══════════════════════════════════════════════════════════════════════════════
+  if (!userId) return res.status(400).json({ error: 'userId requis pour cette action.' })
 
   const id = parseInt(userId, 10)
   if (isNaN(id)) return res.status(400).json({ error: 'userId invalide.' })
@@ -43,7 +148,6 @@ module.exports = async function handler(req, res) {
       }
 
       case 'ban': {
-        // Forcer déconnexion
         await prisma.user.update({ where: { id }, data: { banned: true, accepted: false, forceLogout: true } })
         return res.status(200).json({ ok: true, message: 'Utilisateur banni et déconnecté.' })
       }
@@ -89,7 +193,11 @@ module.exports = async function handler(req, res) {
         if (category)  updateData.category  = category
         const updated = await prisma.user.update({
           where: { id }, data: updateData,
-          select: { id: true, username: true, firstName: true, lastName: true, phone: true, category: true, role: true, accepted: true, banned: true, active: true, createdAt: true },
+          select: {
+            id: true, username: true, firstName: true, lastName: true,
+            phone: true, category: true, role: true,
+            accepted: true, banned: true, active: true, createdAt: true,
+          },
         })
         return res.status(200).json({ ok: true, user: updated })
       }

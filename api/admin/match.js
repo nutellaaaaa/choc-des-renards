@@ -39,7 +39,7 @@ module.exports = async function handler(req, res) {
   // ── GET : matchs en attente + publiés + liste joueurs actifs ────────────────
   if (req.method === 'GET') {
     try {
-      const [pending, published, activeUsers] = await Promise.all([
+      const [pending, published, activeUsers, openSpecials] = await Promise.all([
         prisma.match.findMany({
           where: { published: false },
           orderBy: { createdAt: 'desc' },
@@ -62,8 +62,17 @@ module.exports = async function handler(req, res) {
           select: { id: true, firstName: true, lastName: true, username: true, category: true },
           orderBy: { lastName: 'asc' },
         }),
+        // Rencontres spéciales non résolues — pour affichage dans "en attente"
+        prisma.specialMatch.findMany({
+          where: { resolved: false },
+          orderBy: { createdAt: 'desc' },
+          include: {
+            player1: { select: { id: true, firstName: true, lastName: true, username: true } },
+            player2: { select: { id: true, firstName: true, lastName: true, username: true } },
+          },
+        }),
       ])
-      return res.status(200).json({ pending, published, activeUsers })
+      return res.status(200).json({ pending, published, activeUsers, openSpecials })
     } catch (err) {
       console.error('[admin/match GET]', err)
       return res.status(500).json({ error: 'Erreur serveur.' })

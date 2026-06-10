@@ -247,7 +247,7 @@
   .admin-table th { font-family: var(--font-heading); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gray); padding: 0.6rem 0.75rem; text-align: left; white-space: nowrap; }
   .admin-table td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--dark4); color: var(--gray-light); vertical-align: middle; }
   .admin-table tbody tr:hover { background: var(--dark2); }
-  .admin-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
+  .admin-actions { display: flex; gap: 0.4rem; flex-wrap: nowrap; align-items: center; min-width: max-content; }
   .btn-sm { font-family: var(--font-heading); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.3rem 0.75rem; border-radius: 5px; border: 1px solid transparent; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
   .btn-accept  { background: rgba(100,220,100,0.15); color: #6ddc6d; border-color: rgba(100,220,100,0.3); }
   .btn-accept:hover  { background: rgba(100,220,100,0.25); }
@@ -1032,10 +1032,7 @@ function showAuthOverlay() {
 }
 
 function logout() {
-  // Enregistrer logoutAt (best-effort)
-  try {
-    fetch('/api/logout', { method: 'POST', headers: authHeaders() }).catch(() => {})
-  } catch(e) {}
+  // JWT stateless : /api/logout supprimé (n'existait pas), on vide le token localement
   localStorage.removeItem('cdr_token'); localStorage.removeItem('cdr_user')
   currentUser = null; pendingNotifications = []; classementLoaded = false
   showAuthOverlay()
@@ -1182,7 +1179,7 @@ async function loadMesNotifs() {
   const list = document.getElementById('mes-notifs-list')
   list.innerHTML = '<div class="admin-empty">Chargement…</div>'
   try {
-    const res = await fetch('/api/notifications/history', { headers: authHeaders() })
+    const res = await fetch('/api/notifications?history=1', { headers: authHeaders() })
     if (!res.ok) { list.innerHTML = '<div class="admin-empty">Impossible de charger.</div>'; return }
     const { notifications } = await res.json()
     if (!notifications || notifications.length === 0) {
@@ -1441,7 +1438,7 @@ async function loadAdminData() {
 /* ── Utilisateurs ── */
 async function loadUsers() {
   try {
-    const res = await fetch('/api/admin/users', { headers: authHeaders() })
+    const res = await fetch('/api/admin/action', { headers: authHeaders() })
     if (!res.ok) return
     const { users } = await res.json()
     const accepted = users.filter(u => u.accepted && !u.banned)
@@ -1698,10 +1695,9 @@ function populateOppDropdown() {
 
 function openMatchModal(user) {
   matchModalMode = 'add'
-  document.getElementById('match-modal-title').innerHTML = 'Ajouter un match — <span>' + esc(user.firstName) + ' ' + esc(user.lastName) + '</span>'
+  document.getElementById('match-modal-title').innerHTML = 'Ajouter un match — <span id="match-modal-player-name">' + esc(user.firstName) + ' ' + esc(user.lastName) + '</span>'
   document.getElementById('match-modal-user-id').value = user.id
   document.getElementById('match-modal-match-id').value = ''
-  document.getElementById('match-modal-player-name').textContent = user.firstName + ' ' + user.lastName
   document.getElementById('match-opp-dropdown-group').style.display = 'block'
   populateOppDropdown()
   // Exclure le joueur lui-même du dropdown
@@ -1960,7 +1956,7 @@ let allPlayersForNotify = []
 
 async function loadPlayersForNotify() {
   if (allPlayersForNotify.length > 0) { populatePlayerSelects(); return }
-  const res = await fetch('/api/admin/users', { headers: authHeaders() })
+  const res = await fetch('/api/admin/action', { headers: authHeaders() })
   if (!res.ok) return
   const { users } = await res.json()
   allPlayersForNotify = users.filter(u => u.accepted && !u.banned && !['admin','root'].includes(u.username.toLowerCase()))
@@ -2050,10 +2046,11 @@ async function loadPendingMatches() {
       fetch('/api/admin/phase', { headers: authHeaders() }),
     ])
     if (!matchRes.ok) return
-    const { pending, published, activeUsers: au } = await matchRes.json()
+    const { pending, published, activeUsers: au, openSpecials: specials } = await matchRes.json()
     activeUsers = au || []
-    document.getElementById('badge-pending-matches').textContent = pending.length
-    document.getElementById('badge-pending2').textContent = pending.length
+    const totalPending = pending.length + (specials ? specials.length : 0)
+    document.getElementById('badge-pending-matches').textContent = totalPending
+    document.getElementById('badge-pending2').textContent = totalPending
 
     // Statut snapshot
     if (phaseRes.ok) {
@@ -2063,9 +2060,23 @@ async function loadPendingMatches() {
 
     // Matchs en attente
     const pendingList = document.getElementById('pending-matches-list')
-    pendingList.innerHTML = pending.length === 0
+    const specialsHtml = (specials && specials.length > 0)
+      ? specials.map(s => `<div class="pending-match-card" style="border-left:3px solid var(--orange)">
+          <div class="pending-match-info">
+            <div class="pending-match-player" style="color:var(--orange-light)">🗓 Rencontre spéciale</div>
+            <div class="pending-match-player">${esc(s.player1?.firstName)} ${esc(s.player1?.lastName)} <span style="color:var(--gray)">vs</span> ${esc(s.player2?.firstName)} ${esc(s.player2?.lastName)}</div>
+            <div class="pending-match-detail">Organisée le ${fmtDateOnly(s.createdAt)} · Du ${fmtDateOnly(s.startDate)} au ${fmtDateOnly(s.endDate)}</div>
+            <div style="font-size:0.82rem;color:var(--gray);margin-top:0.2rem">Motif : ${esc(s.reason)}${s.note ? ' — ' + esc(s.note) : ''}</div>
+          </div>
+          <div class="pending-match-actions">
+            <button class="btn-sm btn-match" onclick="openMatchModal(${JSON.stringify(s.player1).replace(/"/g,'&quot;')})">Saisir scores (joueur 1)</button>
+            <button class="btn-sm btn-edit" onclick="openMatchModal(${JSON.stringify(s.player2).replace(/"/g,'&quot;')})">Saisir scores (joueur 2)</button>
+          </div>
+        </div>`).join('')
+      : ''
+    pendingList.innerHTML = (pending.length === 0 && !specialsHtml)
       ? '<div class="admin-empty">Aucun match en attente.</div>'
-      : pending.map(m => renderMatchCard(m, false)).join('')
+      : specialsHtml + pending.map(m => renderMatchCard(m, false)).join('')
 
     // Matchs publiés
     const pubList = document.getElementById('published-matches-list')
@@ -2125,7 +2136,7 @@ async function otherAction(action, confirmMsg) {
   const feedback = document.getElementById('other-actions-feedback')
   feedback.textContent = 'Traitement…'; feedback.style.color = 'var(--orange)'
   try {
-    const res = await fetch('/api/admin/other_actions', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action }) })
+    const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action }) })
     const data = await res.json()
     if (res.ok) {
       feedback.textContent = '✓ ' + (data.message || 'Opération effectuée.')
