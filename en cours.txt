@@ -1,18 +1,7 @@
-- Retirer nb phases et nb mois sur l'accueil
-- Ajouter nb matchs joués (somme du nombre de matchs joués par chaque joueurs divisée par deux)
-- Remplacer 24 par une variable dynamique qui dépend du nombre d'utilisateurs actif=true présents sur le site 
-- Remplacer 4 par une variable dynamique qui reprend le nombre de poules de la phase 1 
 - Corriges les problèmes d'alignement de la section "Charte" (situés dans les différents articles de la charte)
 - Revoir ce qui est mis en gras dans la Charte (exemple pour l'article 3, on met en gras "le dernier samedi" car c'est la date qui est importante)
-- Mettre la lettre N en rouge, R en bleu, D en vert, P en jaune
-- Ajouter la catégorie NC en gris (pour non-classé)
-- Dans le formulaire, les joueurs ne rentrent pas leur pseudo et leur niveau. Le pseudo par défaut est alors leur prénom en minuscule et leur niveau par niveau NC. 
-- Remplacer toutes les dates (2025-2026, 2026, etc) par une variable de l'année actuelle (pour que le site ne soit pas obsolète l'année suivante)
-- On ne se connecte plus avec son pseudo mais avec son prénom et son nom
-- Ajout d'un statut actif/inactif géré par l'administrateur (et visibles dans l'onglet utilisateurs de la console admin). Seul les jours actif=true sont classés, peuvent être intégrés aux poules, etc. Par contre, ils ont droit de consulter le site en tant que "guest".
 - Historique des demandes de connexion refusées par l'admin (comme affichage pour sa propre satisfaction, sans plus d'intérêt particulier)
 - Dans l'affichage des Sets, remplacer les +X par X (ex, +3 devient 3)
-- L'affichage des gens dans le classement (général, poules ou choqués/choquant) se fait par leur pseudo et non pas leur Prénom et leur Nom  
 - Lorsque l'admin ajoute un match à un joueur dans son onglet Utilisateurs, il ne doit plus renseigner le Nom et le Prénom de l'adversaire de la personne mais à un menu déroulant à la place avec la liste des utilisateurs actifs (prénom, nom, pseudo) (plus simple et gain de temps)
 - Avoir l'impression que le bouton figer le classement / remettre le classement en live sont "enfoncés" pour que l'admin puisse avoir un aperçu rapide du statut actuelle
 - Masquer le statut "classement figé" aux utilisateurs
@@ -65,3 +54,22 @@ Par défaut, le malus est none.
  - Revoir le format mobile
  - Créer des joueurs
 
+
+---------- Done ----------
+- Retirer nb phases et nb mois sur l'accueil
+- Ajouter nb matchs joués (somme du nombre de matchs joués par chaque joueurs divisée par deux)
+- Remplacer 24 par une variable dynamique qui dépend du nombre d'utilisateurs actif=true présents sur le site 
+- Remplacer 4 par une variable dynamique qui reprend le nombre de poules de la phase 1 
+- Mettre la lettre N en rouge, R en bleu, D en vert, P en jaune
+- Ajouter la catégorie NC en gris (pour non-classé)
+- Dans le formulaire, les joueurs ne rentrent pas leur pseudo et leur niveau. Le pseudo par défaut est alors leur prénom en minuscule et leur niveau par niveau NC. 
+- Remplacer toutes les dates (2025-2026, 2026, etc) par une variable de l'année actuelle (pour que le site ne soit pas obsolète l'année suivante)
+- On ne se connecte plus avec son pseudo mais avec son prénom et son nom
+- Ajout d'un statut actif/inactif géré par l'administrateur (et visibles dans l'onglet utilisateurs de la console admin). Seul les jours actif=true sont classés, peuvent être intégrés aux poules, etc. Par contre, ils ont droit de consulter le site en tant que "guest".
+- - L'affichage des gens dans le classement (général, poules ou choqués/choquant) se fait par leur pseudo et non pas leur Prénom et leur Nom  
+
+
+---------- Bugs en cours de réparation ----------
+- Mettre sur la même lignes les boutons actions sur un joueur dans utilisateurs
+- Impossibilité de cliquer sur "ajouter un match"
+- Lorsqu'une "rencontre spéciale" est organisée par l'admin, celle-ci n'apparaît pas dans les publications en attente. Or, si elle n'apparait pas cela signifie que l'admin ne peut pas rentrer les scores (autrement qu'en ajoutant manuellement le match à un des deux joueurs)

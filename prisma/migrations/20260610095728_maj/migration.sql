@@ -23,6 +23,9 @@ ADD COLUMN "logoutAt" TIMESTAMP(3);
 -- =====================================================
 
 ALTER TABLE "Match"
+ALTER COLUMN "phase" DROP DEFAULT;
+
+ALTER TABLE "Match"
 ALTER COLUMN "phase"
 TYPE "Phase"
 USING ("phase"::text::"Phase");
@@ -32,27 +35,24 @@ USING ("phase"::text::"Phase");
 -- =====================================================
 
 ALTER TABLE "Poule"
+ALTER COLUMN "phase" DROP DEFAULT;
+
+ALTER TABLE "Poule"
 ALTER COLUMN "phase"
 TYPE "Phase"
 USING ("phase"::text::"Phase");
 
 ALTER TABLE "Poule"
 ALTER COLUMN "phase"
-SET DEFAULT 'PHASE1';
+SET DEFAULT 'PHASE1'::"Phase";
 
 -- =====================================================
 -- TOURNAMENTSTATE
 -- =====================================================
 
-CREATE SEQUENCE tournamentstate_id_seq;
 
 ALTER TABLE "TournamentState"
-DROP COLUMN "updatedAt",
-ADD COLUMN "siteSuspended" BOOLEAN NOT NULL DEFAULT false,
-ALTER COLUMN "id" SET DEFAULT nextval('tournamentstate_id_seq');
-
-ALTER SEQUENCE tournamentstate_id_seq
-OWNED BY "TournamentState"."id";
+ALTER COLUMN "currentPhase" DROP DEFAULT;
 
 ALTER TABLE "TournamentState"
 ALTER COLUMN "currentPhase"
@@ -61,7 +61,7 @@ USING ("currentPhase"::text::"Phase");
 
 ALTER TABLE "TournamentState"
 ALTER COLUMN "currentPhase"
-SET DEFAULT 'PHASE0';
+SET DEFAULT 'PHASE0'::"Phase";
 
 -- =====================================================
 -- USER
@@ -69,8 +69,7 @@ SET DEFAULT 'PHASE0';
 
 ALTER TABLE "User"
 ADD COLUMN "active" BOOLEAN NOT NULL DEFAULT true,
-ADD COLUMN "forceLogout" BOOLEAN NOT NULL DEFAULT false,
-ALTER COLUMN "category" SET DEFAULT 'NC';
+ADD COLUMN "forceLogout" BOOLEAN NOT NULL DEFAULT false;
 
 -- =====================================================
 -- INDEXES
