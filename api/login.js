@@ -30,6 +30,27 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
   if (req.method === 'OPTIONS') return res.status(200).end()
+
+  // ── POST /api/login?action=logout — enregistrer la déconnexion ──────────────
+  if (req.method === 'POST' && req.query?.action === 'logout') {
+    const { loginEventId, reason } = req.body || {}
+    if (loginEventId) {
+      try {
+        const eid = parseInt(loginEventId, 10)
+        if (!isNaN(eid)) {
+          await prisma.loginEvent.update({
+            where: { id: eid },
+            data: {
+              logoutAt: new Date(),
+              logoutReason: reason === 'inactivity' ? 'inactivity' : 'manual',
+            },
+          })
+        }
+      } catch(e) { console.error('[logout log]', e) }
+    }
+    return res.status(200).json({ ok: true })
+  }
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' })
 
   const { firstName, lastName, password } = req.body || {}
@@ -104,7 +125,18 @@ module.exports = async function handler(req, res) {
 		} catch (mailErr) { console.error('[EMAIL ADMIN]', mailErr) }
 	}
 
-    await logLogin(user.id, req, true, 'Connexion réussie')
+    // Créer l'événement de login et retourner son ID pour pouvoir logger le logout
+    const rawIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null
+    const ip = rawIp ? rawIp.split(',')[0].trim() : null
+    const loginEvent = await prisma.loginEvent.create({
+      data: {
+        userId: user.id,
+        ip,
+        userAgent: req.headers['user-agent'] || null,
+        success: true,
+        message: 'Connexion réussie',
+      },
+    })
 
     const token = jwt.sign(
       { userId: user.id, username: user.username, role: isAdmin ? 'ADMIN' : user.role },
@@ -122,6 +154,7 @@ module.exports = async function handler(req, res) {
 
     return res.status(200).json({
       token,
+      loginEventId: loginEvent.id,
       user: {
         id: user.id,
         username: user.username,

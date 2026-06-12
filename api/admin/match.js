@@ -7,6 +7,25 @@ const prisma = global._prisma
 
 const ADMIN_USERNAMES = ['admin', 'root']
 
+const MALUS_LIST = [
+  'Interdiction de smasher ou de tendre droit',
+  'Porter un cache-œil',
+  'Interdiction de taper le volant au-dessus de la bande',
+  'Jouer en demi-terrain pour le joueur le moins bien classé (le demi-terrain change selon le service en cours)',
+  'Jouer avec une raquette courte',
+  'Jouer avec une raquette lestée',
+  'Jouer avec une raquette de précision',
+  'Jouer avec un bras dans le dos constamment',
+  'Interdiction de faire un coup droit',
+  'Interdiction de faire un revers',
+  'Annoncer chaque coup à voix haute avant de le jouer',
+  'Les couloirs font partie du terrain du joueur le plus classé',
+  'Les points du joueur le moins classé comptent double',
+  'Le point est marqué par le joueur le mieux classé uniquement s\'il touche le sol avant la raquette de l\'adversaire',
+  'Le joueur le moins classé marque le point',
+  'Zone restrictive changeant à chaque set : rivière, box, couloir du fond, box puis rivière',
+]
+
 function computeStats(matches) {
   let played = 0, wins = 0, losses = 0, setDiff = 0
   for (const m of matches) {
@@ -36,10 +55,10 @@ module.exports = async function handler(req, res) {
   const payload = requireAdmin(req, res)
   if (!payload) return
 
-  // ── GET : matchs en attente + publiés + liste joueurs actifs ────────────────
+  // ── GET : matchs en attente + publiés + liste joueurs actifs + matchs planifiés
   if (req.method === 'GET') {
     try {
-      const [pending, published, activeUsers, openSpecials] = await Promise.all([
+      const [pending, published, activeUsers, openSpecials, planned] = await Promise.all([
         prisma.match.findMany({
           where: { published: false },
           orderBy: { createdAt: 'desc' },
@@ -62,7 +81,6 @@ module.exports = async function handler(req, res) {
           select: { id: true, firstName: true, lastName: true, username: true, category: true },
           orderBy: { lastName: 'asc' },
         }),
-        // Rencontres spéciales non résolues — pour affichage dans "en attente"
         prisma.specialMatch.findMany({
           where: { resolved: false },
           orderBy: { createdAt: 'desc' },
@@ -71,8 +89,15 @@ module.exports = async function handler(req, res) {
             player2: { select: { id: true, firstName: true, lastName: true, username: true } },
           },
         }),
+        prisma.plannedMatch.findMany({
+          orderBy: { scheduledDate: 'asc' },
+          include: {
+            player1: { select: { id: true, firstName: true, lastName: true, username: true, category: true } },
+            player2: { select: { id: true, firstName: true, lastName: true, username: true, category: true } },
+          },
+        }),
       ])
-      return res.status(200).json({ pending, published, activeUsers, openSpecials })
+      return res.status(200).json({ pending, published, activeUsers, openSpecials, planned, malusList: MALUS_LIST })
     } catch (err) {
       console.error('[admin/match GET]', err)
       return res.status(500).json({ error: 'Erreur serveur.' })
@@ -83,7 +108,7 @@ module.exports = async function handler(req, res) {
 
   const { action } = req.body || {}
 
-  // ── PUBLISH ─────────────────────────────────────────────────────────────────
+  // ── PUBLISH ──────────────────────────────────────────────────────────────────
   if (action === 'publish') {
     const mid = parseInt(req.body.matchId, 10)
     if (isNaN(mid)) return res.status(400).json({ error: 'matchId invalide.' })
@@ -113,7 +138,6 @@ module.exports = async function handler(req, res) {
     if (!sets || !Array.isArray(sets) || sets.length === 0 || sets.length > 5)
       return res.status(400).json({ error: 'Entre 1 et 5 sets requis.' })
     try {
-      // Supprimer les anciens sets
       await prisma.matchSet.deleteMany({ where: { matchId: mid } })
       const updated = await prisma.match.update({
         where: { id: mid },
@@ -226,7 +250,6 @@ module.exports = async function handler(req, res) {
     if (ADMIN_USERNAMES.includes(player.username.toLowerCase()))
       return res.status(403).json({ error: "Impossible d'ajouter un match à un compte admin." })
 
-    // Adversaire : soit par opponentId (dropdown), soit par nom/prénom
     let oppFn, oppLn, oppUser = null
     if (opponentId) {
       const oppId = parseInt(opponentId, 10)
@@ -308,6 +331,66 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // ── ADD FROM SPECIAL (score rencontre spéciale, convertit le match planifié) ──
+  if (action === 'add_from_special') {
+    const { specialMatchId, matchDate, note, sets } = req.body
+
+    const smid = parseInt(specialMatchId, 10)
+    if (isNaN(smid)) return res.status(400).json({ error: 'specialMatchId invalide.' })
+    if (!matchDate) return res.status(400).json({ error: 'Date du match requise.' })
+    if (!Array.isArray(sets) || sets.length === 0 || sets.length > 5)
+      return res.status(400).json({ error: 'Entre 1 et 5 sets requis.' })
+
+    try {
+      const sm = await prisma.specialMatch.findUnique({ where: { id: smid } })
+      if (!sm) return res.status(404).json({ error: 'Rencontre spéciale introuvable.' })
+      if (sm.resolved) return res.status(400).json({ error: 'Cette rencontre est déjà résolue.' })
+
+      const [p1, p2] = await Promise.all([
+        prisma.user.findUnique({ where: { id: sm.player1Id } }),
+        prisma.user.findUnique({ where: { id: sm.player2Id } }),
+      ])
+      if (!p1 || !p2) return res.status(404).json({ error: 'Joueur introuvable.' })
+
+      const matchDateObj = new Date(matchDate)
+      const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
+      const phase = state?.currentPhase || 'PHASE0'
+      const roundInt = phase === 'PHASE2' ? state?.currentRound : null
+
+      await prisma.specialMatch.update({ where: { id: smid }, data: { resolved: true } })
+
+      const [m1, m2] = await Promise.all([
+        prisma.match.create({
+          data: {
+            userId: sm.player1Id, phase, roundNumber: roundInt,
+            matchDate: matchDateObj,
+            opponentFirstName: p2.firstName, opponentLastName: p2.lastName,
+            note: note ? note.trim() : null,
+            published: false, specialMatchId: smid,
+            sets: { create: sets.map(s => ({ setNumber: s.setNumber, playerScore: s.playerScore, opponentScore: s.opponentScore })) },
+          },
+          include: { sets: true },
+        }),
+        prisma.match.create({
+          data: {
+            userId: sm.player2Id, phase, roundNumber: roundInt,
+            matchDate: matchDateObj,
+            opponentFirstName: p1.firstName, opponentLastName: p1.lastName,
+            note: note ? note.trim() : null,
+            published: false, specialMatchId: smid,
+            sets: { create: sets.map(s => ({ setNumber: s.setNumber, playerScore: s.opponentScore, opponentScore: s.playerScore })) },
+          },
+          include: { sets: true },
+        }),
+      ])
+
+      return res.status(201).json({ ok: true, match1: m1, match2: m2 })
+    } catch (err) {
+      console.error('[admin/match add_from_special]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
   // ── DELETE ───────────────────────────────────────────────────────────────────
   if (action === 'delete') {
     const mid = parseInt(req.body.matchId, 10)
@@ -317,6 +400,138 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, message: 'Match supprimé.' })
     } catch (err) {
       return res.status(500).json({ error: 'Erreur serveur ou match introuvable.' })
+    }
+  }
+
+  // ── PLANNED : créer un match planifié ────────────────────────────────────────
+  if (action === 'planned_add') {
+    const { player1Id, player2Id, scheduledDate, malus, malusTarget, note, phase, round } = req.body
+    if (!player1Id || !player2Id) return res.status(400).json({ error: 'Les deux joueurs sont requis.' })
+    const p1id = parseInt(player1Id, 10)
+    const p2id = parseInt(player2Id, 10)
+    if (isNaN(p1id) || isNaN(p2id) || p1id === p2id)
+      return res.status(400).json({ error: 'Joueurs invalides.' })
+    try {
+      const pm = await prisma.plannedMatch.create({
+        data: {
+          player1Id: p1id,
+          player2Id: p2id,
+          scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
+          malus: malus || null,
+          malusTarget: malusTarget ? parseInt(malusTarget, 10) : null,
+          note: note ? note.trim() : null,
+          phase: phase || 'PHASE1',
+          roundNumber: phase === 'PHASE2' ? (parseInt(round, 10) || null) : null,
+        },
+        include: {
+          player1: { select: { id: true, firstName: true, lastName: true, username: true, category: true } },
+          player2: { select: { id: true, firstName: true, lastName: true, username: true, category: true } },
+        },
+      })
+      return res.status(201).json({ ok: true, plannedMatch: pm })
+    } catch (err) {
+      console.error('[planned_add]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  // ── PLANNED : modifier ────────────────────────────────────────────────────────
+  if (action === 'planned_edit') {
+    const { plannedMatchId, scheduledDate, malus, malusTarget, note, phase, round } = req.body
+    const pmid = parseInt(plannedMatchId, 10)
+    if (isNaN(pmid)) return res.status(400).json({ error: 'plannedMatchId invalide.' })
+    try {
+      const pm = await prisma.plannedMatch.update({
+        where: { id: pmid },
+        data: {
+          scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
+          malus: malus || null,
+          malusTarget: malusTarget ? parseInt(malusTarget, 10) : null,
+          note: note ? note.trim() : null,
+          phase: phase || 'PHASE1',
+          roundNumber: phase === 'PHASE2' ? (parseInt(round, 10) || null) : null,
+        },
+        include: {
+          player1: { select: { id: true, firstName: true, lastName: true, username: true, category: true } },
+          player2: { select: { id: true, firstName: true, lastName: true, username: true, category: true } },
+        },
+      })
+      return res.status(200).json({ ok: true, plannedMatch: pm })
+    } catch (err) {
+      console.error('[planned_edit]', err)
+      return res.status(500).json({ error: 'Erreur serveur ou match introuvable.' })
+    }
+  }
+
+  // ── PLANNED : supprimer ───────────────────────────────────────────────────────
+  if (action === 'planned_delete') {
+    const pmid = parseInt(req.body.plannedMatchId, 10)
+    if (isNaN(pmid)) return res.status(400).json({ error: 'plannedMatchId invalide.' })
+    try {
+      await prisma.plannedMatch.delete({ where: { id: pmid } })
+      return res.status(200).json({ ok: true })
+    } catch (err) {
+      return res.status(500).json({ error: 'Erreur serveur ou match introuvable.' })
+    }
+  }
+
+  // ── PLANNED → convertir en match réel ────────────────────────────────────────
+  if (action === 'planned_convert') {
+    const { plannedMatchId, matchDate, note, sets } = req.body
+    const pmid = parseInt(plannedMatchId, 10)
+    if (isNaN(pmid)) return res.status(400).json({ error: 'plannedMatchId invalide.' })
+    if (!matchDate) return res.status(400).json({ error: 'Date du match requise.' })
+    if (!Array.isArray(sets) || sets.length === 0 || sets.length > 5)
+      return res.status(400).json({ error: 'Entre 1 et 5 sets requis.' })
+
+    try {
+      const pm = await prisma.plannedMatch.findUnique({
+        where: { id: pmid },
+        include: {
+          player1: true,
+          player2: true,
+        },
+      })
+      if (!pm) return res.status(404).json({ error: 'Match planifié introuvable.' })
+
+      const matchDateObj = new Date(matchDate)
+      const roundInt = pm.phase === 'PHASE2' ? pm.roundNumber : null
+
+      const noteStr = note ? note.trim() : (pm.note || null)
+
+      // Créer les deux matchs miroir
+      const [m1, m2] = await Promise.all([
+        prisma.match.create({
+          data: {
+            userId: pm.player1Id, phase: pm.phase, roundNumber: roundInt,
+            matchDate: matchDateObj,
+            opponentFirstName: pm.player2.firstName, opponentLastName: pm.player2.lastName,
+            note: noteStr,
+            published: false,
+            sets: { create: sets.map(s => ({ setNumber: s.setNumber, playerScore: s.playerScore, opponentScore: s.opponentScore })) },
+          },
+          include: { sets: true },
+        }),
+        prisma.match.create({
+          data: {
+            userId: pm.player2Id, phase: pm.phase, roundNumber: roundInt,
+            matchDate: matchDateObj,
+            opponentFirstName: pm.player1.firstName, opponentLastName: pm.player1.lastName,
+            note: noteStr,
+            published: false,
+            sets: { create: sets.map(s => ({ setNumber: s.setNumber, playerScore: s.opponentScore, opponentScore: s.playerScore })) },
+          },
+          include: { sets: true },
+        }),
+      ])
+
+      // Supprimer le match planifié
+      await prisma.plannedMatch.delete({ where: { id: pmid } })
+
+      return res.status(201).json({ ok: true, match1: m1, match2: m2 })
+    } catch (err) {
+      console.error('[planned_convert]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
     }
   }
 

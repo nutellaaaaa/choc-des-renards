@@ -2,13 +2,13 @@
 - Revoir ce qui est mis en gras dans la Charte (exemple pour l'article 3, on met en gras "le dernier samedi" car c'est la date qui est importante)
 - Historique des demandes de connexion refusées par l'admin (comme affichage pour sa propre satisfaction, sans plus d'intérêt particulier)
 - Dans l'affichage des Sets, remplacer les +X par X (ex, +3 devient 3)
-- Les matchs fait par chaque joueurs dans le classement général doit toujours être affiché en Live, c'est le calcul du classement qui doit être actualisé par l'admin. Par exemple, si je viens de faire un match, mon match devient visible par les autres utilisateurs lorsqu'il est publié par l'admin, mes points me sont attribués, mais je ne bouge pas dans le classement avant que le classement ne soit défigé. Ca évite les problèmes lors de la phase de ronde suisse. 
+- Les matchs fait par chaque joueurs dans le classement général doit toujours être affiché en Live, c'est le calcul du classement qui doit être actualisé par l'admin. Par exemple, si je viens de faire un match, mon match devient visible par les autres utilisateurs lorsqu'il est publié par l'admin, mes points me sont attribués, mais je ne bouge pas dans le classement avant que le classement ne soit défigé. Ca évite les problèmes lors de la phase de ronde suisse par exemple. 
 - Dans les logs de connexions de la section "Connexions" auquelle a accès l'admin, ajoute l'heure de déconnexion à l'heure de connexion des joueurs. Si un joueur s'est déconnecté manuellement, l'heure de déconnexion est celle indiquée. Si le joueur a été déconnecté par inactivité, retires 15 minutes à l'heure pour avoir la vraie heure à laquelle il a arrêté d'utiliser le site. 
 - Rajouter un onglet "Matchs à venir" pour l'admin. Les matchs à venir sont calculées comme suit : lorsque la phase 2 commence, à la fin de chaque ronde le 1er affronte le 2e, le 3e le 4e, etc (dans les deux groupes renards choquants/renards choqués) pour le calcul des matchs de la phase 1, on verra ça plus tard. Dans cet onglet l'admin peut consulter les maths à venir et choisir du moment où il envoie une convocation (lorsqu'il lance la convocation pour un match, il notifie les deux joueurs en même temps et le match apparaît dans les rencontres prévues). L'admin a la possibilité d'envoyer les convocations à tout le monde en même temps. 
 - Lorsque l'admin ajoute un match à des joueurs, il a la possibilité de mettre une note optionnelle. Je voudrai qu'il ait également la possibilité de rajouter une/plusieurs photos. Elles seront alors visibles par tous dans le classement, en cliquant sur un joueur, dans le match en question de l'historique des matchs joués de ce joueur. Il sera possible de cliquer sur ces images pour les ouvrir en grand. 
 - Avoir la possibilité d'envoyer une notification à plusieurs joueurs en même temps (petites cases à cocher + case "tout le monde")
 - Toutes les photos sont stockées dans la base de donnée et sont consultables publiquement dans un onglet "souvenirs" à côté de l'onglet "classement" (en plus dêtre présentes dans l'historique des matchs des joueurs)
-- Possibilité de rajouter des malus à certains joueurs, menu déroulant présent lors d'une rencontre. Concrètement, l'admin ira dans les matchs à venir, et aura un menu déroulant pour ajouter un malus parmis : 
+- Possibilité de rajouter des malus à certains joueurs, menu déroulant présent dans "rencontre" ou dans "publication des matchs". Concrètement, l'admin ira dans les matchs à venir, et aura un menu déroulant pour ajouter un malus parmis : 
 ♡ Interdiction de smasher ou de tendre droit
 ♡ Porter un cache-œil
 ♡ Interdiction de taper le volant au dessus de la bande
@@ -72,5 +72,40 @@ Par défaut, le malus est none.
 
 
 ---------- Bugs en cours de réparation ----------
-- Mettre sur la même lignes les boutons actions sur un joueur dans utilisateurs
-- Lorsqu'une "rencontre spéciale" est organisée par l'admin, celle-ci n'apparaît pas dans les publications en attente. Or, si elle n'apparait pas cela signifie que l'admin ne peut pas rentrer les scores (autrement qu'en ajoutant manuellement le match à un des deux joueurs)
+- Dans l'onglet "publication match", "en attente", l'admin renseigne le score pour les deux joueurs. C'est à dire qu'on ne lui propose pas de renseigner le score joueur 1 ou le score joueur 2 mais juste "renseigner le score" et l'adversaire n'est pas à choisir parmi la liste des utilisateurs, c'est l'adversaire du match et ça ne peut être autrement. 
+- Les matchs en attente de publication (qui n'ont donc pas encore été joués) peuvent être modifiés (malus, date) ou supprimé. 
+
+
+- Dans l'onglet "publication match", "en attente", l'admin renseigne le score pour les deux joueurs. C'est à dire qu'on ne lui propose pas de renseigner le score joueur 1 ou le score joueur 2 mais juste "renseigner le score" et l'adversaire n'est pas à choisir parmi la liste des utilisateurs, c'est l'adversaire du match et ça ne peut être autrement. 
+- Les matchs en attente de publication (qui n'ont donc pas encore été joués) peuvent être modifiés (malus, date) ou supprimé. 
+- Corriges les problèmes d'alignement de la section "Charte" (situés dans les différents articles de la charte)
+- Revoir ce qui est mis en gras dans la Charte (exemple pour l'article 3, on met en gras "le dernier samedi" car c'est la date qui est importante)
+- Historique des demandes de connexion refusées par l'admin (comme affichage pour sa propre satisfaction, sans plus d'intérêt particulier)
+- Dans l'affichage des Sets, remplacer les +X par X (ex, +3 devient 3)
+- Les matchs fait par chaque joueurs dans le classement général doit toujours être affiché en Live, c'est le calcul du classement qui doit être actualisé par l'admin. Par exemple, si je viens de faire un match, mon match devient visible par les autres utilisateurs lorsqu'il est publié par l'admin, mes points me sont attribués, mais je ne bouge pas dans le classement avant que le classement ne soit défigé. Ca évite les problèmes lors de la phase de ronde suisse par exemple. 
+- Dans les logs de connexions de la section "Connexions" auquelle a accès l'admin, ajoute l'heure de déconnexion à l'heure de connexion des joueurs. Si un joueur s'est déconnecté manuellement, l'heure de déconnexion est celle indiquée. Si le joueur a été déconnecté par inactivité, retires 15 minutes à l'heure pour avoir la vraie heure à laquelle il a arrêté d'utiliser le site. 
+- Lorsque l'admin ajoute un match à des joueurs, il a la possibilité de mettre une note optionnelle. Je voudrai qu'il ait également la possibilité de rajouter une/plusieurs photos. Elles seront alors visibles par tous dans le classement, en cliquant sur un joueur, dans le match en question de l'historique des matchs joués de ce joueur. Il sera possible de cliquer sur ces images pour les ouvrir en grand. 
+- Avoir la possibilité d'envoyer une notification à plusieurs joueurs en même temps (petites cases à cocher + case "tout le monde")
+- Toutes les photos sont stockées dans la base de donnée et sont consultables publiquement dans un onglet "souvenirs" à côté de l'onglet "classement" (en plus dêtre présentes dans l'historique des matchs des joueurs)
+- Possibilité de rajouter des malus à certains joueurs, menu déroulant présent dans "rencontre" ou dans "publication des matchs". Concrètement, l'admin ira dans les matchs à venir, et aura un menu déroulant pour ajouter un malus parmis : 
+♡ Interdiction de smasher ou de tendre droit
+♡ Porter un cache-œil
+♡ Interdiction de taper le volant au dessus de la bande
+♡ Jouer en demi-terrain pour le joueur le moins bien class´e (le demi-terrain
+change selon le service en cours)
+♡ Jouer avec une raquette courte
+♡ Jouer avec une raquette lest´ee
+♡ Jouer avec une raquette de pr´ecision
+♡ Jouer avec un bras dans le dos constamment
+♡ Interdiction de faire un coup droit
+♡ Interdiction de faire un revers
+♡ Annoncer chaque coup `a voix haute avant de le jouer
+♡ Les couloirs font partie du terrain du joueur le plus class´e
+♡ Les points du joueur le moins class´e comptent double
+♡ Le point est marqu´e par le joueur le mieux class´e uniquement s’il touche
+le sol avant la raquette de l’adversaire
+♡ Le point est marqu´e par le joueur le moins class´e
+♡ Le joueur le mieux class´e marque si le volant touche le sol uniquement
+dans une zone donn´ee ; la zone change `a set : rivi`ere, box, couloir du
+fond, box puis rivi`ere
+Par défaut, le malus est none. 

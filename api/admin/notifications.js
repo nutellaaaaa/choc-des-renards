@@ -1,40 +1,24 @@
+Write updated admin notifications.js with bulk sendbashcat > /home/claude/notifications_admin.js << 'EOF'
 /**
  * api/admin/notifications.js
  *
  * POST /api/admin/notifications
- *   action: 'send'        → envoyer une notification simple à un joueur
- *   action: 'send_special'→ organiser une rencontre spéciale (notifie 2 joueurs + crée SpecialMatch)
- *   action: 'delete'      → supprimer une notification
+ *   action: 'send'         → envoyer une notification à un ou plusieurs joueurs
+ *   action: 'send_special' → organiser une rencontre spéciale (notifie 2 joueurs + crée SpecialMatch)
+ *   action: 'delete'       → supprimer une notification
  *
  * GET /api/admin/notifications
  *   → liste toutes les notifications (avec statut de lecture)
- *
- * ─────────────────────────────────────────────────────────────────────────────
- * api/notifications.js (utilisateur connecté)
- *
- * GET /api/notifications        → notifications non lues de l'utilisateur connecté
- * POST /api/notifications       → { action: 'acknowledge', notificationId }
- *   → marquer une notification comme lue (+ log dans l'historique de connexion)
  */
 const { PrismaClient } = require('@prisma/client')
 const { requireAdmin } = require('../_auth')
-const jwt = require('jsonwebtoken')
 
 if (!global._prisma) global._prisma = new PrismaClient()
 const prisma = global._prisma
 
 const ADMIN_USERNAMES = ['admin', 'root']
 
-function requireAuth(req, res) {
-  const authHeader = req.headers['authorization'] || ''
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
-  if (!token) { res.status(401).json({ error: 'Non authentifié.' }); return null }
-  try { return jwt.verify(token, process.env.JWT_SECRET) }
-  catch { res.status(401).json({ error: 'Session expirée ou invalide.' }); return null }
-}
-
-// ── Handler admin ─────────────────────────────────────────────────────────────
-async function adminHandler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
@@ -61,25 +45,35 @@ async function adminHandler(req, res) {
 
   const { action } = req.body || {}
 
-  // ── send : notification simple ──
+  // ── send : notification simple (1 joueur ou plusieurs) ──
   if (action === 'send') {
-    const { userId, title, message } = req.body
-    if (!userId || !title || !message)
-      return res.status(400).json({ error: 'userId, title et message requis.' })
+    const { userId, userIds, title, message } = req.body
+    if (!title || !message)
+      return res.status(400).json({ error: 'title et message requis.' })
 
-    const uid = parseInt(userId, 10)
-    if (isNaN(uid)) return res.status(400).json({ error: 'userId invalide.' })
+    // Construire la liste des IDs cibles
+    let targetIds = []
+    if (Array.isArray(userIds) && userIds.length > 0) {
+      targetIds = userIds.map(id => parseInt(id, 10)).filter(id => !isNaN(id))
+    } else if (userId) {
+      const uid = parseInt(userId, 10)
+      if (!isNaN(uid)) targetIds = [uid]
+    }
 
-    const user = await prisma.user.findUnique({ where: { id: uid } })
-    if (!user) return res.status(404).json({ error: 'Utilisateur introuvable.' })
-    if (ADMIN_USERNAMES.includes(user.username.toLowerCase()))
-      return res.status(403).json({ error: 'Impossible de notifier un compte admin.' })
+    if (targetIds.length === 0)
+      return res.status(400).json({ error: 'Au moins un joueur requis.' })
 
     try {
-      const notif = await prisma.notification.create({
-        data: { userId: uid, type: 'message', title: title.trim(), message: message.trim() },
-      })
-      return res.status(201).json({ ok: true, notification: notif })
+      const created = []
+      for (const uid of targetIds) {
+        const user = await prisma.user.findUnique({ where: { id: uid } })
+        if (!user || ADMIN_USERNAMES.includes(user.username.toLowerCase())) continue
+        const notif = await prisma.notification.create({
+          data: { userId: uid, type: 'message', title: title.trim(), message: message.trim() },
+        })
+        created.push(notif)
+      }
+      return res.status(201).json({ ok: true, count: created.length, notifications: created })
     } catch (err) {
       console.error('[admin/notifications send]', err)
       return res.status(500).json({ error: 'Erreur serveur.' })
@@ -106,7 +100,6 @@ async function adminHandler(req, res) {
       return res.status(403).json({ error: 'Impossible d\'impliquer un compte admin.' })
 
     try {
-      // Créer la rencontre spéciale
       const special = await prisma.specialMatch.create({
         data: {
           player1Id: p1id,
@@ -167,69 +160,88 @@ async function adminHandler(req, res) {
 
   return res.status(400).json({ error: 'Action invalide.' })
 }
+EOF
+echo "notifications_admin.js done"Outputnotifications_admin.js done
+DoneMaintenant le gros du travail : le frontend index.html. Je vais le modifier section par section.Ran 12 commands
 
-// ── Handler utilisateur ───────────────────────────────────────────────────────
-async function userHandler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-  if (req.method === 'OPTIONS') return res.status(200).end()
 
-  const auth = requireAuth(req, res)
-  if (!auth) return
+Copy index.html to working dir
+bash
 
-  // GET : notifications en attente de l'utilisateur
-  if (req.method === 'GET') {
-    try {
-      const notifications = await prisma.notification.findMany({
-        where: { userId: auth.userId, read: false },
-        orderBy: { createdAt: 'desc' },
-      })
-      return res.status(200).json({ notifications })
-    } catch (err) {
-      console.error('[notifications GET]', err)
-      return res.status(500).json({ error: 'Erreur serveur.' })
-    }
-  }
+cp /mnt/user-data/uploads/index.html /home/claude/index.html
+echo "copied"
+Output
 
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' })
+copied
 
-  const { action, notificationId } = req.body || {}
+Fix charte alignment
+bash
 
-  if (action === 'acknowledge') {
-    const nid = parseInt(notificationId, 10)
-    if (isNaN(nid)) return res.status(400).json({ error: 'notificationId invalide.' })
+# Fix 1: article-body ul li alignment - add padding-left on ul and adjust li
+python3 -c "
+import re
 
-    try {
-      const notif = await prisma.notification.findUnique({ where: { id: nid } })
-      if (!notif || notif.userId !== auth.userId)
-        return res.status(404).json({ error: 'Notification introuvable.' })
+with open('/home/claude/index.html', 'r') as f:
+    content = f.read()
 
-      await prisma.notification.update({
-        where: { id: nid },
-        data: { read: true, readAt: new Date() },
-      })
+# Fix ul alignment in article-body
+old = '  .article-body ul { padding-left: 0; list-style: none; }\n  .article-body ul li { display: flex; gap: 0.75rem; align-items: flex-start; color: var(--gray-light); font-size: 0.95rem; padding: 0.5rem 0; border-bottom: 1px solid var(--dark4); line-height: 1.6; }'
+new = '  .article-body ul { padding-left: 0; list-style: none; }\n  .article-body ul li { display: flex; gap: 0.75rem; align-items: flex-start; color: var(--gray-light); font-size: 0.95rem; padding: 0.5rem 0; border-bottom: 1px solid var(--dark4); line-height: 1.6; }\n  .article-body ul li > span, .article-body ul li > strong { flex: 1; }'
 
-      // Logger dans l'historique de connexion
-      const user = await prisma.user.findUnique({ where: { id: auth.userId }, select: { firstName: true, lastName: true, username: true } })
-      await prisma.loginEvent.create({
-        data: {
-          userId: auth.userId,
-          ip: null,
-          userAgent: null,
-          success: true,
-          message: `${user?.firstName} ${user?.lastName} (@${user?.username}) a pris connaissance de sa notification : "${notif.title}"`,
-        },
-      })
+if old in content:
+    content = content.replace(old, new)
+    print('Fixed li span wrapping')
+else:
+    print('Pattern not found, trying alternative')
 
-      return res.status(200).json({ ok: true })
-    } catch (err) {
-      console.error('[notifications acknowledge]', err)
-      return res.status(500).json({ error: 'Erreur serveur.' })
-    }
-  }
+with open('/home/claude/index.html', 'w') as f:
+    f.write(content)
+"
+Output
 
-  return res.status(400).json({ error: 'Action invalide.' })
-}
+Fixed li span wrapping
 
-module.exports = adminHandler
+Fix bold in charte and setDiff display
+bash
+
+python3 << 'PYEOF'
+with open('/home/claude/index.html', 'r') as f:
+    content = f.read()
+
+# Fix 2: Article 3 bold - "le dernier samedi" instead of "vainqueur"
+old_art3 = '''          <li>À l'issue de l'affrontement, le <strong>vainqueur</strong> communique les scores à Yanis avant <strong>le dernier samedi</strong> de la période des deux semaines.</li>'''
+new_art3 = '''          <li>À l'issue de l'affrontement, le vainqueur communique les scores à Yanis avant <strong>le dernier samedi</strong> de la période des deux semaines.</li>'''
+if old_art3 in content:
+    content = content.replace(old_art3, new_art3)
+    print('Fixed article 3 bold')
+else:
+    print('Art3 pattern not found')
+
+# Fix 3: Replace +X by X in setDiff display (renderRankingTable)
+old_diff = "    const diff = p.setDiff > 0 ? '+' + p.setDiff : p.setDiff"
+new_diff = "    const diff = p.setDiff"
+if old_diff in content:
+    content = content.replace(old_diff, new_diff)
+    print('Fixed setDiff display')
+else:
+    print('setDiff pattern not found')
+
+# Also fix showPlayerDetail setDiff
+old_diff2 = "  const diff = player.setDiff > 0 ? '+' + player.setDiff : player.setDiff"
+new_diff2 = "  const diff = player.setDiff"
+if old_diff2 in content:
+    content = content.replace(old_diff2, new_diff2)
+    print('Fixed player detail setDiff')
+else:
+    print('player detail setDiff not found')
+
+with open('/home/claude/index.html', 'w') as f:
+    f.write(content)
+PYEOF
+Output
+
+Fixed article 3 bold
+Fixed setDiff display
+Fixed player detail setDiff
+
+Add admin tabs for planned matches and refused registrations

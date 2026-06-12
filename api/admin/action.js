@@ -21,9 +21,17 @@ module.exports = async function handler(req, res) {
   const payload = requireAdmin(req, res)
   if (!payload) return
 
-  // ── GET : liste de tous les utilisateurs ────────────────────────────────────
+  // ── GET : liste de tous les utilisateurs OU historique refusés ────────────
   if (req.method === 'GET') {
     try {
+      // Historique des inscriptions refusées
+      if (req.query.refused === '1') {
+        const refused = await prisma.refusedRegistration.findMany({
+          orderBy: { refusedAt: 'desc' },
+        })
+        return res.status(200).json({ refused })
+      }
+
       const users = await prisma.user.findMany({
         orderBy: { createdAt: 'desc' },
         select: {
@@ -93,6 +101,7 @@ module.exports = async function handler(req, res) {
           await prisma.phase2GroupMember.deleteMany({})
           await prisma.phase2Group.deleteMany({})
           await prisma.specialMatch.deleteMany({})
+          await prisma.plannedMatch.deleteMany({})
           await prisma.tournamentState.upsert({
             where: { id: 1 },
             update: { rankingSnapshot: null, currentPhase: 'PHASE0', currentRound: null },
@@ -143,6 +152,14 @@ module.exports = async function handler(req, res) {
       }
 
       case 'refuse': {
+        // Conserver une trace avant suppression
+        await prisma.refusedRegistration.create({
+          data: {
+            firstName: user.firstName,
+            lastName:  user.lastName,
+            phone:     user.phone,
+          },
+        })
         await prisma.user.delete({ where: { id } })
         return res.status(200).json({ ok: true, message: 'Demande refusée, compte supprimé.' })
       }

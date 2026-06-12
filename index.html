@@ -472,11 +472,13 @@
     <div class="admin-tabs">
       <button class="admin-tab active" onclick="adminTab('users',this)">Utilisateurs <span class="badge" id="badge-users">–</span></button>
       <button class="admin-tab" onclick="adminTab('pending',this)">En attente <span class="badge" id="badge-pending">–</span></button>
+      <button class="admin-tab" onclick="adminTab('refused',this)">Refusés</button>
       <button class="admin-tab" onclick="adminTab('history',this)">Connexions</button>
       <button class="admin-tab" onclick="adminTab('phase',this)">Phase du tournoi</button>
       <button class="admin-tab" onclick="adminTab('poules',this)">Organiser la phase</button>
       <button class="admin-tab" onclick="adminTab('notify',this)">Notifier un joueur</button>
       <button class="admin-tab" onclick="adminTab('special',this)">Rencontre spéciale</button>
+      <button class="admin-tab" onclick="adminTab('planned',this)">Matchs planifiés <span class="badge" id="badge-planned">–</span></button>
       <button class="admin-tab" onclick="adminTab('publication',this)">Publication matchs <span class="badge" id="badge-pending-matches">–</span></button>
       <button class="admin-tab" onclick="adminTab('notifications-list',this)">Notifications <span class="badge" id="badge-notifs">–</span></button>
       <button class="admin-tab" onclick="adminTab('other-actions',this)">Actions autres</button>
@@ -518,6 +520,18 @@
           <tbody id="tbl-history"></tbody>
         </table>
         <div id="history-empty" class="admin-empty" style="display:none">Aucun événement.</div>
+      </div>
+    </div>
+
+    <!-- Inscriptions refusées -->
+    <div id="admin-refused" class="admin-section">
+      <div class="admin-section-header"><h3>Inscriptions refusées</h3></div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Prénom</th><th>Nom</th><th>Téléphone</th><th>Refusé le</th></tr></thead>
+          <tbody id="tbl-refused"></tbody>
+        </table>
+        <div id="refused-empty" class="admin-empty" style="display:none">Aucune inscription refusée.</div>
       </div>
     </div>
 
@@ -603,6 +617,15 @@
         <div id="special-success" class="modal-success"></div>
         <button class="btn-modal-save" style="width:100%" onclick="sendSpecialMatch()">Créer la rencontre &amp; notifier</button>
       </div>
+    </div>
+
+    <!-- Matchs planifiés -->
+    <div id="admin-planned" class="admin-section">
+      <div class="admin-section-header">
+        <h3>Matchs planifiés (à venir)</h3>
+        <button class="btn-sm btn-accept" onclick="openPlannedAddModal()">+ Planifier un match</button>
+      </div>
+      <div id="planned-matches-list"><div class="admin-empty">Chargement…</div></div>
     </div>
 
     <!-- Publication matchs -->
@@ -755,6 +778,112 @@
     <div class="modal-actions">
       <button class="btn-modal-cancel" onclick="closeMatchModal()">Annuler</button>
       <button class="btn-modal-save" id="match-save-btn" onclick="saveMatch()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PLANIFIER MATCH -->
+<div id="planned-modal" class="admin-modal-bg">
+  <div class="admin-modal" style="max-width:540px">
+    <h3 id="planned-modal-title">Planifier un <span>Match</span></h3>
+    <input type="hidden" id="planned-modal-id">
+    <div class="form-row">
+      <div class="form-group"><label>Joueur 1</label><select id="planned-p1"><option value="">— Joueur 1 —</option></select></div>
+      <div class="form-group"><label>Joueur 2</label><select id="planned-p2"><option value="">— Joueur 2 —</option></select></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Phase</label>
+        <select id="planned-phase" onchange="onPlannedPhaseChange()">
+          <option value="PHASE0">Phase 0</option>
+          <option value="PHASE1" selected>Phase 1 — Poules</option>
+          <option value="PHASE2">Phase 2 — Finales</option>
+        </select>
+      </div>
+      <div class="form-group" id="planned-round-group" style="display:none">
+        <label>Ronde n°</label>
+        <input type="number" id="planned-round" min="1" value="1">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Date prévue (optionnelle)</label>
+      <input type="date" id="planned-date">
+    </div>
+    <div class="form-group">
+      <label>Malus (optionnel)</label>
+      <select id="planned-malus">
+        <option value="">— Aucun malus —</option>
+      </select>
+    </div>
+    <div class="form-group" id="planned-malus-target-group" style="display:none">
+      <label>Malus attribué à</label>
+      <select id="planned-malus-target">
+        <option value="1">Joueur 1</option>
+        <option value="2">Joueur 2</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Note (optionnelle)</label>
+      <textarea id="planned-note" rows="2" placeholder="Contexte, remarques…"></textarea>
+    </div>
+    <div id="planned-modal-error" class="modal-error"></div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeModal('planned-modal')">Annuler</button>
+      <button class="btn-modal-save" onclick="savePlannedMatch()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SAISIR SCORE MATCH PLANIFIÉ -->
+<div id="planned-score-modal" class="admin-modal-bg">
+  <div class="admin-modal" style="max-width:520px">
+    <h3>Renseigner le <span>Score</span></h3>
+    <input type="hidden" id="planned-score-id">
+    <div id="planned-score-players" style="background:var(--dark3);border:1px solid var(--dark4);border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.95rem;color:var(--gray-light)"></div>
+    <div class="form-group">
+      <label>Date du match</label>
+      <input type="date" id="planned-score-date">
+    </div>
+    <div class="form-group">
+      <label>Sets (score joueur 1 – joueur 2)</label>
+      <div class="sets-container" id="planned-score-sets"></div>
+      <button class="btn-add-set" onclick="addPlannedSetRow()">+ Ajouter un set</button>
+    </div>
+    <div class="form-group">
+      <label>Note (optionnelle)</label>
+      <textarea id="planned-score-note" rows="2"></textarea>
+    </div>
+    <div id="planned-score-error" class="modal-error"></div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeModal('planned-score-modal')">Annuler</button>
+      <button class="btn-modal-save" onclick="savePlannedScore()">Enregistrer & créer les matchs</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SAISIR SCORE RENCONTRE SPÉCIALE -->
+<div id="special-score-modal" class="admin-modal-bg">
+  <div class="admin-modal" style="max-width:520px">
+    <h3>Renseigner le <span>Score</span></h3>
+    <input type="hidden" id="special-score-id">
+    <div id="special-score-players" style="background:var(--dark3);border:1px solid var(--dark4);border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.95rem;color:var(--gray-light)"></div>
+    <div class="form-group">
+      <label>Date du match</label>
+      <input type="date" id="special-score-date">
+    </div>
+    <div class="form-group">
+      <label>Sets (score joueur 1 – joueur 2)</label>
+      <div class="sets-container" id="special-score-sets"></div>
+      <button class="btn-add-set" onclick="addSpecialSetRow()">+ Ajouter un set</button>
+    </div>
+    <div class="form-group">
+      <label>Note (optionnelle)</label>
+      <textarea id="special-score-note" rows="2"></textarea>
+    </div>
+    <div id="special-score-error" class="modal-error"></div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeModal('special-score-modal')">Annuler</button>
+      <button class="btn-modal-save" onclick="saveSpecialScore()">Enregistrer & créer les matchs</button>
     </div>
   </div>
 </div>

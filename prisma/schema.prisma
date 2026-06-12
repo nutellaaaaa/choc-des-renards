@@ -50,6 +50,8 @@ model User {
   loginEvents    LoginEvent[]
   specialMatches1 SpecialMatch[] @relation("Player1")
   specialMatches2 SpecialMatch[] @relation("Player2")
+  plannedMatches1 PlannedMatch[] @relation("PlannedPlayer1")
+  plannedMatches2 PlannedMatch[] @relation("PlannedPlayer2")
 }
 
 model LoginEvent {
@@ -61,8 +63,18 @@ model LoginEvent {
   message   String?
   createdAt DateTime @default(now())
   logoutAt  DateTime?
+  logoutReason String? // 'manual' | 'inactivity'
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Historique des inscriptions refusées (conservé après suppression du compte)
+model RefusedRegistration {
+  id        Int      @id @default(autoincrement())
+  firstName String
+  lastName  String
+  phone     String
+  refusedAt DateTime @default(now())
 }
 
 model TournamentState {
@@ -152,6 +164,23 @@ model SpecialMatch {
   player1  User    @relation("Player1", fields: [player1Id], references: [id])
   player2  User    @relation("Player2", fields: [player2Id], references: [id])
   matches  Match[]
+}
+
+// Matchs planifiés (à venir, non encore joués)
+model PlannedMatch {
+  id          Int      @id @default(autoincrement())
+  player1Id   Int
+  player2Id   Int
+  scheduledDate DateTime?
+  malus       String?  // enum value or null
+  malusTarget Int?     // 1 = player1, 2 = player2
+  note        String?
+  phase       Phase    @default(PHASE1)
+  roundNumber Int?
+  createdAt   DateTime @default(now())
+
+  player1 User @relation("PlannedPlayer1", fields: [player1Id], references: [id])
+  player2 User @relation("PlannedPlayer2", fields: [player2Id], references: [id])
 }
 
 model Notification {

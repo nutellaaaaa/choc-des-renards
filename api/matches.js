@@ -28,7 +28,7 @@ function computeStats(matches) {
   return { played, wins, losses, setDiff, points }
 }
 
-// Ordre : victoires DESC, matchs joués ASC, points DESC, createdAt ASC (ancienneté)
+// Ordre : victoires DESC, matchs joués ASC, points DESC, createdAt ASC
 function sortPlayers(players) {
   return [...players].sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins
@@ -74,7 +74,7 @@ module.exports = async function handler(req, res) {
   try {
     const { userId } = req.query || {}
 
-    // Requête joueur spécifique
+    // Requête joueur spécifique — toujours live
     if (userId) {
       const uid = parseInt(userId, 10)
       if (isNaN(uid)) return res.status(400).json({ error: 'userId invalide.' })
@@ -109,24 +109,7 @@ module.exports = async function handler(req, res) {
       create: { id: 1, currentPhase: 'PHASE0', currentRound: null },
     })
 
-    // Snapshot figé
-    if (state.rankingSnapshot) {
-      try {
-        const snapshot = JSON.parse(state.rankingSnapshot)
-        const response = {
-          phase: state.currentPhase,
-          round: state.currentRound,
-          players: snapshot.players || snapshot,
-          poules: snapshot.poules || [],
-          phase2Groups: snapshot.phase2Groups || [],
-        }
-        // fromSnapshot visible uniquement par l'admin
-        if (isAdmin) response.fromSnapshot = true
-        return res.status(200).json(response)
-      } catch { /* snapshot corrompu, recalcul */ }
-    }
-
-    // Seuls les joueurs actifs=true sont classés
+    // Toujours calculer les stats LIVE depuis la DB
     const users = await prisma.user.findMany({
       where: {
         accepted: true,
@@ -156,19 +139,47 @@ module.exports = async function handler(req, res) {
     const userPouleMap = {}
     for (const p of poules) for (const m of p.members) userPouleMap[m.userId] = p.id
 
-    const players = users.map(u => ({
+    // Statistiques live pour chaque joueur
+    const livePlayers = users.map(u => ({
       id: u.id, username: u.username,
       firstName: u.firstName, lastName: u.lastName,
-      category: u.category,
-      createdAt: u.createdAt,
+      category: u.category, createdAt: u.createdAt,
       pouleId: userPouleMap[u.id] || null,
       ...computeStats(u.matches),
       matches: u.matches,
     }))
 
+    // Si snapshot actif : utiliser l'ordre figé mais les stats live
+    let orderedPlayers
+    if (state.rankingSnapshot) {
+      try {
+        const snapshot = JSON.parse(state.rankingSnapshot)
+        const frozenOrder = snapshot.players || snapshot
+
+        // Réordonner selon le snapshot (position figée), mais stats live
+        const liveMap = {}
+        for (const p of livePlayers) liveMap[p.id] = p
+
+        // Joueurs dans l'ordre du snapshot avec stats live
+        const ordered = frozenOrder
+          .map(fp => liveMap[fp.id] || { ...fp })
+          .filter(Boolean)
+
+        // Joueurs nouveaux (pas dans le snapshot) → en fin
+        const frozenIds = new Set(frozenOrder.map(p => p.id))
+        const newPlayers = livePlayers.filter(p => !frozenIds.has(p.id))
+
+        orderedPlayers = [...ordered, ...newPlayers]
+      } catch {
+        orderedPlayers = sortPlayers(livePlayers)
+      }
+    } else {
+      orderedPlayers = sortPlayers(livePlayers)
+    }
+
     const poulesWithStats = poules.map(p => {
       const memberIds = new Set(p.members.map(m => m.userId))
-      const poulePlayers = players.filter(pl => memberIds.has(pl.id))
+      const poulePlayers = livePlayers.filter(pl => memberIds.has(pl.id))
       return {
         id: p.id, name: p.name, phase: p.phase,
         totalPoints: poulePlayers.reduce((a, pl) => a + pl.points, 0),
@@ -185,11 +196,12 @@ module.exports = async function handler(req, res) {
     const response = {
       phase: state.currentPhase,
       round: state.currentRound,
-      players: sortPlayers(players),
+      players: orderedPlayers,
       poules: poulesWithStats,
       phase2Groups,
+      rankingFrozen: !!state.rankingSnapshot,
     }
-    if (isAdmin) response.fromSnapshot = false
+    if (isAdmin) response.fromSnapshot = !!state.rankingSnapshot
 
     return res.status(200).json(response)
   } catch (err) {
