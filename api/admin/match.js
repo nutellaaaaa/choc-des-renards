@@ -64,6 +64,7 @@ module.exports = async function handler(req, res) {
           orderBy: { createdAt: 'desc' },
           include: {
             sets: { orderBy: { setNumber: 'asc' } },
+            photos: { orderBy: { createdAt: 'asc' } },
             user: { select: { id: true, firstName: true, lastName: true, username: true } },
           },
         }),
@@ -73,6 +74,7 @@ module.exports = async function handler(req, res) {
           take: 200,
           include: {
             sets: { orderBy: { setNumber: 'asc' } },
+            photos: { orderBy: { createdAt: 'asc' } },
             user: { select: { id: true, firstName: true, lastName: true, username: true } },
           },
         }),
@@ -532,6 +534,57 @@ module.exports = async function handler(req, res) {
     } catch (err) {
       console.error('[planned_convert]', err)
       return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  // ── ADD PHOTOS (attach Cloudinary URLs to a match) ──────────────────────────
+  if (action === 'add_photos') {
+    const { matchId, photos } = req.body
+    const mid = parseInt(matchId, 10)
+    if (isNaN(mid)) return res.status(400).json({ error: 'matchId invalide.' })
+    if (!Array.isArray(photos) || photos.length === 0)
+      return res.status(400).json({ error: 'photos requis (array).' })
+    try {
+      const match = await prisma.match.findUnique({ where: { id: mid } })
+      if (!match) return res.status(404).json({ error: 'Match introuvable.' })
+      const created = await prisma.matchPhoto.createMany({
+        data: photos.map(p => ({
+          matchId: mid,
+          url: p.url,
+          publicId: p.publicId || null,
+          caption: p.caption || null,
+        })),
+      })
+      // If this is a mirrored match, also attach to the mirror
+      if (req.body.mirrorMatchId) {
+        const mmid = parseInt(req.body.mirrorMatchId, 10)
+        if (!isNaN(mmid)) {
+          await prisma.matchPhoto.createMany({
+            data: photos.map(p => ({
+              matchId: mmid,
+              url: p.url,
+              publicId: p.publicId || null,
+              caption: p.caption || null,
+            })),
+          })
+        }
+      }
+      return res.status(201).json({ ok: true, count: created.count })
+    } catch (err) {
+      console.error('[admin/match add_photos]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  // ── DELETE PHOTO ─────────────────────────────────────────────────────────────
+  if (action === 'delete_photo') {
+    const pid = parseInt(req.body.photoId, 10)
+    if (isNaN(pid)) return res.status(400).json({ error: 'photoId invalide.' })
+    try {
+      await prisma.matchPhoto.delete({ where: { id: pid } })
+      return res.status(200).json({ ok: true })
+    } catch (err) {
+      return res.status(500).json({ error: 'Erreur serveur ou photo introuvable.' })
     }
   }
 

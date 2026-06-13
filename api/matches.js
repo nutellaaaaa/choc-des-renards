@@ -45,6 +45,28 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Méthode non autorisée' })
 
+  // Galerie photos (membres connectés)
+  if (req.query.gallery === '1') {
+    const auth = requireAuth(req, res)
+    if (!auth) return
+    try {
+      const photos = await prisma.matchPhoto.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: {
+          match: {
+            include: {
+              user: { select: { id: true, firstName: true, lastName: true, username: true } },
+            },
+          },
+        },
+      })
+      return res.status(200).json({ photos })
+    } catch (err) {
+      console.error('[matches gallery]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
   // Rencontres en cours (public)
   if (req.query.public === '1') {
     try {
@@ -86,7 +108,10 @@ module.exports = async function handler(req, res) {
           matches: {
             where: { published: true },
             orderBy: { matchDate: 'desc' },
-            include: { sets: { orderBy: { setNumber: 'asc' } } },
+            include: {
+              sets: { orderBy: { setNumber: 'asc' } },
+              photos: { orderBy: { createdAt: 'asc' } },
+            },
           },
         },
       })
@@ -124,7 +149,10 @@ module.exports = async function handler(req, res) {
         matches: {
           where: { published: true },
           orderBy: { matchDate: 'desc' },
-          include: { sets: { orderBy: { setNumber: 'asc' } } },
+          include: {
+            sets: { orderBy: { setNumber: 'asc' } },
+            photos: { orderBy: { createdAt: 'asc' } },
+          },
         },
       },
     })

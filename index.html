@@ -360,6 +360,51 @@
   .notif-history-title { font-weight: 600; color: var(--white); font-size: 0.95rem; margin-bottom: 0.25rem; }
   .notif-history-meta { font-size: 0.8rem; color: var(--gray); }
 
+
+  /* ── Photos / Galerie ── */
+  .photo-upload-zone { border: 2px dashed var(--dark4); border-radius: 10px; padding: 1.1rem; text-align: center; cursor: pointer; transition: border-color 0.2s; background: var(--dark3); margin-bottom: 0.5rem; }
+  .photo-upload-zone:hover, .photo-upload-zone.dragover { border-color: var(--orange); }
+  .photo-upload-zone input[type=file] { display: none; }
+  .photo-upload-label { color: var(--gray); font-size: 0.88rem; cursor: pointer; }
+  .photo-upload-label span { color: var(--orange); text-decoration: underline; }
+  .photo-previews { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.5rem; }
+  .photo-preview-item { position: relative; width: 76px; height: 76px; border-radius: 8px; overflow: hidden; border: 2px solid var(--dark4); flex-shrink: 0; }
+  .photo-preview-item img { width: 100%; height: 100%; object-fit: cover; }
+  .photo-preview-remove { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.72); color: #fff; border: none; border-radius: 50%; width: 17px; height: 17px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
+  .photo-upload-progress { font-size: 0.82rem; color: var(--orange); min-height: 1.1em; margin-top: 0.25rem; }
+  /* Miniatures dans les cartes match */
+  .match-photos { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
+  .match-photo-thumb { width: 54px; height: 54px; border-radius: 6px; object-fit: cover; cursor: pointer; border: 2px solid var(--dark4); transition: border-color 0.15s, transform 0.15s; }
+  .match-photo-thumb:hover { border-color: var(--orange); transform: scale(1.06); }
+  /* Admin miniatures */
+  .admin-match-photos { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.4rem; }
+  .admin-photo-thumb { width: 42px; height: 42px; border-radius: 5px; object-fit: cover; cursor: pointer; border: 1px solid var(--dark4); transition: border-color 0.15s; }
+  .admin-photo-thumb:hover { border-color: var(--orange); }
+  /* Lightbox */
+  .lightbox-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.93); z-index: 9999; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+  .lightbox-bg.open { opacity: 1; pointer-events: all; }
+  .lightbox-bg img { max-width: 90vw; max-height: 86vh; border-radius: 10px; box-shadow: 0 8px 48px rgba(0,0,0,0.7); display: block; }
+  .lightbox-close { position: absolute; top: 1.1rem; right: 1.4rem; background: none; border: none; color: #fff; font-size: 2.2rem; cursor: pointer; opacity: 0.7; line-height: 1; }
+  .lightbox-close:hover { opacity: 1; }
+  .lightbox-caption { position: absolute; bottom: 1.4rem; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,0.75); font-size: 0.88rem; text-align: center; max-width: 80vw; pointer-events: none; }
+  .lightbox-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.1); border: none; color: #fff; font-size: 1.9rem; width: 3rem; height: 3rem; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
+  .lightbox-nav:hover { background: rgba(255,255,255,0.22); }
+  .lightbox-prev { left: 1rem; }
+  .lightbox-next { right: 1rem; }
+  /* Page Souvenirs */
+  .gallery-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .gallery-tab { background: var(--dark2); border: 1px solid var(--dark4); border-radius: 8px; padding: 0.45rem 1.15rem; font-family: var(--font-heading); font-size: 0.88rem; font-weight: 600; letter-spacing: 0.06em; color: var(--gray); cursor: pointer; transition: all 0.2s; }
+  .gallery-tab.active, .gallery-tab:hover { border-color: var(--orange); color: var(--orange); background: var(--orange-dim); }
+  .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-top: 0.5rem; }
+  .gallery-item { border-radius: 10px; overflow: hidden; background: var(--dark2); border: 1px solid var(--dark4); cursor: pointer; transition: transform 0.15s, border-color 0.15s; }
+  .gallery-item:hover { transform: translateY(-3px); border-color: var(--orange); }
+  .gallery-item img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
+  .gallery-item-meta { padding: 0.5rem 0.75rem; font-size: 0.78rem; color: var(--gray); line-height: 1.4; }
+  .gallery-item-meta strong { color: var(--gray-light); display: block; margin-bottom: 1px; }
+  .gallery-match-group { margin-bottom: 2rem; }
+  .gallery-match-header { display: flex; align-items: baseline; gap: 0.75rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--dark4); margin-bottom: 0.75rem; flex-wrap: wrap; }
+  .gallery-match-title { font-family: var(--font-heading); font-size: 1rem; font-weight: 700; color: var(--white); letter-spacing: 0.04em; }
+  .gallery-match-date { font-size: 0.8rem; color: var(--gray); }
   @media (max-width: 600px) {
     .malus-grid { grid-template-columns: 1fr; }
     .hero-stats { gap: 1rem; }
@@ -786,6 +831,19 @@
       <label>Note (optionnelle)</label>
       <textarea id="match-note" placeholder="Contexte, malus, remarques…"></textarea>
     </div>
+    <div id="match-photo-section" class="form-group">
+      <label>Photos (optionnelles)</label>
+      <div class="photo-upload-zone" id="match-photo-zone"
+           onclick="document.getElementById('match-photo-input').click()"
+           ondragover="photoDragOver(event,'match-photo-zone')"
+           ondragleave="photoDragLeave('match-photo-zone')"
+           ondrop="photoDrop(event,'match-photo')">
+        <input type="file" id="match-photo-input" multiple accept="image/*" onchange="handlePhotoSelect(event,'match-photo')">
+        <div class="photo-upload-label">Glissez des photos ici ou <span>cliquez pour sélectionner</span></div>
+      </div>
+      <div class="photo-previews" id="match-photo-previews"></div>
+      <div class="photo-upload-progress" id="match-photo-progress"></div>
+    </div>
     <div id="match-modal-error" class="modal-error"></div>
     <div class="modal-actions">
       <button class="btn-modal-cancel" onclick="closeMatchModal()">Annuler</button>
@@ -951,6 +1009,7 @@
     <button class="nav-btn active" onclick="showPage('accueil',this)">Accueil</button>
     <button class="nav-btn" onclick="showPage('reglement',this)">Charte</button>
     <button class="nav-btn" onclick="showPage('classement',this)">Classement</button>
+    <button class="nav-btn" onclick="showPage('souvenirs',this)">Souvenirs 📸</button>
     <button class="nav-btn" onclick="showPage('mes-notifs',this)">Mes messages</button>
   </div>
   <div class="nav-user-info" id="nav-user">
@@ -1068,6 +1127,24 @@
   </div>
 </div>
 
+<!-- PAGE SOUVENIRS -->
+<div id="page-souvenirs" class="page">
+  <div class="section">
+    <h1 class="section-title">Le Choc en <span>Photos</span></h1>
+    <p class="section-subtitle">Tous les souvenirs du Choc des Renards</p>
+    <div class="gallery-tabs">
+      <button class="gallery-tab active" onclick="switchGalleryTab('grid',this)">🖼 Grille</button>
+      <button class="gallery-tab" onclick="switchGalleryTab('matches',this)">🏸 Par match</button>
+    </div>
+    <div id="gallery-view-grid">
+      <div id="gallery-grid-content" class="gallery-grid"><div class="admin-empty">Chargement…</div></div>
+    </div>
+    <div id="gallery-view-matches" style="display:none">
+      <div id="gallery-matches-content"><div class="admin-empty">Chargement…</div></div>
+    </div>
+  </div>
+</div>
+
 <!-- PAGE MES MESSAGES -->
 <div id="page-mes-notifs" class="page">
   <div class="section">
@@ -1104,6 +1181,7 @@ function showPage(id, btn) {
   if (btn) btn.classList.add('active')
   window.scrollTo(0, 0)
   if (id === 'classement') loadClassement()
+  if (id === 'souvenirs') loadGallery()
   if (id === 'mes-notifs') loadMesNotifs()
 }
 function toggleArticle(el) { el.classList.toggle('open') }
@@ -1329,6 +1407,167 @@ async function acknowledgeNotification() {
 }
 
 /* ══════════════ MES MESSAGES (historique notifs lues) ══════════════ */
+/* ══════════════ CLOUDINARY & PHOTOS ══════════════ */
+const CLOUDINARY_CLOUD  = 'dile60go9'
+const CLOUDINARY_PRESET = 'dkblb0jw'
+const CLOUDINARY_FOLDER = 'choc-des-renards'
+
+let pendingPhotos = [] // [{file, previewUrl}]
+
+function photoDragOver(e, zoneId) { e.preventDefault(); document.getElementById(zoneId).classList.add('dragover') }
+function photoDragLeave(zoneId)   { document.getElementById(zoneId).classList.remove('dragover') }
+function photoDrop(e, prefix) {
+  e.preventDefault()
+  document.getElementById(prefix + '-zone').classList.remove('dragover')
+  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))
+  addPendingPhotos(files, prefix)
+}
+function handlePhotoSelect(e, prefix) {
+  addPendingPhotos(Array.from(e.target.files), prefix)
+  e.target.value = ''
+}
+function addPendingPhotos(files, prefix) {
+  const el = document.getElementById(prefix + '-previews')
+  files.forEach(file => {
+    const idx = pendingPhotos.length
+    const url = URL.createObjectURL(file)
+    pendingPhotos.push({ file, previewUrl: url })
+    const div = document.createElement('div')
+    div.className = 'photo-preview-item'
+    div.id = 'pp-' + idx
+    div.innerHTML = `<img src="${url}" alt=""><button class="photo-preview-remove" onclick="removePendingPhoto(${idx})">×</button>`
+    el.appendChild(div)
+  })
+}
+function removePendingPhoto(idx) {
+  pendingPhotos[idx] = null
+  const el = document.getElementById('pp-' + idx)
+  if (el) el.remove()
+}
+function clearPendingPhotos(prefix) {
+  pendingPhotos = []
+  const el = document.getElementById(prefix + '-previews')
+  if (el) el.innerHTML = ''
+  const prog = document.getElementById(prefix + '-progress')
+  if (prog) prog.textContent = ''
+}
+
+async function uploadPhotosToCloudinary(prefix) {
+  const toUpload = pendingPhotos.filter(Boolean)
+  if (toUpload.length === 0) return []
+  const prog = document.getElementById(prefix + '-progress')
+  const results = []
+  for (let i = 0; i < toUpload.length; i++) {
+    if (prog) prog.textContent = `⬆ Upload photo ${i+1}/${toUpload.length}…`
+    const fd = new FormData()
+    fd.append('file', toUpload[i].file)
+    fd.append('upload_preset', CLOUDINARY_PRESET)
+    fd.append('folder', CLOUDINARY_FOLDER)
+    try {
+      const r = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, { method: 'POST', body: fd })
+      const d = await r.json()
+      if (d.secure_url) results.push({ url: d.secure_url, publicId: d.public_id || null })
+    } catch(e) { console.error('[Cloudinary]', e) }
+  }
+  if (prog) prog.textContent = results.length > 0 ? `✓ ${results.length} photo(s) prête(s)` : '⚠ Échec upload'
+  return results
+}
+
+/* ── Galerie Souvenirs ─────────────────────────────────────────────────────── */
+let galleryPhotos = []
+let galleryLoaded = false
+
+async function loadGallery(force) {
+  if (galleryLoaded && !force) return
+  galleryLoaded = true
+  document.getElementById('gallery-grid-content').innerHTML = '<div class="admin-empty">Chargement…</div>'
+  document.getElementById('gallery-matches-content').innerHTML = '<div class="admin-empty">Chargement…</div>'
+  try {
+    const res = await fetch('/api/matches?gallery=1', { headers: authHeaders() })
+    if (!res.ok) { document.getElementById('gallery-grid-content').innerHTML = '<div class="admin-empty">Impossible de charger les photos.</div>'; return }
+    const { photos } = await res.json()
+    galleryPhotos = photos || []
+    renderGalleryGrid()
+    renderGalleryByMatch()
+  } catch(e) { console.error('[loadGallery]', e) }
+}
+
+function switchGalleryTab(name, btn) {
+  document.querySelectorAll('.gallery-tab').forEach(b => b.classList.remove('active'))
+  btn.classList.add('active')
+  document.getElementById('gallery-view-grid').style.display    = name === 'grid'    ? '' : 'none'
+  document.getElementById('gallery-view-matches').style.display = name === 'matches' ? '' : 'none'
+}
+
+function renderGalleryGrid() {
+  const el = document.getElementById('gallery-grid-content')
+  if (!galleryPhotos.length) { el.innerHTML = '<div class="admin-empty">Aucune photo pour l'instant. L'admin peut en ajouter lors de la saisie des matchs.</div>'; return }
+  const lbArr = galleryPhotos.map(p => ({ url: p.url, caption: p.caption || '' }))
+  el.innerHTML = galleryPhotos.map((p, i) => {
+    const m = p.match
+    const label = m ? `${esc(m.user?.firstName||'')} ${esc(m.user?.lastName||'')} vs ${esc(m.opponentFirstName||'')} ${esc(m.opponentLastName||'')}` : ''
+    const date  = m?.matchDate ? fmtDateOnly(m.matchDate) : ''
+    return `<div class="gallery-item" onclick="openLightbox(${JSON.stringify(lbArr).replace(/"/g,'&quot;')},${i})">
+      <img src="${esc(p.url)}" alt="${esc(p.caption||'')}">
+      <div class="gallery-item-meta"><strong>${label}</strong>${date}</div>
+    </div>`
+  }).join('')
+}
+
+function renderGalleryByMatch() {
+  const el = document.getElementById('gallery-matches-content')
+  if (!galleryPhotos.length) { el.innerHTML = '<div class="admin-empty">Aucune photo pour l'instant.</div>'; return }
+  const groups = {}
+  galleryPhotos.forEach((p, gi) => {
+    const mid = p.matchId
+    if (!groups[mid]) groups[mid] = { match: p.match, photos: [], globalIdxs: [] }
+    groups[mid].photos.push(p)
+    groups[mid].globalIdxs.push(gi)
+  })
+  const lbArr = galleryPhotos.map(p => ({ url: p.url, caption: p.caption || '' }))
+  el.innerHTML = Object.values(groups).map(g => {
+    const m = g.match
+    const label = m ? `${esc(m.user?.firstName||'')} ${esc(m.user?.lastName||'')} vs ${esc(m.opponentFirstName||'')} ${esc(m.opponentLastName||'')}` : 'Match inconnu'
+    const date  = m?.matchDate ? fmtDateOnly(m.matchDate) : ''
+    const thumbs = g.photos.map((p, li) =>
+      `<img class="match-photo-thumb" src="${esc(p.url)}" alt="${esc(p.caption||'')}" onclick="openLightbox(${JSON.stringify(lbArr).replace(/"/g,'&quot;')},${g.globalIdxs[li]})">`
+    ).join('')
+    return `<div class="gallery-match-group">
+      <div class="gallery-match-header">
+        <span class="gallery-match-title">${label}</span>
+        <span class="gallery-match-date">${date}</span>
+      </div>
+      <div class="match-photos">${thumbs}</div>
+    </div>`
+  }).join('')
+}
+
+/* ── Lightbox ──────────────────────────────────────────────────────────────── */
+let lbImages = [], lbIdx = 0
+
+function openLightbox(images, startIdx) {
+  lbImages = typeof images === 'string' ? JSON.parse(images) : images
+  lbIdx = startIdx || 0
+  renderLb()
+  document.getElementById('lightbox').classList.add('open')
+}
+function closeLightbox() { document.getElementById('lightbox').classList.remove('open') }
+function lbClickOutside(e) { if (e.target.id === 'lightbox') closeLightbox() }
+function lbNav(dir) { lbIdx = (lbIdx + dir + lbImages.length) % lbImages.length; renderLb() }
+function renderLb() {
+  const img = lbImages[lbIdx]
+  document.getElementById('lb-img').src = img.url
+  document.getElementById('lb-caption').textContent = img.caption || ''
+  document.querySelector('.lightbox-prev').style.display = lbImages.length > 1 ? '' : 'none'
+  document.querySelector('.lightbox-next').style.display = lbImages.length > 1 ? '' : 'none'
+}
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('lightbox').classList.contains('open')) return
+  if (e.key === 'Escape') closeLightbox()
+  if (e.key === 'ArrowLeft')  lbNav(-1)
+  if (e.key === 'ArrowRight') lbNav(1)
+})
+
 async function loadMesNotifs() {
   const list = document.getElementById('mes-notifs-list')
   list.innerHTML = '<div class="admin-empty">Chargement…</div>'
@@ -1535,6 +1774,11 @@ function showPlayerDetail(player) {
         return `<span class="set-chip ${cls}">${s.playerScore}–${s.opponentScore}</span>`
       }).join('')
       const phaseTxt = m.phase === 'PHASE0' ? 'Phase 0' : m.phase === 'PHASE1' ? 'Phase 1' : m.roundNumber ? `Phase 2 · R${m.roundNumber}` : 'Phase 2'
+      const photoHtml = (m.photos && m.photos.length > 0)
+        ? `<div class="match-photos">${m.photos.map((p,i) =>
+            `<img class="match-photo-thumb" src="${p.url}" alt="${esc(p.caption||'')}"
+              onclick="openLightbox(${JSON.stringify(m.photos.map(x=>({url:x.url,caption:x.caption||''})))},${i});event.stopPropagation()">`
+          ).join('')}</div>` : ''
       return `<div class="match-card">
         <div class="match-card-header">
           <span class="match-opponent">vs ${esc(m.opponentFirstName)} ${esc(m.opponentLastName)}</span>
@@ -1544,6 +1788,7 @@ function showPlayerDetail(player) {
         <div class="match-date">${fmtDateOnly(m.matchDate)}</div>
         <div class="match-sets">${setChips}</div>
         ${m.note ? `<div class="match-note">📝 ${esc(m.note)}</div>` : ''}
+        ${photoHtml}
       </div>`
     }).join('')
   }
@@ -1866,6 +2111,8 @@ function openMatchModal(user) {
   setCount = 0
   document.getElementById('btn-add-set').style.display = ''
   addSetRow()
+  document.getElementById('match-photo-section').style.display = ''
+  clearPendingPhotos('match-photo')
   document.getElementById('match-modal').classList.add('open')
 }
 
@@ -1892,6 +2139,7 @@ function openEditMatchModal(match) {
       document.getElementById('set-opp-' + setCount).value = s.opponentScore
     })
   } else { addSetRow() }
+  document.getElementById('match-photo-section').style.display = 'none'
   document.getElementById('match-modal').classList.add('open')
 }
 
@@ -1934,6 +2182,17 @@ async function saveMatch() {
       const res = await fetch('/api/admin/match', { method:'POST', headers: authHeaders(), body: JSON.stringify(body) })
       const data = await res.json()
       if (!res.ok) { errorEl.textContent = data.error||'Erreur.'; return }
+      // Upload photos to Cloudinary then attach URLs
+      const uploadedPhotos = await uploadPhotosToCloudinary('match-photo')
+      if (uploadedPhotos.length > 0 && data.match) {
+        await fetch('/api/admin/match', { method:'POST', headers: authHeaders(), body: JSON.stringify({
+          action: 'add_photos',
+          matchId: data.match.id,
+          mirrorMatchId: data.mirrorMatch ? data.mirrorMatch.id : null,
+          photos: uploadedPhotos,
+        })})
+      }
+      clearPendingPhotos('match-photo')
       if (data.warning) {
         const w = document.getElementById('match-warning')
         w.textContent = '⚠ ' + data.warning; w.style.display = 'block'
@@ -2262,12 +2521,18 @@ function renderMatchCard(m, isPublished) {
   const ow = m.sets.filter(s => s.opponentScore > s.playerScore).length
   const won = pw > ow
   const chips = m.sets.map(s => `<span class="set-chip ${s.playerScore > s.opponentScore ? 'set-win':'set-loss'}">${s.playerScore}–${s.opponentScore}</span>`).join('')
+  const adminPhotoHtml = (m.photos && m.photos.length > 0)
+    ? `<div class="admin-match-photos">${m.photos.map((p,i) =>
+        `<img class="admin-photo-thumb" src="${p.url}" title="${esc(p.caption||'')}"
+          onclick="openLightbox(${JSON.stringify(m.photos.map(x=>({url:x.url,caption:x.caption||''})))},${i})">`
+      ).join('')}</div>` : ''
   return `<div class="pending-match-card">
     <div class="pending-match-info">
       <div class="pending-match-player">${esc(m.user?.firstName)} ${esc(m.user?.lastName)} <span style="color:var(--gray)">vs</span> ${esc(m.opponentFirstName)} ${esc(m.opponentLastName)}</div>
       <div class="pending-match-detail">${fmtDateOnly(m.matchDate)} · ${m.phase === 'PHASE0' ? 'Phase 0' : m.phase === 'PHASE1' ? 'Phase 1' : 'Phase 2 R'+(m.roundNumber||'?')} · <span class="${won?'log-success':'log-fail'}">${won?'Victoire':'Défaite'}</span></div>
       <div class="pending-match-sets">${chips}</div>
       ${m.note ? `<div style="font-size:0.8rem;color:var(--gray);margin-top:0.3rem;font-style:italic">📝 ${esc(m.note)}</div>` : ''}
+      ${adminPhotoHtml}
     </div>
     <div class="pending-match-actions">
       ${!isPublished ? `<button class="btn-sm btn-publish" onclick="publishMatch(${m.id})">✓ Publier</button>` : ''}
@@ -2650,5 +2915,14 @@ function animateHero() {
 }
 window.addEventListener('load', animateHero)
 </script>
+<!-- LIGHTBOX -->
+<div id="lightbox" class="lightbox-bg" onclick="lbClickOutside(event)">
+  <button class="lightbox-close" onclick="closeLightbox()">×</button>
+  <button class="lightbox-nav lightbox-prev" onclick="lbNav(-1);event.stopPropagation()">&#8249;</button>
+  <img id="lb-img" src="" alt="">
+  <button class="lightbox-nav lightbox-next" onclick="lbNav(1);event.stopPropagation()">&#8250;</button>
+  <div class="lightbox-caption" id="lb-caption"></div>
+</div>
+
 </body>
 </html>

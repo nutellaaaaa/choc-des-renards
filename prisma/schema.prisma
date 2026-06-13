@@ -137,7 +137,19 @@ model Match {
 
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   sets         MatchSet[]
+  photos       MatchPhoto[]
   specialMatch SpecialMatch? @relation(fields: [specialMatchId], references: [id])
+}
+
+model MatchPhoto {
+  id        Int      @id @default(autoincrement())
+  matchId   Int
+  url       String
+  publicId  String?
+  caption   String?
+  createdAt DateTime @default(now())
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
 }
 
 model MatchSet {
