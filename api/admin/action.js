@@ -2,8 +2,8 @@
 // ─ Actions sur un utilisateur (accept, refuse, ban, unban, activate, deactivate, update, delete_banned)
 // ─ Actions globales (suspend_site, unsuspend_site, force_logout_all, reset_all_matches,
 //                     reset_all_notifications, deactivate_all_players)
-//   → anciennement dans api/admin/other_actions.js, maintenant fusionné ici
-// ─ GET → liste de tous les utilisateurs (anciennement api/admin/users.js)
+// ─ GET → liste de tous les utilisateurs
+// ─ GET ?refused=1 → historique des inscriptions refusées
 const { PrismaClient } = require('@prisma/client')
 const { requireAdmin } = require('../_auth')
 

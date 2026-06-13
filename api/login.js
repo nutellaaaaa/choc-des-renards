@@ -60,11 +60,8 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    // Vérifier suspension du site
     const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
-    const isAdminLogin = false // on déterminera ça après
 
-    // Rechercher par prénom + nom (insensible à la casse)
     const user = await prisma.user.findFirst({
       where: {
         firstName: { equals: firstName.trim(), mode: 'insensitive' },
@@ -84,7 +81,8 @@ module.exports = async function handler(req, res) {
             from: 'onboarding@resend.dev',
             to: process.env.ADMIN_EMAIL,
             subject: '⚠️ Tentative de connexion ADMIN',
-			html: `<h2>Tentative de connexion ADMIN</h2><p><strong>Résultat :</strong> mauvais mot de passe</p><p><strong>IP :</strong> ${(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim()}</p>`,          })
+            html: `<h2>Tentative de connexion ADMIN</h2><p><strong>Résultat :</strong> mauvais mot de passe</p><p><strong>IP :</strong> ${(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim()}</p>`,
+          })
         } catch (mailErr) { console.error('[EMAIL ADMIN]', mailErr) }
       }
       await logLogin(user.id, req, false, 'Mot de passe incorrect')
@@ -93,7 +91,6 @@ module.exports = async function handler(req, res) {
 
     const isAdmin = ['admin', 'root'].includes(user.username.toLowerCase()) || user.role === 'ADMIN'
 
-    // Vérif suspension site (les admins passent toujours)
     if (!isAdmin && state?.siteSuspended) {
       await logLogin(user.id, req, false, 'Site suspendu')
       return res.status(403).json({ error: 'Le site est temporairement suspendu. Revenez plus tard.' })
@@ -109,21 +106,20 @@ module.exports = async function handler(req, res) {
       return res.status(403).json({ error: 'Votre demande d\'inscription est en attente de validation par l\'administrateur.' })
     }
 
-    // Réinitialiser forceLogout si actif
     if (user.forceLogout) {
       await prisma.user.update({ where: { id: user.id }, data: { forceLogout: false } })
     }
 
     if (isAdmin) {
-		try {
-			await resend.emails.send({
-			from: 'onboarding@resend.dev',
-			to: process.env.ADMIN_EMAIL,
-			subject: '✅ Connexion ADMIN réussie',
-			html: `<h2>Connexion ADMIN réussie</h2><p><strong>Pseudo :</strong> ${user.username}</p><p><strong>IP :</strong> ${(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim()}</p>`,
-			})
-		} catch (mailErr) { console.error('[EMAIL ADMIN]', mailErr) }
-	}
+      try {
+        await resend.emails.send({
+          from: 'onboarding@resend.dev',
+          to: process.env.ADMIN_EMAIL,
+          subject: '✅ Connexion ADMIN réussie',
+          html: `<h2>Connexion ADMIN réussie</h2><p><strong>Pseudo :</strong> ${user.username}</p><p><strong>IP :</strong> ${(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim()}</p>`,
+        })
+      } catch (mailErr) { console.error('[EMAIL ADMIN]', mailErr) }
+    }
 
     // Créer l'événement de login et retourner son ID pour pouvoir logger le logout
     const rawIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null
