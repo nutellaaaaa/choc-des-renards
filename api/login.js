@@ -31,6 +31,24 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
   if (req.method === 'OPTIONS') return res.status(200).end()
 
+  // ── POST /api/login?action=resume — annuler un faux logout "page_closed" ────
+  // (déclenché par un rafraîchissement de page : la session est en fait restée active)
+  if (req.method === 'POST' && req.query?.action === 'resume') {
+    const { loginEventId } = req.body || {}
+    if (loginEventId) {
+      try {
+        const eid = parseInt(loginEventId, 10)
+        if (!isNaN(eid)) {
+          await prisma.loginEvent.updateMany({
+            where: { id: eid, logoutReason: 'page_closed' },
+            data: { logoutAt: null, logoutReason: null },
+          })
+        }
+      } catch(e) { console.error('[resume log]', e) }
+    }
+    return res.status(200).json({ ok: true })
+  }
+
   // ── POST /api/login?action=logout — enregistrer la déconnexion ──────────────
   if (req.method === 'POST' && req.query?.action === 'logout') {
     const { loginEventId, reason } = req.body || {}
@@ -38,11 +56,12 @@ module.exports = async function handler(req, res) {
       try {
         const eid = parseInt(loginEventId, 10)
         if (!isNaN(eid)) {
+          const validReasons = ['manual', 'inactivity', 'page_closed']
           await prisma.loginEvent.update({
             where: { id: eid },
             data: {
               logoutAt: new Date(),
-              logoutReason: reason === 'inactivity' ? 'inactivity' : 'manual',
+              logoutReason: validReasons.includes(reason) ? reason : 'manual',
             },
           })
         }
