@@ -94,8 +94,8 @@ module.exports = async function handler(req, res) {
         prisma.plannedMatch.findMany({
           orderBy: { scheduledDate: 'asc' },
           include: {
-            player1: { select: { id: true, firstName: true, lastName: true, username: true, category: true, phone: true } },
-            player2: { select: { id: true, firstName: true, lastName: true, username: true, category: true, phone: true } },
+            player1: { select: { id: true, firstName: true, lastName: true, username: true, category: true } },
+            player2: { select: { id: true, firstName: true, lastName: true, username: true, category: true } },
           },
         }),
       ])
@@ -398,9 +398,31 @@ module.exports = async function handler(req, res) {
     const mid = parseInt(req.body.matchId, 10)
     if (isNaN(mid)) return res.status(400).json({ error: 'matchId invalide.' })
     try {
+      const match = await prisma.match.findUnique({ where: { id: mid }, include: { user: true } })
+      if (!match) return res.status(404).json({ error: 'Match introuvable.' })
+
+      // Retrouver le match miroir côté adversaire (même date/phase/ronde, joueurs croisés)
+      const mirror = await prisma.match.findFirst({
+        where: {
+          id: { not: mid },
+          matchDate: match.matchDate,
+          phase: match.phase,
+          roundNumber: match.roundNumber,
+          opponentFirstName: { equals: match.user.firstName, mode: 'insensitive' },
+          opponentLastName:  { equals: match.user.lastName,  mode: 'insensitive' },
+          user: {
+            firstName: { equals: match.opponentFirstName, mode: 'insensitive' },
+            lastName:  { equals: match.opponentLastName,  mode: 'insensitive' },
+          },
+        },
+      })
+
       await prisma.match.delete({ where: { id: mid } })
-      return res.status(200).json({ ok: true, message: 'Match supprimé.' })
+      if (mirror) await prisma.match.delete({ where: { id: mirror.id } }).catch(() => {})
+
+      return res.status(200).json({ ok: true, message: 'Match supprimé.', mirrorDeleted: !!mirror })
     } catch (err) {
+      console.error('[admin/match delete]', err)
       return res.status(500).json({ error: 'Erreur serveur ou match introuvable.' })
     }
   }
