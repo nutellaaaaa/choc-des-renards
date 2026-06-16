@@ -60,7 +60,16 @@ module.exports = async function handler(req, res) {
           },
         },
       })
-      return res.status(200).json({ photos })
+      // Dédupliquer : une même photo (même URL Cloudinary) est attachée aux deux
+      // matchs miroir (un par joueur). On ne garde qu'une occurrence par URL.
+      const seenUrls = new Set()
+      const deduped = []
+      for (const p of photos) {
+        if (seenUrls.has(p.url)) continue
+        seenUrls.add(p.url)
+        deduped.push(p)
+      }
+      return res.status(200).json({ photos: deduped })
     } catch (err) {
       console.error('[matches gallery]', err)
       return res.status(500).json({ error: 'Erreur serveur.' })
