@@ -1011,11 +1011,11 @@
     <button class="nav-btn active" onclick="showPage('accueil',this)">Accueil</button>
     <button class="nav-btn" onclick="showPage('reglement',this)">Charte</button>
     <button class="nav-btn" onclick="showPage('classement',this)">Classement</button>
-    <button class="nav-btn" onclick="showPage('souvenirs',this)">Souvenirs</button>
+    <button class="nav-btn" onclick="showPage('souvenirs',this)">Souvenirs 📸</button>
     <button class="nav-btn" onclick="showPage('mes-notifs',this)">Mes messages</button>
   </div>
   <div class="nav-user-info" id="nav-user">
-    <span class="nav-user-greeting">Salut, <strong id="nav-user-name"></strong> <span id="nav-user-badge" class="player-level"></span></span>
+    <span class="nav-user-greeting">Bonjour, <strong id="nav-user-name"></strong> <span id="nav-user-badge" class="player-level"></span></span>
     <button class="nav-logout-btn" onclick="logout()">Déconnexion</button>
   </div>
 </nav>
@@ -1025,7 +1025,7 @@
   <div class="hero">
     <img class="hero-logo" src="bondy-badminton-club.png" alt="Logo Bondy Badminton Club">
     <p class="hero-tagline" id="hero-tagline">Saison — —</p>
-    <p class="hero-desc">Le tournoi interne au club de Bondy, de Septembre à Juin. Organisé par Yanis, avec l'aide de son élève pour la conception de ce site.</p>
+    <p class="hero-desc">Le tournoi interne au club de Bondy, de Septembre à Juin. Organisé par Yanis Feddoul, avec l'aide de son élève pour la conception de ce site.</p>
     <div class="hero-stats">
       <div class="stat-card"><div class="stat-num" id="stat-joueurs">–</div><div class="stat-label">Joueurs actifs</div></div>
       <div class="stat-card"><div class="stat-num" id="stat-poules">–</div><div class="stat-label">Poules</div></div>
@@ -1150,7 +1150,7 @@
 <!-- PAGE MES MESSAGES -->
 <div id="page-mes-notifs" class="page">
   <div class="section">
-    <h1 class="section-title"><span>Messages</span></h1>
+    <h1 class="section-title">Mes <span>Messages</span></h1>
     <p class="section-subtitle">Historique des notifications dont vous avez pris connaissance</p>
     <div id="mes-notifs-list"><div class="admin-empty">Chargement…</div></div>
   </div>
@@ -1634,11 +1634,18 @@ async function loadMesNotifs() {
 /* ══════════════ INACTIVITÉ ══════════════ */
 const INACTIVITY_MS = 15 * 60 * 1000
 const WARN_BEFORE_MS = 60 * 1000
+const INACTIVITY_EXEMPT_USERNAMES = ['admin', 'yanis']
 let inactivityTimer = null, warnTimer = null, warnCountdown = null
+
+function isInactivityExempt() {
+  const username = (currentUser?.username || '').toLowerCase()
+  return INACTIVITY_EXEMPT_USERNAMES.includes(username)
+}
 
 function resetInactivityTimer() {
   clearTimeout(inactivityTimer); clearTimeout(warnTimer); clearInterval(warnCountdown)
   document.getElementById('inactivity-toast').style.display = 'none'
+  if (isInactivityExempt()) return // jamais déconnecté pour inactivité
   warnTimer = setTimeout(() => {
     const toast = document.getElementById('inactivity-toast')
     const span = document.getElementById('inactivity-countdown')
@@ -1648,6 +1655,7 @@ function resetInactivityTimer() {
   inactivityTimer = setTimeout(() => logout('inactivity'), INACTIVITY_MS)
 }
 function startInactivityTimer() {
+  if (isInactivityExempt()) return // pas besoin d'écouter l'activité, jamais déconnecté
   ;['mousemove','keydown','click','scroll','touchstart'].forEach(e => document.addEventListener(e, resetInactivityTimer, {passive:true}))
   resetInactivityTimer()
 }

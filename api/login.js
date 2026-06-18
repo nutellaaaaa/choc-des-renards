@@ -156,7 +156,7 @@ module.exports = async function handler(req, res) {
     const token = jwt.sign(
       { userId: user.id, username: user.username, role: isAdmin ? 'ADMIN' : user.role },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '30d' }
     )
 
     let pendingNotifications = []
