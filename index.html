@@ -264,6 +264,8 @@
   .btn-match:hover   { background: var(--orange-dim); }
   .btn-notif   { background: rgba(130,180,255,0.1); color: #82B4FF; border-color: rgba(130,180,255,0.25); }
   .btn-notif:hover   { background: rgba(130,180,255,0.2); }
+  .btn-whatsapp { background: rgba(37,211,102,0.12); color: #25D366; border-color: rgba(37,211,102,0.3); }
+  .btn-whatsapp:hover { background: rgba(37,211,102,0.22); }
   .btn-publish { background: rgba(100,220,100,0.12); color: #6ddc6d; border-color: rgba(100,220,100,0.3); }
   .btn-publish:hover { background: rgba(100,220,100,0.22); }
   .btn-danger  { background: rgba(255,100,100,0.12); color: #ff7070; border-color: rgba(255,100,100,0.3); }
@@ -1009,11 +1011,11 @@
     <button class="nav-btn active" onclick="showPage('accueil',this)">Accueil</button>
     <button class="nav-btn" onclick="showPage('reglement',this)">Charte</button>
     <button class="nav-btn" onclick="showPage('classement',this)">Classement</button>
-    <button class="nav-btn" onclick="showPage('souvenirs',this)">Souvenirs 📸</button>
+    <button class="nav-btn" onclick="showPage('souvenirs',this)">Souvenirs</button>
     <button class="nav-btn" onclick="showPage('mes-notifs',this)">Mes messages</button>
   </div>
   <div class="nav-user-info" id="nav-user">
-    <span class="nav-user-greeting">Bonjour, <strong id="nav-user-name"></strong> <span id="nav-user-badge" class="player-level"></span></span>
+    <span class="nav-user-greeting">Salut, <strong id="nav-user-name"></strong> <span id="nav-user-badge" class="player-level"></span></span>
     <button class="nav-logout-btn" onclick="logout()">Déconnexion</button>
   </div>
 </nav>
@@ -1023,7 +1025,7 @@
   <div class="hero">
     <img class="hero-logo" src="bondy-badminton-club.png" alt="Logo Bondy Badminton Club">
     <p class="hero-tagline" id="hero-tagline">Saison — —</p>
-    <p class="hero-desc">Le tournoi interne au club de Bondy, de Septembre à Juin. Organisé par Yanis Feddoul, avec l'aide de son élève pour la conception de ce site.</p>
+    <p class="hero-desc">Le tournoi interne au club de Bondy, de Septembre à Juin. Organisé par Yanis, avec l'aide de son élève pour la conception de ce site.</p>
     <div class="hero-stats">
       <div class="stat-card"><div class="stat-num" id="stat-joueurs">–</div><div class="stat-label">Joueurs actifs</div></div>
       <div class="stat-card"><div class="stat-num" id="stat-poules">–</div><div class="stat-label">Poules</div></div>
@@ -1148,7 +1150,7 @@
 <!-- PAGE MES MESSAGES -->
 <div id="page-mes-notifs" class="page">
   <div class="section">
-    <h1 class="section-title">Mes <span>Messages</span></h1>
+    <h1 class="section-title"><span>Messages</span></h1>
     <p class="section-subtitle">Historique des notifications dont vous avez pris connaissance</p>
     <div id="mes-notifs-list"><div class="admin-empty">Chargement…</div></div>
   </div>
@@ -1909,6 +1911,7 @@ async function loadUsers() {
               <button class="btn-sm btn-edit" onclick="openEditModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">Modifier</button>
               <button class="btn-sm btn-match" onclick="openMatchModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">+ Match</button>
               <button class="btn-sm btn-notif" onclick="quickNotify(${u.id},'${esc(u.firstName)} ${esc(u.lastName)}')">✉</button>
+              <button class="btn-sm btn-whatsapp" onclick="whatsappUser('${escJs(u.firstName)}','${escJs(u.lastName)}','${escJs(u.phone)}','Bonjour ${escJs(u.firstName)}, ')" title="Contacter sur WhatsApp">📱 WhatsApp</button>
               ${u.active
                 ? `<button class="btn-sm btn-deactivate" onclick="adminAction('deactivate',${u.id})">Désactiver</button>`
                 : `<button class="btn-sm btn-activate"   onclick="adminAction('activate',${u.id})">Activer</button>`}
@@ -2633,6 +2636,9 @@ async function loadPlannedMatches() {
     list.innerHTML = plannedData.map(pm => {
       const p1 = pm.player1, p2 = pm.player2
       const malusText = pm.malus ? `♡ <strong>${esc(pm.malus)}</strong> → ${pm.malusTarget === 1 ? esc(p1.firstName) : esc(p2.firstName)}` : 'Aucun malus'
+      const dateTxt = pm.scheduledDate ? fmtDateOnly(pm.scheduledDate) : 'une date à convenir'
+      const msgP1 = `Bonjour ${p1.firstName}, ton prochain match au Choc des Renards est prévu contre ${p2.firstName} ${p2.lastName} (${dateTxt}). `
+      const msgP2 = `Bonjour ${p2.firstName}, ton prochain match au Choc des Renards est prévu contre ${p1.firstName} ${p1.lastName} (${dateTxt}). `
       return `<div class="pending-match-card">
         <div class="pending-match-info">
           <div class="pending-match-player">${esc(p1.firstName)} ${esc(p1.lastName)} <span class="player-level level-${p1.category||'NC'}">${p1.category||'NC'}</span> <span style="color:var(--gray)">vs</span> ${esc(p2.firstName)} ${esc(p2.lastName)} <span class="player-level level-${p2.category||'NC'}">${p2.category||'NC'}</span></div>
@@ -2641,6 +2647,8 @@ async function loadPlannedMatches() {
           ${pm.note ? `<div style="font-size:0.82rem;color:var(--gray);margin-top:0.2rem;font-style:italic">📝 ${esc(pm.note)}</div>` : ''}
         </div>
         <div class="pending-match-actions">
+          <button class="btn-sm btn-whatsapp" onclick="whatsappUser('${escJs(p1.firstName)}','${escJs(p1.lastName)}','${escJs(p1.phone||'')}',${JSON.stringify(msgP1)})" title="Prévenir ${esc(p1.firstName)} sur WhatsApp">📱 ${esc(p1.firstName)}</button>
+          <button class="btn-sm btn-whatsapp" onclick="whatsappUser('${escJs(p2.firstName)}','${escJs(p2.lastName)}','${escJs(p2.phone||'')}',${JSON.stringify(msgP2)})" title="Prévenir ${esc(p2.firstName)} sur WhatsApp">📱 ${esc(p2.firstName)}</button>
           <button class="btn-sm btn-match" onclick="openPlannedScoreModal(${pm.id})">Renseigner le score</button>
           <button class="btn-sm btn-edit" onclick="openPlannedEditModal(${pm.id})">Modifier</button>
           <button class="btn-sm btn-danger" onclick="deletePlannedMatch(${pm.id})">Supprimer</button>
@@ -2925,6 +2933,34 @@ function closeModal(id) { document.getElementById(id).classList.remove('open') }
 function esc(str) {
   return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
 }
+
+/* ── WhatsApp ── */
+// Échappe une chaîne pour une insertion sûre entre guillemets simples dans un attribut onclick.
+function escJs(str) {
+  return String(str||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")
+}
+// Convertit un numéro français local (06 12 34 56 78, 06.12.34.56.78, etc.)
+// au format international attendu par wa.me (sans le 0, préfixé par 33).
+// Si le numéro semble déjà international (commence par +33 ou 33), il est conservé tel quel.
+function formatPhoneForWhatsapp(phone) {
+  if (!phone) return null
+  let digits = String(phone).replace(/[^0-9+]/g, '')
+  if (digits.startsWith('+')) digits = digits.slice(1)
+  if (digits.startsWith('0')) digits = '33' + digits.slice(1)
+  else if (!digits.startsWith('33')) digits = '33' + digits
+  return digits
+}
+function openWhatsapp(phone, message) {
+  const num = formatPhoneForWhatsapp(phone)
+  if (!num) { alert('Numéro de téléphone invalide ou manquant.'); return }
+  const url = `https://wa.me/${num}` + (message ? `?text=${encodeURIComponent(message)}` : '')
+  window.open(url, '_blank')
+}
+function whatsappUser(firstName, lastName, phone, message) {
+  if (!phone) { alert(`Aucun numéro de téléphone enregistré pour ${firstName} ${lastName}.`); return }
+  openWhatsapp(phone, message)
+}
+
 function fmtDate(iso) {
   if (!iso) return '—'
   const d = new Date(iso)
