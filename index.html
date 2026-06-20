@@ -165,6 +165,62 @@
   /* FOOTER */
   footer { border-top: 1px solid var(--dark4); padding: 2rem; text-align: center; font-family: var(--font-heading); font-size: 0.82rem; letter-spacing: 0.08em; color: var(--gray); }
   footer span { color: var(--orange); }
+  .footer-privacy-link { color: var(--gray); text-decoration: none; border-bottom: 1px solid transparent; transition: color 0.2s, border-color 0.2s; margin-top: 0.55rem; display: inline-block; font-size: 0.75rem; letter-spacing: 0.08em; }
+  .footer-privacy-link:hover { color: var(--orange); border-bottom-color: var(--orange); }
+
+  /* PAGE CONFIDENTIALITÉ */
+  .privacy-wrap { max-width: 860px; margin: 0 auto; padding: 3rem 2rem 4rem; }
+  .privacy-hero { text-align: center; padding: 3rem 2rem 2rem; background: var(--dark2); border: 1px solid var(--dark4); border-top: 3px solid var(--orange); border-radius: 14px; margin-bottom: 2rem; position: relative; overflow: hidden; }
+  .privacy-hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 0%, rgba(255,109,0,0.06) 0%, transparent 65%); pointer-events: none; }
+  .privacy-eyebrow { font-family: var(--font-heading); font-size: 0.75rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--orange); margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: center; gap: 0.75rem; }
+  .privacy-eyebrow::before, .privacy-eyebrow::after { content: ''; height: 1px; width: 36px; background: var(--orange); opacity: 0.5; }
+  .privacy-hero h1 { font-family: var(--font-display); font-size: clamp(2.2rem, 6vw, 3.4rem); letter-spacing: 0.04em; color: var(--white); line-height: 1.1; margin-bottom: 0.5rem; }
+  .privacy-hero h1 span { color: var(--orange); }
+  .privacy-paw { font-size: 1.3rem; opacity: 0.4; display: block; margin-top: 1rem; }
+  .privacy-intro { background: var(--dark2); border: 1px solid var(--dark4); border-left: 3px solid var(--orange); border-radius: 12px; padding: 1.5rem 1.75rem; margin-bottom: 1.75rem; }
+  .privacy-intro-title { font-family: var(--font-heading); font-size: 0.8rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--orange); margin-bottom: 0.9rem; }
+  .privacy-intro p { color: var(--gray-light); line-height: 1.8; font-size: 0.95rem; margin-bottom: 0.65rem; }
+  .privacy-intro p:last-child { margin-bottom: 0; }
+  .privacy-sep { display: flex; align-items: center; gap: 1rem; margin: 1.5rem 0; color: var(--gray); font-family: var(--font-heading); font-size: 0.72rem; letter-spacing: 0.15em; text-transform: uppercase; }
+  .privacy-sep::before, .privacy-sep::after { content: ''; flex: 1; height: 1px; background: var(--dark4); }
+  .privacy-grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1.1rem; margin-bottom: 1.1rem; }
+  .privacy-bloc { background: var(--dark2); border: 1px solid var(--dark4); border-radius: 12px; padding: 1.4rem; transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s; }
+  .privacy-bloc:hover { border-color: var(--orange); transform: translateY(-3px); box-shadow: 0 6px 24px rgba(0,0,0,0.3); }
+  .privacy-bloc-icon { width: 38px; height: 38px; background: var(--orange-dim); border: 1px solid rgba(255,109,0,0.2); border-radius: 9px; display: flex; align-items: center; justify-content: center; margin-bottom: 0.9rem; font-size: 1.15rem; }
+  .privacy-bloc-title { font-family: var(--font-heading); font-size: 0.8rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--white); margin-bottom: 0.7rem; }
+  .privacy-bloc-body { font-size: 0.91rem; color: var(--gray-light); line-height: 1.75; }
+  .privacy-bloc-body p { margin-bottom: 0.55rem; }
+  .privacy-bloc-body p:last-child { margin-bottom: 0; }
+  .privacy-bloc-body strong { color: var(--white); }
+  .privacy-paw-list { list-style: none; padding: 0; margin: 0.5rem 0; display: flex; flex-direction: column; gap: 0.4rem; }
+  .privacy-paw-list li { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.9rem; color: var(--gray-light); line-height: 1.55; }
+  .privacy-paw-list li::before { content: '🐾'; font-size: 0.68rem; margin-top: 0.3rem; flex-shrink: 0; opacity: 0.6; }
+  .privacy-check-list { list-style: none; padding: 0; margin: 0.5rem 0; display: flex; flex-direction: column; gap: 0.4rem; }
+  .privacy-check-list li { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.9rem; color: var(--gray-light); line-height: 1.5; }
+  .privacy-check-list li::before { content: '✓'; color: #6ddc6d; font-weight: 700; font-size: 0.82rem; margin-top: 0.1rem; flex-shrink: 0; }
+  .privacy-droits { background: var(--dark2); border: 1px solid var(--dark4); border-top: 3px solid var(--orange); border-radius: 12px; padding: 1.5rem 1.75rem; margin-bottom: 1.1rem; transition: transform 0.2s, box-shadow 0.2s; }
+  .privacy-droits:hover { transform: translateY(-3px); box-shadow: 0 6px 24px rgba(0,0,0,0.3); }
+  .privacy-droits-title { font-family: var(--font-heading); font-size: 0.8rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--white); margin-bottom: 0.3rem; display: flex; align-items: center; gap: 0.5rem; }
+  .privacy-droits-sub { font-size: 0.87rem; color: var(--gray); font-style: italic; margin-bottom: 1.1rem; }
+  .privacy-droits-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 0.6rem; margin-bottom: 1.1rem; }
+  .privacy-droit-item { background: var(--dark3); border: 1px solid var(--dark4); border-radius: 8px; padding: 0.7rem 0.4rem; text-align: center; transition: background 0.2s, border-color 0.2s, transform 0.2s; cursor: default; }
+  .privacy-droit-item:hover { background: var(--orange-dim); border-color: rgba(255,109,0,0.3); transform: translateY(-2px); }
+  .privacy-droit-item-icon { font-size: 1.2rem; display: block; margin-bottom: 0.3rem; }
+  .privacy-droit-item-label { font-size: 0.7rem; color: var(--gray-light); line-height: 1.3; }
+  .privacy-droits-body { font-size: 0.91rem; color: var(--gray-light); line-height: 1.75; }
+  .privacy-droits-body strong { color: var(--orange); }
+  .privacy-fin { background: var(--dark2); border: 1px solid var(--dark4); border-radius: 12px; padding: 1.75rem 2rem; text-align: center; transition: transform 0.2s, box-shadow 0.2s; }
+  .privacy-fin:hover { transform: translateY(-3px); box-shadow: 0 6px 24px rgba(0,0,0,0.3); }
+  .privacy-fin-title { font-family: var(--font-heading); font-size: 0.8rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--white); margin-bottom: 0.9rem; }
+  .privacy-fin-body { font-size: 0.95rem; color: var(--gray-light); line-height: 1.8; margin-bottom: 0.9rem; }
+  .privacy-fin-punch { font-family: var(--font-heading); font-size: 1rem; font-weight: 700; letter-spacing: 0.04em; color: var(--orange); font-style: italic; }
+
+  /* Checkbox RGPD inscription */
+  .checkbox-group-rgpd { display: flex; align-items: flex-start; gap: 0.75rem; background: var(--dark3); border: 1px solid rgba(255,109,0,0.2); border-radius: 8px; padding: 0.9rem 1rem; margin-bottom: 1rem; }
+  .checkbox-group-rgpd input[type=checkbox] { width: 18px; height: 18px; min-width: 18px; margin-top: 2px; accent-color: var(--orange); cursor: pointer; }
+  .checkbox-group-rgpd label { font-size: 0.85rem; color: var(--gray-light); line-height: 1.55; cursor: pointer; }
+  .checkbox-group-rgpd label a { color: var(--orange); text-decoration: none; border-bottom: 1px solid rgba(255,109,0,0.4); transition: border-color 0.2s; }
+  .checkbox-group-rgpd label a:hover { border-bottom-color: var(--orange); }
 
   /* AUTH OVERLAY */
   .auth-overlay { position: fixed; inset: 0; z-index: 999; background: var(--dark); display: flex; align-items: center; justify-content: center; padding: 1rem; opacity: 1; transition: opacity 0.3s ease; }
@@ -510,6 +566,10 @@
       <div class="form-group">
         <label for="reg-confirm">Confirmer le mot de passe</label>
         <input type="password" id="reg-confirm" placeholder="••••••••" autocomplete="new-password">
+      </div>
+      <div class="checkbox-group-rgpd">
+        <input type="checkbox" id="reg-rgpd">
+        <label for="reg-rgpd">Je consens à ce que mes données soient collectées et utilisées pour l'organisation du Choc Des Renards (promis, pas de fouille sauvage). Pour plus d'informations, nous vous encourageons à vous renseigner sur <a href="#" onclick="showPrivacyPage(); return false;">Vos données et vos droits</a>.</label>
       </div>
       <div class="checkbox-group">
         <input type="checkbox" id="reg-ack">
@@ -1217,8 +1277,121 @@
   </div>
 </div>
 
+<!-- PAGE CONFIDENTIALITÉ -->
+<div id="page-confidentialite" class="page">
+  <div class="privacy-wrap">
+
+    <div class="privacy-hero">
+      <div class="privacy-eyebrow">Vos données et vos droits</div>
+      <h1>Politique de <span>Confidentialité</span></h1>
+      <span class="privacy-paw">🐾</span>
+    </div>
+
+    <div class="privacy-intro">
+      <div class="privacy-intro-title">🦊 Propos liminaire</div>
+      <p>Connus et reconnus pour leur malice et leur fourberie, les renards n'en savent pas moins être sérieux et rigoureux. Aussi, soyez rassurés : dans le cadre de l'organisation du Choc Des Renards, le respect de la vie privée représente pour nous un enjeu majeur. Pas question de fouiller dans vos données comme dans un poulailler.</p>
+      <p>Futé et discret, le renard sait se cacher et disparaître dans la nature, sans laisser de trace. En bons renards qui se respectent, nous nous engageons à protéger vos données et votre vie privée contre l'adversité.</p>
+      <p>Cet espace « Vos données et vos droits » a pour but d'offrir à l'ensemble des renards une vision globale de nos pratiques en matière de protection des données, en rassemblant en un même lieu l'ensemble des informations utiles.</p>
+    </div>
+
+    <div class="privacy-sep">Données &amp; traitement</div>
+
+    <div class="privacy-grid-3">
+      <div class="privacy-bloc">
+        <div class="privacy-bloc-icon">👤</div>
+        <div class="privacy-bloc-title">Responsable du traitement</div>
+        <div class="privacy-bloc-body">
+          <p>C'est le Choc Des Renards, représenté par son créateur, <strong>Yanis</strong>, qui est responsable du traitement.</p>
+          <p>Le Choc Des Renards détermine les données récoltées ainsi que leur utilisation.</p>
+        </div>
+      </div>
+      <div class="privacy-bloc">
+        <div class="privacy-bloc-icon">📂</div>
+        <div class="privacy-bloc-title">Données collectées et traitées</div>
+        <div class="privacy-bloc-body">
+          <p>Le Choc Des Renards s'engage à ne collecter que ce qui est strictement nécessaire :</p>
+          <ul class="privacy-paw-list">
+            <li>Données d'identification (nom, prénom, numéro de téléphone)</li>
+            <li>Données de connexion (IP, logs…)</li>
+            <li>Photos fournies par les intéressés avec leur accord</li>
+          </ul>
+          <p style="margin-top:0.5rem;font-style:italic;font-size:0.87rem;color:var(--gray)">Aucune donnée sensible n'est collectée.</p>
+        </div>
+      </div>
+      <div class="privacy-bloc">
+        <div class="privacy-bloc-icon">🎯</div>
+        <div class="privacy-bloc-title">Finalité du traitement</div>
+        <div class="privacy-bloc-body">
+          <p>Le Choc Des Renards a besoin de vos données pour :</p>
+          <ul class="privacy-check-list">
+            <li>Gérer votre inscription et votre participation</li>
+            <li>Vous informer sur le déroulé des événements</li>
+            <li>Assurer le bon fonctionnement du site</li>
+            <li>Améliorer l'expérience utilisateur</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="privacy-grid-3">
+      <div class="privacy-bloc">
+        <div class="privacy-bloc-icon">🛡️</div>
+        <div class="privacy-bloc-title">Base légale du traitement</div>
+        <div class="privacy-bloc-body">
+          <p>Le Choc Des Renards prend en compte votre avis. Nous traitons vos données sur des bases solides.</p>
+          <p>C'est <strong>votre consentement</strong> qui nous permet de traiter vos données.</p>
+        </div>
+      </div>
+      <div class="privacy-bloc">
+        <div class="privacy-bloc-icon">⏳</div>
+        <div class="privacy-bloc-title">Durée de conservation</div>
+        <div class="privacy-bloc-body">
+          <p>Vos données ne doivent pas errer dans la nature ou dans des terriers.</p>
+          <p>Nous nous engageons à les conserver uniquement pendant la durée du Choc Des Renards, à la suite de quoi elles seront <strong>supprimées ou archivées</strong>.</p>
+        </div>
+      </div>
+      <div class="privacy-bloc">
+        <div class="privacy-bloc-icon">👥</div>
+        <div class="privacy-bloc-title">Destinataires</div>
+        <div class="privacy-bloc-body">
+          <p>Vos données ne seront en aucun cas transmises à des tiers. Elles sont uniquement destinées au Choc Des Renards.</p>
+          <p>Les renards sont des animaux grégaires qui aiment rester entre eux : c'est plus sûr !</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="privacy-sep">Vos droits</div>
+
+    <div class="privacy-droits">
+      <div class="privacy-droits-title">🔑 Droits</div>
+      <p class="privacy-droits-sub">Parce que chaque renard mérite le contrôle de sa tanière, vous disposez des droits suivants :</p>
+      <div class="privacy-droits-grid">
+        <div class="privacy-droit-item"><span class="privacy-droit-item-icon">👁️</span><div class="privacy-droit-item-label">Droit d'accès</div></div>
+        <div class="privacy-droit-item"><span class="privacy-droit-item-icon">✏️</span><div class="privacy-droit-item-label">Droit de rectification</div></div>
+        <div class="privacy-droit-item"><span class="privacy-droit-item-icon">🗑️</span><div class="privacy-droit-item-label">Droit à l'effacement</div></div>
+        <div class="privacy-droit-item"><span class="privacy-droit-item-icon">⏸️</span><div class="privacy-droit-item-label">Droit à la limitation du traitement</div></div>
+        <div class="privacy-droit-item"><span class="privacy-droit-item-icon">🚫</span><div class="privacy-droit-item-label">Droit d'opposition</div></div>
+        <div class="privacy-droit-item"><span class="privacy-droit-item-icon">📦</span><div class="privacy-droit-item-label">Droit à la portabilité</div></div>
+      </div>
+      <div class="privacy-droits-body">
+        <p>Vous pouvez les exercer à tout moment en nous contactant via le formulaire de contact. Nous vous répondrons dans les plus brefs délais.</p>
+        <p>Et si quelque chose vous semble suspect, vous pouvez aussi saisir la <strong>CNIL</strong>.</p>
+      </div>
+    </div>
+
+    <div class="privacy-fin">
+      <div class="privacy-fin-title">🐾 Mot de la fin</div>
+      <p class="privacy-fin-body">Vous pouvez avoir confiance en nous. Transparence, respect et sécurité sont des règles d'or que l'on s'engage à respecter. Avec nous, vos données sont bien gardées.</p>
+      <p class="privacy-fin-punch">Promis : ce sont les seules choses que nous ne chassons pas.</p>
+    </div>
+
+  </div>
+</div>
+
 <footer>
   <span>CDR</span> — Le Choc des Renards &mdash; <span id="footer-year"></span>
+  <br>
+  <a href="#" class="footer-privacy-link" onclick="showPrivacyPage(); return false;">🐾 Vos données et vos droits</a>
 </footer>
 
 <script defer src="/_vercel/insights/script.js"></script>
@@ -1246,6 +1419,27 @@ function showPage(id, btn) {
   if (id === 'classement') loadClassement()
   if (id === 'souvenirs') loadGallery()
   if (id === 'mes-notifs') loadMesNotifs()
+}
+
+function showPrivacyPage() {
+  // Si on est dans l'overlay d'auth, on ferme et on navigue après connexion
+  const overlay = document.getElementById('auth-overlay')
+  if (overlay && overlay.style.display !== 'none' && !overlay.classList.contains('fade-out')) {
+    // On est sur l'écran de connexion — ouvrir dans un nouvel onglet n'est pas possible,
+    // on montre la page dans le site en fermant temporairement l'overlay
+    overlay.classList.add('fade-out')
+    setTimeout(() => {
+      overlay.style.display = 'none'
+      showPage('confidentialite', null)
+    }, 300)
+    return
+  }
+  // Admin panel actif ? On masque et on montre la page
+  const adminPanel = document.getElementById('admin-panel')
+  if (adminPanel && adminPanel.classList.contains('active')) {
+    adminPanel.classList.remove('active')
+  }
+  showPage('confidentialite', null)
 }
 function toggleArticle(el) { el.classList.toggle('open') }
 
@@ -1370,10 +1564,12 @@ async function handleRegister() {
   const password  = document.getElementById('reg-password').value
   const confirm   = document.getElementById('reg-confirm').value
   const ack       = document.getElementById('reg-ack').checked
+  const rgpd      = document.getElementById('reg-rgpd').checked
   const errorEl   = document.getElementById('reg-error')
   const btn       = document.getElementById('reg-btn')
   errorEl.textContent = ''
   if (!firstName || !lastName || !phone || !password || !confirm) { errorEl.textContent = 'Veuillez remplir tous les champs.'; return }
+  if (!rgpd) { errorEl.textContent = 'Vous devez consentir à la collecte de vos données.'; return }
   if (!ack) { errorEl.textContent = 'Vous devez cocher la case de prise de connaissance.'; return }
   if (password !== confirm) { errorEl.textContent = 'Les mots de passe ne correspondent pas.'; return }
   if (password.length < 8) { errorEl.textContent = 'Le mot de passe doit contenir au moins 8 caractères.'; return }
