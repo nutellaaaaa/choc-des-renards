@@ -359,10 +359,10 @@
   .notify-dropdown-panel { display: none; position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 50; background: var(--dark2); border: 1px solid var(--dark4); border-radius: 10px; box-shadow: 0 10px 32px rgba(0,0,0,0.45); padding: 0.65rem; max-height: 380px; display: none; flex-direction: column; }
   .notify-dropdown.open .notify-dropdown-panel { display: flex; }
   .notify-dropdown-section-label { font-family: var(--font-heading); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--orange); padding: 0.2rem 0.3rem 0.45rem; }
-  #notify-quick-selects { display: flex; flex-direction: column; gap: 0.3rem; max-height: 130px; overflow-y: auto; margin-bottom: 0.3rem; }
-  .notify-quick-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.6rem; border-radius: 7px; background: rgba(255,138,61,0.08); border: 1px solid rgba(255,138,61,0.25); color: var(--orange); font-size: 0.83rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
-  .notify-quick-item:hover { background: rgba(255,138,61,0.18); }
-  .notify-quick-item .nq-icon { flex-shrink: 0; }
+  #notify-quick-selects { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; max-height: 160px; overflow-y: auto; margin-bottom: 0.3rem; }
+  .notify-quick-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0.65rem; border-radius: 7px; background: linear-gradient(135deg, rgba(255,138,61,0.1), rgba(255,109,0,0.06)); border: 1px solid rgba(255,138,61,0.22); color: var(--orange-light); font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .notify-quick-item:hover { background: linear-gradient(135deg, rgba(255,138,61,0.22), rgba(255,109,0,0.16)); border-color: rgba(255,138,61,0.5); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(255,109,0,0.15); }
+  .notify-quick-item .nq-icon { flex-shrink: 0; font-size: 1rem; }
   .notify-dropdown-divider { height: 1px; background: var(--dark4); margin: 0.4rem 0 0.5rem; }
   .notify-dropdown-search { width: 100%; background: var(--dark3); border: 1px solid var(--dark4); border-radius: 7px; padding: 0.45rem 0.7rem; color: var(--gray-light); font-size: 0.83rem; margin-bottom: 0.45rem; }
   .notify-dropdown-players { display: flex; flex-direction: column; gap: 0.15rem; overflow-y: auto; max-height: 180px; }
@@ -553,12 +553,10 @@
     <div class="admin-tabs">
       <button class="admin-tab active" onclick="adminTab('users',this)">Utilisateurs <span class="badge" id="badge-users">–</span></button>
       <button class="admin-tab" onclick="adminTab('pending',this)">En attente <span class="badge" id="badge-pending">–</span></button>
-      <button class="admin-tab" onclick="adminTab('refused',this)">Refusés</button>
       <button class="admin-tab" onclick="adminTab('history',this)">Connexions</button>
       <button class="admin-tab" onclick="adminTab('phase',this)">Phase du tournoi</button>
       <button class="admin-tab" onclick="adminTab('poules',this)">Organiser la phase</button>
       <button class="admin-tab" onclick="adminTab('notify',this)">Notifier un joueur</button>
-      <button class="admin-tab" onclick="adminTab('special',this)">Rencontre spéciale</button>
       <button class="admin-tab" onclick="adminTab('planned',this)">Matchs planifiés <span class="badge" id="badge-planned">–</span></button>
       <button class="admin-tab" onclick="adminTab('publication',this)">Publication matchs <span class="badge" id="badge-pending-matches">–</span></button>
       <button class="admin-tab" onclick="adminTab('notifications-list',this)">Notifications <span class="badge" id="badge-notifs">–</span></button>
@@ -585,6 +583,17 @@
         </table>
         <div id="pending-empty" class="admin-empty" style="display:none">Aucune demande en attente.</div>
       </div>
+      <!-- Refusés fusionnés ici -->
+      <div id="refused-section" style="margin-top:2.5rem;padding-top:2rem;border-top:1px solid var(--dark4)">
+        <h3 style="font-family:var(--font-heading);font-size:1rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--gray);margin-bottom:1rem">📋 Inscriptions refusées</h3>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead><tr><th>Prénom</th><th>Nom</th><th>Téléphone</th><th>Refusé le</th></tr></thead>
+            <tbody id="tbl-refused"></tbody>
+          </table>
+          <div id="refused-empty" class="admin-empty" style="display:none">Aucune inscription refusée.</div>
+        </div>
+      </div>
     </div>
 
     <!-- Historique connexions -->
@@ -604,17 +613,7 @@
       </div>
     </div>
 
-    <!-- Inscriptions refusées -->
-    <div id="admin-refused" class="admin-section">
-      <div class="admin-section-header"><h3>Inscriptions refusées</h3></div>
-      <div class="admin-table-wrap">
-        <table class="admin-table">
-          <thead><tr><th>Prénom</th><th>Nom</th><th>Téléphone</th><th>Refusé le</th></tr></thead>
-          <tbody id="tbl-refused"></tbody>
-        </table>
-        <div id="refused-empty" class="admin-empty" style="display:none">Aucune inscription refusée.</div>
-      </div>
-    </div>
+
 
     <!-- Phase -->
     <div id="admin-phase" class="admin-section">
@@ -695,25 +694,8 @@
       </div>
     </div>
 
-    <!-- Rencontre spéciale -->
-    <div id="admin-special" class="admin-section">
-      <div style="max-width:560px">
-        <h3 style="font-family:var(--font-heading);font-size:1.2rem;font-weight:700;letter-spacing:0.06em;margin-bottom:1.5rem">Organiser une rencontre spéciale</h3>
-        <div class="form-row">
-          <div class="form-group"><label>Joueur 1</label><select id="special-player1"><option value="">— Joueur 1 —</option></select></div>
-          <div class="form-group"><label>Joueur 2</label><select id="special-player2"><option value="">— Joueur 2 —</option></select></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label>À partir du</label><input type="date" id="special-start"></div>
-          <div class="form-group"><label>Avant le</label><input type="date" id="special-end"></div>
-        </div>
-        <div class="form-group"><label>Motif</label><input type="text" id="special-reason" placeholder="Ex : Rattrapage de match…"></div>
-        <div class="form-group"><label>Note / Message (optionnel)</label><textarea id="special-note" rows="3"></textarea></div>
-        <div id="special-error" class="modal-error"></div>
-        <div id="special-success" class="modal-success"></div>
-        <button class="btn-modal-save" style="width:100%" onclick="sendSpecialMatch()">Créer la rencontre &amp; notifier</button>
-      </div>
-    </div>
+    <!-- Rencontre spéciale (conservée pour les anciennes références) -->
+    <div id="admin-special" class="admin-section" style="display:none"></div>
 
     <!-- Matchs planifiés -->
     <div id="admin-planned" class="admin-section">
@@ -978,6 +960,19 @@
       <label>Note (optionnelle)</label>
       <textarea id="planned-score-note" rows="2"></textarea>
     </div>
+    <div class="form-group">
+      <label>Photos (optionnelles)</label>
+      <div class="photo-upload-zone" id="planned-score-photo-zone"
+           onclick="document.getElementById('planned-score-photo-input').click()"
+           ondragover="photoDragOver(event,'planned-score-photo-zone')"
+           ondragleave="photoDragLeave('planned-score-photo-zone')"
+           ondrop="photoDrop(event,'planned-score-photo')">
+        <input type="file" id="planned-score-photo-input" multiple accept="image/*" onchange="handlePhotoSelect(event,'planned-score-photo')">
+        <div class="photo-upload-label">Glissez des photos ici ou <span>cliquez pour sélectionner</span></div>
+      </div>
+      <div class="photo-previews" id="planned-score-photo-previews"></div>
+      <div class="photo-upload-progress" id="planned-score-photo-progress"></div>
+    </div>
     <div id="planned-score-error" class="modal-error"></div>
     <div class="modal-actions">
       <button class="btn-modal-cancel" onclick="closeModal('planned-score-modal')">Annuler</button>
@@ -1004,6 +999,19 @@
     <div class="form-group">
       <label>Note (optionnelle)</label>
       <textarea id="special-score-note" rows="2"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Photos (optionnelles)</label>
+      <div class="photo-upload-zone" id="special-score-photo-zone"
+           onclick="document.getElementById('special-score-photo-input').click()"
+           ondragover="photoDragOver(event,'special-score-photo-zone')"
+           ondragleave="photoDragLeave('special-score-photo-zone')"
+           ondrop="photoDrop(event,'special-score-photo')">
+        <input type="file" id="special-score-photo-input" multiple accept="image/*" onchange="handlePhotoSelect(event,'special-score-photo')">
+        <div class="photo-upload-label">Glissez des photos ici ou <span>cliquez pour sélectionner</span></div>
+      </div>
+      <div class="photo-previews" id="special-score-photo-previews"></div>
+      <div class="photo-upload-progress" id="special-score-photo-progress"></div>
     </div>
     <div id="special-score-error" class="modal-error"></div>
     <div class="modal-actions">
@@ -1871,9 +1879,9 @@ function adminTab(name, btn) {
   if (name === 'publication') loadPendingMatches()
   if (name === 'planned') loadPlannedMatches()
   if (name === 'notifications-list') loadNotificationsList()
-  if (name === 'notify' || name === 'special') loadPlayersForNotify()
+  if (name === 'notify') loadPlayersForNotify()
   if (name === 'history') loadHistory()
-  if (name === 'refused') loadRefused()
+  if (name === 'pending') loadRefused()
 }
 
 function pubSubTab(name, btn) {
@@ -2202,7 +2210,8 @@ function openEditMatchModal(match) {
       document.getElementById('set-opp-' + setCount).value = s.opponentScore
     })
   } else { addSetRow() }
-  document.getElementById('match-photo-section').style.display = 'none'
+  document.getElementById('match-photo-section').style.display = ''
+  clearPendingPhotos('match-photo')
   document.getElementById('match-modal').classList.add('open')
 }
 
@@ -2235,6 +2244,17 @@ async function saveMatch() {
       const res = await fetch('/api/admin/match', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'edit', matchId, matchDate, note: note||null, sets }) })
       const data = await res.json()
       if (!res.ok) { errorEl.textContent = data.error||'Erreur.'; return }
+      // Upload photos if any were added
+      const uploadedPhotos = await uploadPhotosToCloudinary('match-photo')
+      if (uploadedPhotos.length > 0) {
+        await fetch('/api/admin/match', { method:'POST', headers: authHeaders(), body: JSON.stringify({
+          action: 'add_photos',
+          matchId,
+          mirrorMatchId: null,
+          photos: uploadedPhotos,
+        })})
+      }
+      clearPendingPhotos('match-photo')
       closeMatchModal(); await loadPendingMatches()
     } else {
       const userId   = parseInt(document.getElementById('match-modal-user-id').value, 10)
@@ -2691,7 +2711,7 @@ function renderMatchCard(m, isPublished) {
     <div class="pending-match-actions">
       ${!isPublished ? `<button class="btn-sm btn-publish" onclick="publishMatch(${m.id})">✓ Publier</button>` : ''}
       <button class="btn-sm btn-edit" onclick="openEditMatchModal(${JSON.stringify(m).replace(/"/g,'&quot;')})">Modifier</button>
-      ${!isPublished ? `<button class="btn-sm btn-danger" onclick="deleteMatch(${m.id})">Supprimer</button>` : ''}
+      <button class="btn-sm btn-danger" onclick="deleteMatch(${m.id})">Supprimer</button>
     </div>
   </div>`
 }
@@ -2894,6 +2914,7 @@ function openPlannedScoreModal(pmid) {
   document.getElementById('planned-score-sets').innerHTML = ''
   plannedSetCount = 0
   addPlannedSetRow()
+  clearPendingPhotos('planned-score-photo')
   document.getElementById('planned-score-modal').classList.add('open')
 }
 
@@ -2916,6 +2937,17 @@ async function savePlannedScore() {
     const res = await fetch('/api/admin/match', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'planned_convert', plannedMatchId: pmid, matchDate: date, note: note||null, sets }) })
     const data = await res.json()
     if (!res.ok) { errorEl.textContent = data.error||'Erreur.'; return }
+    // Upload photos
+    const uploadedPhotos = await uploadPhotosToCloudinary('planned-score-photo')
+    if (uploadedPhotos.length > 0 && data.match) {
+      await fetch('/api/admin/match', { method:'POST', headers: authHeaders(), body: JSON.stringify({
+        action: 'add_photos',
+        matchId: data.match.id,
+        mirrorMatchId: data.mirrorMatch ? data.mirrorMatch.id : null,
+        photos: uploadedPhotos,
+      })})
+    }
+    clearPendingPhotos('planned-score-photo')
     closeModal('planned-score-modal')
     await loadPlannedMatches()
     await loadPendingMatches()
@@ -2952,6 +2984,7 @@ function openSpecialScoreModal(smid, p1, p2) {
   document.getElementById('special-score-sets').innerHTML = ''
   specialScoreSetCount = 0
   addSpecialSetRow()
+  clearPendingPhotos('special-score-photo')
   document.getElementById('special-score-modal').classList.add('open')
 }
 
@@ -2974,6 +3007,17 @@ async function saveSpecialScore() {
     const res = await fetch('/api/admin/match', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'add_from_special', specialMatchId: smid, matchDate: date, note: note||null, sets }) })
     const data = await res.json()
     if (!res.ok) { errorEl.textContent = data.error||'Erreur.'; return }
+    // Upload photos
+    const uploadedPhotos = await uploadPhotosToCloudinary('special-score-photo')
+    if (uploadedPhotos.length > 0 && data.match) {
+      await fetch('/api/admin/match', { method:'POST', headers: authHeaders(), body: JSON.stringify({
+        action: 'add_photos',
+        matchId: data.match.id,
+        mirrorMatchId: data.mirrorMatch ? data.mirrorMatch.id : null,
+        photos: uploadedPhotos,
+      })})
+    }
+    clearPendingPhotos('special-score-photo')
     closeModal('special-score-modal')
     await loadPendingMatches()
   } catch(e) { errorEl.textContent = 'Erreur réseau.' }
@@ -3046,6 +3090,7 @@ async function runMyffbadUpdate() {
 
   await sleep(250)
   myffbadLine('── Comparaison avec les joueurs du site ──', 'title')
+  await sleep(2000)
 
   for (const r of data.results || []) {
     await sleep(110)
@@ -3056,11 +3101,9 @@ async function runMyffbadUpdate() {
 
   await sleep(200)
   myffbadLine('── ' + (data.message || 'Terminé.') + ' ──', 'title')
+  myffbadLine('✔ Console conservée — fermez manuellement quand vous avez terminé.', 'ok')
 
-  setTimeout(async () => {
-    closeMyffbadConsole()
-    await loadUsers()
-  }, 3000)
+  await loadUsers()
 }
 
 /* ── Actions autres ── */
