@@ -6,11 +6,72 @@
 // ─ GET ?refused=1 → historique des inscriptions refusées
 const { PrismaClient } = require('@prisma/client')
 const { requireAdmin } = require('../_auth')
+const cheerio = require('cheerio')
 
 if (!global._prisma) global._prisma = new PrismaClient()
 const prisma = global._prisma
 
 const ADMIN_USERNAMES = ['admin', 'root']
+const VALID_CATEGORIES = ['N', 'R', 'D', 'P', 'NC']
+const MYFFBAD_BASE = 'https://myffbad.fr/recherche/joueur?league=12&committee=67&club=2359&isFirstLoad=false'
+
+// Normalise une chaîne pour comparaison de noms (minuscule, sans accents, sans espaces/ponctuation)
+function normName(s) {
+  return (s || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z]/g, '')
+}
+
+// Scrape toutes les pages du club sur MYFFBAD et renvoie { scraped, logs }
+async function scrapeMyffbadClub() {
+  const logs = []
+  const scraped = []
+  const MAX_PAGES = 15
+
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const url = `${MYFFBAD_BASE}&page=${page}`
+    let html
+    try {
+      const r = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; CDR-bot/1.0)' },
+      })
+      if (!r.ok) {
+        logs.push({ ok: false, message: `Page ${page} : échec HTTP ${r.status}.` })
+        break
+      }
+      html = await r.text()
+    } catch (e) {
+      logs.push({ ok: false, message: `Page ${page} : erreur réseau (${e.message}).` })
+      break
+    }
+
+    const $ = cheerio.load(html)
+    const rows = $('table tbody tr')
+    if (rows.length === 0) {
+      logs.push({ ok: true, message: `Page ${page} : aucune ligne — fin de la pagination.` })
+      break
+    }
+
+    let countOnPage = 0
+    rows.each((i, tr) => {
+      const tds = $(tr).find('td')
+      if (tds.length < 5) return
+      const fullName = $(tds[0]).text().trim().replace(/\s+/g, ' ')
+      if (!fullName) return
+      const sdmText = $(tds[4]).text().trim()
+      const tokens = sdmText.split(/\s+/).filter(Boolean)
+      const simpleToken = tokens[0] || ''
+      scraped.push({ fullName, simpleToken })
+      countOnPage++
+    })
+    logs.push({ ok: true, message: `Page ${page} : ${countOnPage} joueur(s) récupéré(s).` })
+
+    if (countOnPage === 0) break
+  }
+
+  return { scraped, logs }
+}
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -58,6 +119,7 @@ module.exports = async function handler(req, res) {
   const globalActions = [
     'suspend_site', 'unsuspend_site', 'force_logout_all',
     'reset_all_matches', 'reset_all_notifications', 'deactivate_all_players',
+    'scrape_myffbad',
   ]
 
   if (globalActions.includes(action)) {
@@ -121,6 +183,73 @@ module.exports = async function handler(req, res) {
             data: { active: false },
           })
           return res.status(200).json({ ok: true, message: 'Tous les joueurs ont été mis en inactif.' })
+        }
+
+        case 'scrape_myffbad': {
+          const { scraped, logs } = await scrapeMyffbadClub()
+
+          logs.push({ ok: true, message: `── Total récupéré sur MYFFBAD : ${scraped.length} joueur(s). ──` })
+
+          const users = await prisma.user.findMany({
+            where: { username: { notIn: ADMIN_USERNAMES } },
+            select: { id: true, firstName: true, lastName: true, category: true, username: true },
+          })
+
+          const normedScraped = scraped.map(s => ({ ...s, norm: normName(s.fullName) }))
+
+          const results = []
+          for (const u of users) {
+            const displayName = `${u.firstName} ${u.lastName}`
+            const key1 = normName(u.firstName + u.lastName)
+            const key2 = normName(u.lastName + u.firstName)
+            const match = normedScraped.find(s => s.norm === key1 || s.norm === key2)
+
+            if (!match) {
+              results.push({
+                userId: u.id, name: displayName, found: false, changed: false,
+                message: `${displayName} : non trouvé sur MYFFBAD.`,
+              })
+              continue
+            }
+
+            const m = match.simpleToken.match(/^([A-Z]+)/)
+            const letter = m ? m[1] : null
+
+            if (!letter || !VALID_CATEGORIES.includes(letter)) {
+              results.push({
+                userId: u.id, name: displayName, found: true, changed: false,
+                message: `${displayName} : classement simple non disponible (« ${match.simpleToken || '—'} »), catégorie inchangée.`,
+              })
+              continue
+            }
+
+            if (letter === u.category) {
+              results.push({
+                userId: u.id, name: displayName, found: true, changed: false,
+                message: `${displayName} : classement inchangé (${letter}).`,
+              })
+            } else {
+              await prisma.user.update({ where: { id: u.id }, data: { category: letter } })
+              results.push({
+                userId: u.id, name: displayName, found: true, changed: true,
+                from: u.category, to: letter,
+                message: `${displayName} : classement mis à jour ${u.category} → ${letter}.`,
+              })
+            }
+          }
+
+          const changedCount = results.filter(r => r.changed).length
+          const notFoundCount = results.filter(r => !r.found).length
+
+          return res.status(200).json({
+            ok: true,
+            logs,
+            results,
+            totalScraped: scraped.length,
+            changedCount,
+            notFoundCount,
+            message: `Mise à jour MYFFBAD terminée : ${changedCount} classement(s) modifié(s), ${notFoundCount} joueur(s) non trouvé(s).`,
+          })
         }
       }
     } catch (err) {

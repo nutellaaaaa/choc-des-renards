@@ -264,8 +264,6 @@
   .btn-match:hover   { background: var(--orange-dim); }
   .btn-notif   { background: rgba(130,180,255,0.1); color: #82B4FF; border-color: rgba(130,180,255,0.25); }
   .btn-notif:hover   { background: rgba(130,180,255,0.2); }
-  .btn-whatsapp { background: rgba(37,211,102,0.12); color: #25D366; border-color: rgba(37,211,102,0.3); }
-  .btn-whatsapp:hover { background: rgba(37,211,102,0.22); }
   .btn-publish { background: rgba(100,220,100,0.12); color: #6ddc6d; border-color: rgba(100,220,100,0.3); }
   .btn-publish:hover { background: rgba(100,220,100,0.22); }
   .btn-danger  { background: rgba(255,100,100,0.12); color: #ff7070; border-color: rgba(255,100,100,0.3); }
@@ -351,6 +349,41 @@
   .other-action-card { background: var(--dark3); border: 1px solid var(--dark4); border-radius: 12px; padding: 1.25rem; }
   .other-action-card h4 { font-family: var(--font-heading); font-size: 0.95rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--white); margin-bottom: 0.5rem; }
   .other-action-card p { font-size: 0.83rem; color: var(--gray); line-height: 1.5; margin-bottom: 1rem; }
+  /* Notify dropdown */
+  .notify-dropdown { position: relative; }
+  .notify-dropdown-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; background: var(--dark3); border: 1px solid var(--dark4); border-radius: 8px; padding: 0.6rem 0.9rem; color: var(--gray-light); font-size: 0.88rem; cursor: pointer; text-align: left; transition: border-color 0.15s; }
+  .notify-dropdown-toggle:hover { border-color: var(--orange); }
+  .notify-dropdown.open .notify-dropdown-toggle { border-color: var(--orange); }
+  .notify-dropdown-arrow { color: var(--gray); transition: transform 0.15s; flex-shrink: 0; margin-left: 0.5rem; }
+  .notify-dropdown.open .notify-dropdown-arrow { transform: rotate(180deg); }
+  .notify-dropdown-panel { display: none; position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 50; background: var(--dark2); border: 1px solid var(--dark4); border-radius: 10px; box-shadow: 0 10px 32px rgba(0,0,0,0.45); padding: 0.65rem; max-height: 380px; display: none; flex-direction: column; }
+  .notify-dropdown.open .notify-dropdown-panel { display: flex; }
+  .notify-dropdown-section-label { font-family: var(--font-heading); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--orange); padding: 0.2rem 0.3rem 0.45rem; }
+  #notify-quick-selects { display: flex; flex-direction: column; gap: 0.3rem; max-height: 130px; overflow-y: auto; margin-bottom: 0.3rem; }
+  .notify-quick-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.6rem; border-radius: 7px; background: rgba(255,138,61,0.08); border: 1px solid rgba(255,138,61,0.25); color: var(--orange); font-size: 0.83rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+  .notify-quick-item:hover { background: rgba(255,138,61,0.18); }
+  .notify-quick-item .nq-icon { flex-shrink: 0; }
+  .notify-dropdown-divider { height: 1px; background: var(--dark4); margin: 0.4rem 0 0.5rem; }
+  .notify-dropdown-search { width: 100%; background: var(--dark3); border: 1px solid var(--dark4); border-radius: 7px; padding: 0.45rem 0.7rem; color: var(--gray-light); font-size: 0.83rem; margin-bottom: 0.45rem; }
+  .notify-dropdown-players { display: flex; flex-direction: column; gap: 0.15rem; overflow-y: auto; max-height: 180px; }
+  .notify-player-item { display: flex; align-items: center; gap: 0.55rem; padding: 0.38rem 0.6rem; border-radius: 6px; font-size: 0.85rem; color: var(--gray-light); cursor: pointer; transition: background 0.12s; }
+  .notify-player-item:hover { background: var(--dark3); }
+  .notify-player-item input[type=checkbox] { accent-color: var(--orange); cursor: pointer; flex-shrink: 0; }
+  .notify-player-item .np-inactive { color: var(--gray); font-size: 0.75rem; margin-left: auto; }
+  /* Console MYFFBAD */
+  .myffbad-console { background: #0b0d0e; border: 1px solid #2a2e30; border-radius: 10px; width: min(680px, 92vw); max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 10px 50px rgba(0,0,0,0.6); }
+  .myffbad-console-header { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: #15181a; border-bottom: 1px solid #2a2e30; border-radius: 10px 10px 0 0; font-family: var(--font-heading); font-size: 0.9rem; font-weight: 700; letter-spacing: 0.05em; color: var(--gray-light); }
+  .myffbad-console-close { background: none; border: none; color: var(--gray); font-size: 1.5rem; cursor: pointer; line-height: 1; }
+  .myffbad-console-close:hover { color: var(--white); }
+  .myffbad-console-body { padding: 1rem 1.1rem; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 0.83rem; line-height: 1.65; flex: 1; }
+  .myffbad-console-line { white-space: pre-wrap; word-break: break-word; opacity: 0; animation: myffbadFadeIn 0.15s ease forwards; }
+  @keyframes myffbadFadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
+  .myffbad-line-ok { color: #6ddc6d; }
+  .myffbad-line-err { color: #ff7070; }
+  .myffbad-line-warn { color: #e8c468; }
+  .myffbad-line-changed { color: #6dc4ec; font-weight: 700; }
+  .myffbad-line-info { color: var(--gray); }
+  .myffbad-line-title { color: var(--orange); font-weight: 700; margin-top: 0.5rem; }
 
   /* Filtre historique */
   .history-filter { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
@@ -640,15 +673,19 @@
         <h3 style="font-family:var(--font-heading);font-size:1.2rem;font-weight:700;letter-spacing:0.06em;margin-bottom:1.5rem">Envoyer une notification</h3>
         <div class="form-group">
           <label>Destinataires</label>
-          <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;flex-wrap:wrap">
-            <button class="btn-sm btn-edit" onclick="notifySelectAll(true)">Tout le monde</button>
-            <button class="btn-sm btn-edit" onclick="notifySelectAll(false)">Tout désélectionner</button>
-            <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.82rem;color:var(--gray);cursor:pointer">
-              <input type="checkbox" id="notify-active-only" checked onchange="renderNotifyPlayerList()">
-              Actifs seulement
-            </label>
+          <div class="notify-dropdown" id="notify-dropdown">
+            <button type="button" class="notify-dropdown-toggle" id="notify-dropdown-toggle" onclick="toggleNotifyDropdown(event)">
+              <span id="notify-dropdown-label">Sélectionner des joueurs…</span>
+              <span class="notify-dropdown-arrow">▾</span>
+            </button>
+            <div class="notify-dropdown-panel" id="notify-dropdown-panel">
+              <div class="notify-dropdown-section-label">Sélections rapides</div>
+              <div id="notify-quick-selects"></div>
+              <div class="notify-dropdown-divider"></div>
+              <input type="text" class="notify-dropdown-search" id="notify-search" placeholder="🔍 Rechercher un joueur…" oninput="filterNotifyPlayers()">
+              <div id="notify-players-checkboxes" class="notify-dropdown-players"></div>
+            </div>
           </div>
-          <div id="notify-players-checkboxes" style="background:var(--dark3);border:1px solid var(--dark4);border-radius:8px;padding:0.75rem;max-height:200px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:0.4rem"></div>
         </div>
         <div class="form-group"><label>Titre</label><input type="text" id="notify-title" placeholder="Ex : Rappel de match…"></div>
         <div class="form-group"><label>Message</label><textarea id="notify-message" rows="4" placeholder="Rédigez votre message…"></textarea></div>
@@ -758,8 +795,24 @@
           <p>Passe tous les joueurs en actif=false. Utile en fin de saison pour préparer la suivante.</p>
           <button class="btn-sm btn-deactivate" onclick="otherAction('deactivate_all_players','Passer tous les joueurs en inactif ?')">Désactiver tous</button>
         </div>
+        <div class="other-action-card">
+          <h4>🔄 Mettre à jour les données des joueurs</h4>
+          <p>Récupère les classements officiels du club sur MYFFBAD et met à jour la catégorie des joueurs (classement Simple).</p>
+          <button class="btn-sm btn-edit" onclick="runMyffbadUpdate()">Mettre à jour (MYFFBAD)</button>
+        </div>
       </div>
       <div id="other-actions-feedback" class="modal-success" style="margin-top:1rem"></div>
+    </div>
+
+    <!-- CONSOLE MYFFBAD -->
+    <div id="myffbad-console-bg" class="admin-modal-bg">
+      <div class="myffbad-console">
+        <div class="myffbad-console-header">
+          <span>🔄 Mise à jour MYFFBAD</span>
+          <button class="myffbad-console-close" onclick="closeMyffbadConsole()">×</button>
+        </div>
+        <div class="myffbad-console-body" id="myffbad-console-body"></div>
+      </div>
     </div>
 
   </div>
@@ -1011,11 +1064,11 @@
     <button class="nav-btn active" onclick="showPage('accueil',this)">Accueil</button>
     <button class="nav-btn" onclick="showPage('reglement',this)">Charte</button>
     <button class="nav-btn" onclick="showPage('classement',this)">Classement</button>
-    <button class="nav-btn" onclick="showPage('souvenirs',this)">Souvenirs 📸</button>
-    <button class="nav-btn" onclick="showPage('mes-notifs',this)">Mes messages</button>
+    <button class="nav-btn" onclick="showPage('souvenirs',this)">Souvenirs</button>
+    <button class="nav-btn" onclick="showPage('mes-notifs',this)">Messages</button>
   </div>
   <div class="nav-user-info" id="nav-user">
-    <span class="nav-user-greeting">Bonjour, <strong id="nav-user-name"></strong> <span id="nav-user-badge" class="player-level"></span></span>
+    <span class="nav-user-greeting">Salut, <strong id="nav-user-name"></strong> <span id="nav-user-badge" class="player-level"></span></span>
     <button class="nav-logout-btn" onclick="logout()">Déconnexion</button>
   </div>
 </nav>
@@ -1025,7 +1078,7 @@
   <div class="hero">
     <img class="hero-logo" src="bondy-badminton-club.png" alt="Logo Bondy Badminton Club">
     <p class="hero-tagline" id="hero-tagline">Saison — —</p>
-    <p class="hero-desc">Le tournoi interne au club de Bondy, de Septembre à Juin. Organisé par Yanis Feddoul, avec l'aide de son élève pour la conception de ce site.</p>
+    <p class="hero-desc">Le tournoi interne au club de Bondy, de Septembre à Juin. Organisé par Yanis, avec l'aide de son disciple pour la conception de ce site.</p>
     <div class="hero-stats">
       <div class="stat-card"><div class="stat-num" id="stat-joueurs">–</div><div class="stat-label">Joueurs actifs</div></div>
       <div class="stat-card"><div class="stat-num" id="stat-poules">–</div><div class="stat-label">Poules</div></div>
@@ -1205,21 +1258,7 @@ function initAuth() {
   const token = localStorage.getItem('cdr_token')
   const userStr = localStorage.getItem('cdr_user')
   if (isTokenValid(token) && userStr) {
-    try {
-      currentUser = JSON.parse(userStr)
-      // Si un rafraîchissement de page précédent avait déclenché un logout
-      // "page_closed" (sécurité contre la fermeture d'onglet), on l'annule :
-      // la session est en fait toujours active.
-      const eid = localStorage.getItem('cdr_login_event_id')
-      if (eid) {
-        fetch('/api/login?action=resume', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ loginEventId: parseInt(eid, 10) }),
-        }).catch(e => console.error('[resume session]', e))
-      }
-      showApp(); return
-    } catch {}
+    try { currentUser = JSON.parse(userStr); showApp(); return } catch {}
   }
   localStorage.removeItem('cdr_token')
   localStorage.removeItem('cdr_user')
@@ -1266,52 +1305,24 @@ function showAuthOverlay() {
   stopInactivityTimer(); switchAuthTab('login')
 }
 
-// Envoie l'événement de logout au serveur. sendBeacon est le seul mécanisme
-// fiable quand la page est en train de se décharger (fermeture d'onglet,
-// rafraîchissement, navigation) ; fetch+keepalive est utilisé sinon pour
-// pouvoir logger une erreur réseau le cas échéant.
-function sendLogoutBeacon(eid, reason) {
-  const payload = JSON.stringify({ loginEventId: parseInt(eid, 10), reason: reason || 'manual' })
-  if (navigator.sendBeacon) {
-    const blob = new Blob([payload], { type: 'application/json' })
-    const ok = navigator.sendBeacon('/api/login?action=logout', blob)
-    if (ok) return
-  }
-  try {
-    fetch('/api/login?action=logout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload,
-      keepalive: true,
-    }).catch(e => console.error('[logout beacon]', e))
-  } catch(e) { console.error('[logout beacon]', e) }
-}
-
 function logout(reason) {
   // Logger la déconnexion si on a un loginEventId
   const eid = localStorage.getItem('cdr_login_event_id')
   if (eid) {
-    sendLogoutBeacon(eid, reason)
+    try {
+      fetch('/api/login?action=logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loginEventId: parseInt(eid), reason: reason || 'manual' }),
+        keepalive: true,
+      })
+    } catch(e) {}
     localStorage.removeItem('cdr_login_event_id')
   }
   localStorage.removeItem('cdr_token'); localStorage.removeItem('cdr_user')
   currentUser = null; pendingNotifications = []; classementLoaded = false
   showAuthOverlay()
 }
-
-// Capture aussi la déconnexion "implicite" : fermeture d'onglet, rafraîchissement
-// de page (F5) ou navigation hors du site sans avoir cliqué sur "Déconnexion".
-// Sans ce listener, la session reste indéfiniment sans logoutAt en base.
-;['pagehide', 'beforeunload'].forEach(evt => {
-  window.addEventListener(evt, () => {
-    const eid = localStorage.getItem('cdr_login_event_id')
-    if (!eid) return
-    // On ne supprime PAS cdr_login_event_id ici : si la page se recharge
-    // (et non se ferme), la session reste valide et on ne veut pas perdre
-    // la référence à l'événement de connexion en cours.
-    sendLogoutBeacon(eid, 'page_closed')
-  })
-})
 
 function switchAuthTab(tab) {
   document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'))
@@ -1919,7 +1930,6 @@ async function loadUsers() {
               <button class="btn-sm btn-edit" onclick="openEditModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">Modifier</button>
               <button class="btn-sm btn-match" onclick="openMatchModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">+ Match</button>
               <button class="btn-sm btn-notif" onclick="quickNotify(${u.id},'${esc(u.firstName)} ${esc(u.lastName)}')">✉</button>
-              <button class="btn-sm btn-whatsapp" onclick="whatsappUser('${escJs(u.firstName)}','${escJs(u.lastName)}','${escJs(u.phone)}','Bonjour ${escJs(u.firstName)}, ')" title="Contacter sur WhatsApp">📱 WhatsApp</button>
               ${u.active
                 ? `<button class="btn-sm btn-deactivate" onclick="adminAction('deactivate',${u.id})">Désactiver</button>`
                 : `<button class="btn-sm btn-activate"   onclick="adminAction('activate',${u.id})">Activer</button>`}
@@ -1994,8 +2004,6 @@ function renderHistory(events) {
       if (e.logoutReason === 'inactivity') {
         const adjusted = new Date(new Date(e.logoutAt).getTime() - 15 * 60 * 1000)
         logoutDisplay = `<span style="color:var(--gray)" title="Déconnexion par inactivité — heure réelle estimée">~${fmtDate(adjusted)} <small>(inactivité)</small></span>`
-      } else if (e.logoutReason === 'page_closed') {
-        logoutDisplay = `<span style="color:var(--gray)" title="Onglet fermé ou page quittée sans clic sur Déconnexion">${fmtDate(e.logoutAt)} <small>(fermeture)</small></span>`
       } else {
         logoutDisplay = `<span style="color:var(--gray-light)" title="Déconnexion manuelle">${fmtDate(e.logoutAt)}</span>`
       }
@@ -2418,47 +2426,136 @@ async function removeGroupMember(groupId, userId) {
 
 /* ── Notifications ── */
 let allPlayersForNotify = []
+let poulesForNotify = []
+let groupsForNotify = []
 
 async function loadPlayersForNotify() {
-  const res = await fetch('/api/admin/action', { headers: authHeaders() })
-  if (!res.ok) return
-  const { users } = await res.json()
-  allPlayersForNotify = users.filter(u => u.accepted && !u.banned && !['admin','root'].includes(u.username.toLowerCase()))
+  const [actionRes, poulesRes] = await Promise.all([
+    fetch('/api/admin/action', { headers: authHeaders() }),
+    fetch('/api/admin/poules', { headers: authHeaders() }),
+  ])
+  if (actionRes.ok) {
+    const { users } = await actionRes.json()
+    allPlayersForNotify = users.filter(u => u.accepted && !u.banned && !['admin','root'].includes(u.username.toLowerCase()))
+  }
+  if (poulesRes.ok) {
+    const { poules, groups } = await poulesRes.json()
+    poulesForNotify = poules || []
+    groupsForNotify = groups || []
+  }
   populatePlayerSelects()
 }
+
 function populatePlayerSelects() {
   const opts = allPlayersForNotify.map(u => `<option value="${u.id}">${esc(u.firstName)} ${esc(u.lastName)} (@${esc(u.username)})</option>`).join('')
   const base = '<option value="">— Sélectionner —</option>' + opts
   ;['special-player1','special-player2'].forEach(id => {
     const el = document.getElementById(id); if (el) el.innerHTML = base
   })
+  renderNotifyQuickSelects()
   renderNotifyPlayerList()
 }
+
+function renderNotifyQuickSelects() {
+  const container = document.getElementById('notify-quick-selects')
+  if (!container) return
+  const items = []
+  items.push({ icon: '👥', label: 'Tous les utilisateurs', type: 'all' })
+  items.push({ icon: '✅', label: 'Tous les actifs', type: 'active' })
+  items.push({ icon: '💤', label: 'Tous les inactifs', type: 'inactive' })
+  poulesForNotify.forEach(p => items.push({ icon: '🏆', label: `Poule « ${p.name} »`, type: 'poule', id: p.id }))
+  groupsForNotify.forEach(g => items.push({ icon: '🏸', label: `Groupe « ${g.name} »`, type: 'group', id: g.id }))
+
+  container.innerHTML = items.map((it, i) =>
+    `<div class="notify-quick-item" onclick='selectNotifyGroup(${JSON.stringify(it).replace(/'/g,"&#39;")})'>
+      <span class="nq-icon">${it.icon}</span><span>${esc(it.label)}</span>
+    </div>`
+  ).join('')
+}
+
+function selectNotifyGroup(item) {
+  let targetIds = []
+  if (item.type === 'all') {
+    targetIds = allPlayersForNotify.map(u => u.id)
+  } else if (item.type === 'active') {
+    targetIds = allPlayersForNotify.filter(u => u.active).map(u => u.id)
+  } else if (item.type === 'inactive') {
+    targetIds = allPlayersForNotify.filter(u => !u.active).map(u => u.id)
+  } else if (item.type === 'poule') {
+    const poule = poulesForNotify.find(p => p.id === item.id)
+    targetIds = poule ? poule.members.map(m => m.user.id) : []
+  } else if (item.type === 'group') {
+    const group = groupsForNotify.find(g => g.id === item.id)
+    targetIds = group ? group.members.map(m => m.user.id) : []
+  }
+  const targetSet = new Set(targetIds)
+  document.querySelectorAll('.notify-player-cb').forEach(cb => {
+    cb.checked = targetSet.has(parseInt(cb.value))
+  })
+  updateNotifyDropdownLabel()
+}
+
 function renderNotifyPlayerList() {
-  const activeOnly = document.getElementById('notify-active-only').checked
-  const players = activeOnly ? allPlayersForNotify.filter(u => u.active) : allPlayersForNotify
   const container = document.getElementById('notify-players-checkboxes')
   if (!container) return
-  if (players.length === 0) { container.innerHTML = '<span style="color:var(--gray);font-size:0.83rem">Aucun joueur disponible.</span>'; return }
-  container.innerHTML = players.map(u =>
-    `<label style="display:flex;align-items:center;gap:0.35rem;font-size:0.83rem;color:var(--gray-light);cursor:pointer;background:var(--dark2);border:1px solid var(--dark4);border-radius:6px;padding:0.25rem 0.6rem;white-space:nowrap">
-      <input type="checkbox" class="notify-player-cb" value="${u.id}" style="accent-color:var(--orange);cursor:pointer">
-      ${esc(u.firstName)} ${esc(u.lastName)}
+  if (allPlayersForNotify.length === 0) { container.innerHTML = '<span style="color:var(--gray);font-size:0.83rem;padding:0.4rem">Aucun joueur disponible.</span>'; return }
+  container.innerHTML = allPlayersForNotify.map(u =>
+    `<label class="notify-player-item" data-search="${esc((u.firstName + ' ' + u.lastName + ' ' + u.username).toLowerCase())}">
+      <input type="checkbox" class="notify-player-cb" value="${u.id}" onchange="updateNotifyDropdownLabel()">
+      <span>${esc(u.firstName)} ${esc(u.lastName)}</span>
+      ${!u.active ? '<span class="np-inactive">inactif</span>' : ''}
     </label>`
   ).join('')
 }
+
+function filterNotifyPlayers() {
+  const q = document.getElementById('notify-search').value.trim().toLowerCase()
+  document.querySelectorAll('.notify-player-item').forEach(el => {
+    el.style.display = el.dataset.search.includes(q) ? '' : 'none'
+  })
+}
+
+function toggleNotifyDropdown(e) {
+  if (e) e.stopPropagation()
+  document.getElementById('notify-dropdown').classList.toggle('open')
+}
+document.addEventListener('click', (e) => {
+  const dd = document.getElementById('notify-dropdown')
+  if (dd && dd.classList.contains('open') && !dd.contains(e.target)) dd.classList.remove('open')
+})
+
+function updateNotifyDropdownLabel() {
+  const selected = Array.from(document.querySelectorAll('.notify-player-cb:checked'))
+  const label = document.getElementById('notify-dropdown-label')
+  if (!label) return
+  if (selected.length === 0) { label.textContent = 'Sélectionner des joueurs…'; return }
+  if (selected.length <= 2) {
+    const names = selected.map(cb => {
+      const u = allPlayersForNotify.find(u => u.id === parseInt(cb.value))
+      return u ? `${u.firstName} ${u.lastName}` : ''
+    }).filter(Boolean)
+    label.textContent = names.join(', ')
+  } else {
+    label.textContent = `${selected.length} joueurs sélectionnés`
+  }
+}
+
 function notifySelectAll(select) {
   document.querySelectorAll('.notify-player-cb').forEach(cb => cb.checked = select)
+  updateNotifyDropdownLabel()
 }
+
 function quickNotify(userId, name) {
   adminTab('notify', document.querySelector('[onclick*="notify"]'))
   setTimeout(() => {
     document.querySelectorAll('.notify-player-cb').forEach(cb => {
       cb.checked = parseInt(cb.value) === userId
     })
+    updateNotifyDropdownLabel()
     document.getElementById('notify-title').focus()
   }, 100)
 }
+
 async function sendNotification() {
   const title   = document.getElementById('notify-title').value.trim()
   const message = document.getElementById('notify-message').value.trim()
@@ -2476,8 +2573,10 @@ async function sendNotification() {
   document.getElementById('notify-title').value = ''
   document.getElementById('notify-message').value = ''
   notifySelectAll(false)
+  document.getElementById('notify-dropdown').classList.remove('open')
   setTimeout(() => { successEl.textContent = '' }, 3000)
 }
+
 async function sendSpecialMatch() {
   const p1     = document.getElementById('special-player1').value
   const p2     = document.getElementById('special-player2').value
@@ -2644,9 +2743,6 @@ async function loadPlannedMatches() {
     list.innerHTML = plannedData.map(pm => {
       const p1 = pm.player1, p2 = pm.player2
       const malusText = pm.malus ? `♡ <strong>${esc(pm.malus)}</strong> → ${pm.malusTarget === 1 ? esc(p1.firstName) : esc(p2.firstName)}` : 'Aucun malus'
-      const dateTxt = pm.scheduledDate ? fmtDateOnly(pm.scheduledDate) : 'une date à convenir'
-      const msgP1 = `Bonjour ${p1.firstName}, ton prochain match au Choc des Renards est prévu contre ${p2.firstName} ${p2.lastName} (${dateTxt}). `
-      const msgP2 = `Bonjour ${p2.firstName}, ton prochain match au Choc des Renards est prévu contre ${p1.firstName} ${p1.lastName} (${dateTxt}). `
       return `<div class="pending-match-card">
         <div class="pending-match-info">
           <div class="pending-match-player">${esc(p1.firstName)} ${esc(p1.lastName)} <span class="player-level level-${p1.category||'NC'}">${p1.category||'NC'}</span> <span style="color:var(--gray)">vs</span> ${esc(p2.firstName)} ${esc(p2.lastName)} <span class="player-level level-${p2.category||'NC'}">${p2.category||'NC'}</span></div>
@@ -2655,8 +2751,6 @@ async function loadPlannedMatches() {
           ${pm.note ? `<div style="font-size:0.82rem;color:var(--gray);margin-top:0.2rem;font-style:italic">📝 ${esc(pm.note)}</div>` : ''}
         </div>
         <div class="pending-match-actions">
-          <button class="btn-sm btn-whatsapp" onclick="whatsappUser('${escJs(p1.firstName)}','${escJs(p1.lastName)}','${escJs(p1.phone||'')}',${JSON.stringify(msgP1)})" title="Prévenir ${esc(p1.firstName)} sur WhatsApp">📱 ${esc(p1.firstName)}</button>
-          <button class="btn-sm btn-whatsapp" onclick="whatsappUser('${escJs(p2.firstName)}','${escJs(p2.lastName)}','${escJs(p2.phone||'')}',${JSON.stringify(msgP2)})" title="Prévenir ${esc(p2.firstName)} sur WhatsApp">📱 ${esc(p2.firstName)}</button>
           <button class="btn-sm btn-match" onclick="openPlannedScoreModal(${pm.id})">Renseigner le score</button>
           <button class="btn-sm btn-edit" onclick="openPlannedEditModal(${pm.id})">Modifier</button>
           <button class="btn-sm btn-danger" onclick="deletePlannedMatch(${pm.id})">Supprimer</button>
@@ -2907,6 +3001,68 @@ async function loadRefused() {
   } catch(e) { console.error('[loadRefused]', e) }
 }
 
+/* ── Console MYFFBAD ── */
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
+
+function openMyffbadConsole() {
+  const body = document.getElementById('myffbad-console-body')
+  body.innerHTML = ''
+  document.getElementById('myffbad-console-bg').style.display = 'flex'
+}
+function closeMyffbadConsole() {
+  document.getElementById('myffbad-console-bg').style.display = 'none'
+}
+function myffbadLine(text, cls) {
+  const body = document.getElementById('myffbad-console-body')
+  const div = document.createElement('div')
+  div.className = 'myffbad-console-line' + (cls ? ' myffbad-line-' + cls : '')
+  div.textContent = text
+  body.appendChild(div)
+  body.scrollTop = body.scrollHeight
+}
+
+async function runMyffbadUpdate() {
+  openMyffbadConsole()
+  myffbadLine('Connexion à MYFFBAD…', 'info')
+  await sleep(250)
+
+  let data
+  try {
+    const res = await fetch('/api/admin/action', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'scrape_myffbad' }) })
+    data = await res.json()
+    if (!res.ok) {
+      myffbadLine('✗ ' + (data.error || 'Erreur inconnue.'), 'err')
+      return
+    }
+  } catch (e) {
+    myffbadLine('✗ Erreur réseau pendant la requête.', 'err')
+    return
+  }
+
+  for (const l of data.logs || []) {
+    await sleep(160)
+    myffbadLine((l.ok ? '✓ ' : '✗ ') + l.message, l.ok ? 'ok' : 'err')
+  }
+
+  await sleep(250)
+  myffbadLine('── Comparaison avec les joueurs du site ──', 'title')
+
+  for (const r of data.results || []) {
+    await sleep(110)
+    if (!r.found) myffbadLine('⚠ ' + r.message, 'warn')
+    else if (r.changed) myffbadLine('↻ ' + r.message, 'changed')
+    else myffbadLine('• ' + r.message, 'info')
+  }
+
+  await sleep(200)
+  myffbadLine('── ' + (data.message || 'Terminé.') + ' ──', 'title')
+
+  setTimeout(async () => {
+    closeMyffbadConsole()
+    await loadUsers()
+  }, 3000)
+}
+
 /* ── Actions autres ── */
 async function otherAction(action, confirmMsg) {
   if (!confirm(confirmMsg)) return
@@ -2941,34 +3097,6 @@ function closeModal(id) { document.getElementById(id).classList.remove('open') }
 function esc(str) {
   return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
 }
-
-/* ── WhatsApp ── */
-// Échappe une chaîne pour une insertion sûre entre guillemets simples dans un attribut onclick.
-function escJs(str) {
-  return String(str||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")
-}
-// Convertit un numéro français local (06 12 34 56 78, 06.12.34.56.78, etc.)
-// au format international attendu par wa.me (sans le 0, préfixé par 33).
-// Si le numéro semble déjà international (commence par +33 ou 33), il est conservé tel quel.
-function formatPhoneForWhatsapp(phone) {
-  if (!phone) return null
-  let digits = String(phone).replace(/[^0-9+]/g, '')
-  if (digits.startsWith('+')) digits = digits.slice(1)
-  if (digits.startsWith('0')) digits = '33' + digits.slice(1)
-  else if (!digits.startsWith('33')) digits = '33' + digits
-  return digits
-}
-function openWhatsapp(phone, message) {
-  const num = formatPhoneForWhatsapp(phone)
-  if (!num) { alert('Numéro de téléphone invalide ou manquant.'); return }
-  const url = `https://wa.me/${num}` + (message ? `?text=${encodeURIComponent(message)}` : '')
-  window.open(url, '_blank')
-}
-function whatsappUser(firstName, lastName, phone, message) {
-  if (!phone) { alert(`Aucun numéro de téléphone enregistré pour ${firstName} ${lastName}.`); return }
-  openWhatsapp(phone, message)
-}
-
 function fmtDate(iso) {
   if (!iso) return '—'
   const d = new Date(iso)
