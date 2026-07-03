@@ -38,6 +38,9 @@
   .nav-user-greeting strong { color: var(--white); }
   .nav-logout-btn { background: none; border: 1px solid var(--dark4); cursor: pointer; font-family: var(--font-heading); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray); padding: 0.4rem 0.9rem; border-radius: 6px; transition: all 0.2s; }
   .nav-logout-btn:hover { border-color: var(--orange); color: var(--orange); }
+  .nav-switch-btn { background: none; border: 1px solid var(--orange-dim, #6b3a1a); cursor: pointer; font-family: var(--font-heading); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--orange); padding: 0.4rem 0.9rem; border-radius: 6px; transition: all 0.2s; }
+  .nav-switch-btn:hover { background: var(--orange); color: var(--dark, #111); }
+  .nav-switch-btn:disabled { opacity: 0.5; cursor: default; }
 
   /* PAGES */
   .page { display: none; padding-top: 96px; min-height: 100vh; }
@@ -447,6 +450,15 @@
   .myffbad-line-changed { color: #6dc4ec; font-weight: 700; }
   .myffbad-line-info { color: var(--gray); }
   .myffbad-line-title { color: var(--orange); font-weight: 700; margin-top: 0.5rem; }
+  .myffbad-confirm-row { display: flex; gap: 0.6rem; margin: 0.6rem 0; }
+  .myffbad-confirm-btn { font-family: 'Courier New', monospace; font-size: 0.82rem; font-weight: 700; padding: 0.4rem 0.9rem; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
+  .myffbad-confirm-yes { background: rgba(109,220,109,0.1); border: 1px solid #6ddc6d; color: #6ddc6d; }
+  .myffbad-confirm-yes:hover { background: #6ddc6d; color: #0b0d0e; }
+  .myffbad-confirm-no { background: rgba(255,112,112,0.1); border: 1px solid #ff7070; color: #ff7070; }
+  .myffbad-confirm-no:hover { background: #ff7070; color: #0b0d0e; }
+  .myffbad-progress-label { color: var(--gray-light); font-size: 0.82rem; margin-bottom: 0.4rem; }
+  .myffbad-progress-track { width: 100%; height: 8px; background: #1c1f21; border: 1px solid #2a2e30; border-radius: 5px; overflow: hidden; }
+  .myffbad-progress-fill { width: 0%; height: 100%; background: linear-gradient(90deg, var(--orange), #6ddc6d); transition: width 1.4s ease; }
 
   /* Filtre historique */
   .history-filter { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
@@ -1144,6 +1156,7 @@
   </div>
   <div class="nav-user-info" id="nav-user">
     <span class="nav-user-greeting">Salut, <strong id="nav-user-name"></strong> <span id="nav-user-badge" class="player-level"></span></span>
+    <button class="nav-switch-btn" id="nav-switch-btn" onclick="switchAccount()" style="display:none"></button>
     <button class="nav-logout-btn" onclick="logout()">Déconnexion</button>
   </div>
 </nav>
@@ -1159,7 +1172,6 @@
       <div class="stat-card"><div class="stat-num" id="stat-poules">–</div><div class="stat-label">Poules</div></div>
       <div class="stat-card"><div class="stat-num" id="stat-matchs">–</div><div class="stat-label">Matchs joués</div></div>
     </div>
-    <button class="cta-btn" onclick="showPage('classement', document.querySelectorAll('.nav-btn')[2])">Voir le classement →</button>
   </div>
 </div>
 
@@ -1245,10 +1257,7 @@
 <div id="page-classement" class="page">
   <div class="section">
     <h1 class="section-title">Class<span>ement</span></h1>
-    <p class="section-subtitle" id="classement-subtitle">Mise à jour en temps réel</p>
-    <div class="info-banner" id="classement-banner">
-      <strong id="banner-phase-label">Chargement…</strong> <span id="banner-phase-desc"></span>
-    </div>
+    <p class="section-subtitle" id="classement-subtitle">Chargement…</p>
     <div class="specials-section" id="specials-section" style="display:none">
       <div class="specials-title">🗓 Rencontres en cours</div>
       <div id="specials-list"></div>
@@ -1474,6 +1483,9 @@ let currentUser = null
 let pendingNotifications = []
 let currentNotifIndex = 0
 
+// Comptes "communicants" (admin ⇄ joueur) — même mapping que côté serveur
+const LINKED_USERNAMES = { admin: 'yanis', yanis: 'admin', root: 'alexandre', alexandre: 'root' }
+
 function isTokenValid(token) {
   if (!token) return false
   try {
@@ -1507,6 +1519,16 @@ function showApp() {
       badge.textContent = currentUser.category || 'NC'
       badge.className = 'player-level level-' + (currentUser.category || 'NC')
     }
+    const switchBtn = document.getElementById('nav-switch-btn')
+    if (switchBtn) {
+      const uname = (currentUser.username || '').toLowerCase()
+      if (LINKED_USERNAMES[uname]) {
+        switchBtn.style.display = ''
+        switchBtn.textContent = currentUser.role === 'ADMIN' ? '🔁 Compte joueur' : '🔁 Compte admin'
+      } else {
+        switchBtn.style.display = 'none'
+      }
+    }
   }
   if (currentUser && currentUser.role === 'ADMIN') {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
@@ -1523,6 +1545,37 @@ function showApp() {
     if (pendingNotifications.length > 0) { currentNotifIndex = 0; showNotifOverlay() }
   }
 }
+
+async function switchAccount() {
+  const btn = document.getElementById('nav-switch-btn')
+  if (btn) { btn.disabled = true; var prevLabel = btn.textContent; btn.textContent = '⏳ Changement…' }
+  try {
+    const eid = localStorage.getItem('cdr_login_event_id')
+    const res = await fetch('/api/login?action=switch_account', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ loginEventId: eid ? parseInt(eid, 10) : undefined }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      alert(data.error || 'Impossible de changer de compte.')
+      return
+    }
+    localStorage.setItem('cdr_token', data.token)
+    localStorage.setItem('cdr_user', JSON.stringify(data.user))
+    if (data.loginEventId) localStorage.setItem('cdr_login_event_id', data.loginEventId)
+    currentUser = data.user
+    pendingNotifications = data.pendingNotifications || []
+    classementLoaded = false
+    showApp()
+  } catch (e) {
+    alert('Erreur réseau. Réessayez.')
+  } finally {
+    if (btn) { btn.disabled = false; if (prevLabel) btn.textContent = prevLabel }
+  }
+}
+
+
 
 function showAuthOverlay() {
   const overlay = document.getElementById('auth-overlay')
@@ -1917,49 +1970,66 @@ function phaseLabel(phase, round) {
   return phase || '—'
 }
 
+function seasonLabel() {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = now.getMonth()
+  const start = m >= 8 ? y : y - 1
+  return `${start}-${start + 1}`
+}
+
 async function loadClassement() {
   classementLoaded = true
   const container = document.getElementById('classement-content')
   container.innerHTML = '<div class="admin-empty">Chargement…</div>'
-  loadSpecials()
   try {
     const res = await fetch('/api/matches', { headers: authHeaders() })
     if (!res.ok) { container.innerHTML = '<div class="admin-empty">Impossible de charger le classement.</div>'; return }
-    const { phase, round, players, poules, phase2Groups, fromSnapshot, rankingFrozen } = await res.json()
+    const { phase, round, players, poules, phase2Groups } = await res.json()
     classementPlayers = players || []
 
-    document.getElementById('banner-phase-label').textContent = phaseLabel(phase, round)
-    document.getElementById('banner-phase-desc').textContent = rankingFrozen ? '🔒 Classement figé — positions en attente de mise à jour par l\'admin' : ''
+    document.getElementById('classement-subtitle').textContent = 'Phase en cours : ' + phaseLabel(phase, round)
+
+    // Phase 0 : la saison n'a pas encore débuté, pas de classement à afficher
+    if (phase === 'PHASE0') {
+      document.getElementById('specials-section').style.display = 'none'
+      container.innerHTML = `<div class="admin-empty">La saison ${seasonLabel()} n'a pas encore débutée.</div>`
+      return
+    }
+
+    loadSpecials()
 
     if (!players || players.length === 0) {
       container.innerHTML = '<div class="admin-empty">Aucun joueur inscrit pour l\'instant.</div>'; return
     }
 
+    // Pas de classement général : uniquement Poules (Phase 1) ou Rondes suisses (Phase 2).
+    // L'onglet par défaut suit la phase en cours.
+    const hasPoules = phase === 'PHASE1' && poules && poules.length > 0
+    const hasGroups = phase2Groups && phase2Groups.length > 0
+    const defaultTab = phase === 'PHASE2' && hasGroups ? 'groups' : (hasPoules ? 'poules' : 'groups')
+
     let html = ''
-    html += `<div class="phase-tabs">`
-    html += `<button class="phase-tab active" onclick="switchClassTab('general',this)">Général</button>`
-    if (phase === 'PHASE1' && poules && poules.length > 0)
-      html += `<button class="phase-tab" onclick="switchClassTab('poules',this)">Poules</button>`
-    if (phase2Groups && phase2Groups.length > 0)
-      html += `<button class="phase-tab" onclick="switchClassTab('groups',this)">Groupes</button>`
-    html += `</div>`
 
-    html += `<div id="class-general" class="phase-content active">`
-    html += renderRankingTable(players)
-    html += `<p style="font-size:0.78rem;color:var(--gray);margin-top:1rem;text-align:right">Cliquez sur un joueur pour voir le détail de ses matchs.</p>`
-    html += `</div>`
+    if (hasPoules || hasGroups) {
+      html += `<div class="phase-tabs">`
+      if (hasPoules) html += `<button class="phase-tab${defaultTab === 'poules' ? ' active' : ''}" onclick="switchClassTab('poules',this)">Poules</button>`
+      if (hasGroups) html += `<button class="phase-tab${defaultTab === 'groups' ? ' active' : ''}" onclick="switchClassTab('groups',this)">Rondes suisses</button>`
+      html += `</div>`
+    }
 
-    if (phase === 'PHASE1' && poules && poules.length > 0) {
-      html += `<div id="class-poules" class="phase-content">`
+    if (hasPoules) {
+      html += `<div id="class-poules" class="phase-content${defaultTab === 'poules' ? ' active' : ''}">`
       for (const p of poules) {
         html += `<div class="poule-title">🏓 ${esc(p.name)}</div>`
         html += renderRankingTable(p.members || [])
       }
+      html += `<p style="font-size:0.78rem;color:var(--gray);margin-top:1rem;text-align:right">Cliquez sur un joueur pour voir le détail de ses matchs.</p>`
       html += `</div>`
     }
 
-    if (phase2Groups && phase2Groups.length > 0) {
-      html += `<div id="class-groups" class="phase-content">`
+    if (hasGroups) {
+      html += `<div id="class-groups" class="phase-content${defaultTab === 'groups' ? ' active' : ''}">`
       for (const g of phase2Groups) {
         const gMembers = (g.members || []).map(m => {
           const pl = players.find(p => p.id === (m.userId || m.id))
@@ -1969,6 +2039,10 @@ async function loadClassement() {
         html += renderGroupList(gMembers)
       }
       html += `</div>`
+    }
+
+    if (!hasPoules && !hasGroups) {
+      html += '<div class="admin-empty">Les poules / groupes ne sont pas encore configurés pour cette phase.</div>'
     }
 
     container.innerHTML = html
@@ -3269,6 +3343,7 @@ async function loadRefused() {
 
 /* ── Console MYFFBAD ── */
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
+let myffbadPendingChanges = []
 
 function openMyffbadConsole() {
   const body = document.getElementById('myffbad-console-body')
@@ -3289,6 +3364,7 @@ function myffbadLine(text, cls) {
 
 async function runMyffbadUpdate() {
   openMyffbadConsole()
+  myffbadPendingChanges = []
   myffbadLine('Connexion à MYFFBAD…', 'info')
   await sleep(250)
 
@@ -3323,10 +3399,93 @@ async function runMyffbadUpdate() {
 
   await sleep(200)
   myffbadLine('── ' + (data.message || 'Terminé.') + ' ──', 'title')
-  myffbadLine('✔ Console conservée — fermez manuellement quand vous avez terminé.', 'ok')
 
-  await loadUsers()
+  myffbadPendingChanges = (data.results || [])
+    .filter(r => r.changed)
+    .map(r => ({ userId: r.userId, category: r.to }))
+
+  if (myffbadPendingChanges.length === 0) {
+    await sleep(150)
+    myffbadLine('✔ Aucun changement à appliquer — rien à confirmer.', 'ok')
+    return
+  }
+
+  await sleep(300)
+  myffbadLine(`Souhaitez-vous mettre à jour les ${myffbadPendingChanges.length} joueur(s) suivant(s) ? (Y/N)`, 'title')
+  myffbadShowConfirmPrompt()
 }
+
+function myffbadShowConfirmPrompt() {
+  const body = document.getElementById('myffbad-console-body')
+  const row = document.createElement('div')
+  row.id = 'myffbad-confirm-row'
+  row.className = 'myffbad-console-line myffbad-confirm-row'
+  row.innerHTML =
+    '<button class="myffbad-confirm-btn myffbad-confirm-yes" onclick="myffbadConfirmApply()">Y — Confirmer</button>' +
+    '<button class="myffbad-confirm-btn myffbad-confirm-no" onclick="myffbadCancelApply()">N — Annuler</button>'
+  body.appendChild(row)
+  body.scrollTop = body.scrollHeight
+}
+
+function myffbadRemoveConfirmPrompt() {
+  const row = document.getElementById('myffbad-confirm-row')
+  if (row) row.remove()
+}
+
+function myffbadCancelApply() {
+  myffbadRemoveConfirmPrompt()
+  myffbadLine('N — Mise à jour annulée. Aucune modification appliquée.', 'warn')
+  myffbadPendingChanges = []
+}
+
+async function myffbadConfirmApply() {
+  myffbadRemoveConfirmPrompt()
+  myffbadLine('Y — Confirmé.', 'ok')
+  await myffbadRunFakeProgressBar()
+
+  try {
+    const res = await fetch('/api/admin/action', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ action: 'apply_myffbad_changes', changes: myffbadPendingChanges }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      myffbadLine('✗ ' + (data.error || "Erreur lors de l'application."), 'err')
+      return
+    }
+    myffbadLine('✔ ' + (data.message || 'Modifications appliquées.'), 'ok')
+    myffbadLine('✔ Console conservée — fermez manuellement quand vous avez terminé.', 'ok')
+    await loadUsers()
+  } catch (e) {
+    myffbadLine('✗ Erreur réseau pendant l\'application.', 'err')
+  } finally {
+    myffbadPendingChanges = []
+  }
+}
+
+function myffbadRunFakeProgressBar() {
+  return new Promise(resolve => {
+    const body = document.getElementById('myffbad-console-body')
+    const wrap = document.createElement('div')
+    wrap.className = 'myffbad-console-line'
+    wrap.innerHTML =
+      '<div class="myffbad-progress-label" id="myffbad-progress-label">Chargement des modifications en cours…</div>' +
+      '<div class="myffbad-progress-track"><div class="myffbad-progress-fill" id="myffbad-progress-fill"></div></div>'
+    body.appendChild(wrap)
+    body.scrollTop = body.scrollHeight
+    requestAnimationFrame(() => {
+      const fill = document.getElementById('myffbad-progress-fill')
+      if (fill) fill.style.width = '100%'
+    })
+    setTimeout(() => {
+      const label = document.getElementById('myffbad-progress-label')
+      if (label) label.textContent = '✓ Modifications synchronisées.'
+      resolve()
+    }, 1500)
+  })
+}
+
 
 /* ── Actions autres ── */
 async function otherAction(action, confirmMsg) {

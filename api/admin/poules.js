@@ -61,7 +61,7 @@ module.exports = async function handler(req, res) {
           },
         }),
         prisma.user.findMany({
-          where: { accepted: true, banned: false, username: { notIn: ADMIN_USERNAMES } },
+          where: { accepted: true, banned: false, active: true, username: { notIn: ADMIN_USERNAMES } },
           select: { id: true, firstName: true, lastName: true, username: true, category: true },
           orderBy: { lastName: 'asc' },
         }),
@@ -132,6 +132,8 @@ module.exports = async function handler(req, res) {
     const user = await prisma.user.findUnique({ where: { id: uid } })
     if (!user || ADMIN_USERNAMES.includes(user.username.toLowerCase()))
       return res.status(403).json({ error: 'Joueur invalide.' })
+    if (!user.active)
+      return res.status(403).json({ error: 'Ce joueur est inactif et ne peut pas être ajouté à une poule.' })
 
     try {
       // Retirer d'une autre poule si existant
@@ -166,7 +168,7 @@ module.exports = async function handler(req, res) {
       const allAssigned = await prisma.pouleMember.findMany({ select: { userId: true } })
       const assignedIds = new Set(allAssigned.map(m => m.userId))
       const eligible = await prisma.user.findMany({
-        where: { accepted: true, banned: false, username: { notIn: ADMIN_USERNAMES } },
+        where: { accepted: true, banned: false, active: true, username: { notIn: ADMIN_USERNAMES } },
         select: { id: true },
       })
       const pool = eligible.filter(u => !assignedIds.has(u.id))
@@ -231,6 +233,8 @@ module.exports = async function handler(req, res) {
     const user = await prisma.user.findUnique({ where: { id: uid } })
     if (!user || ADMIN_USERNAMES.includes(user.username.toLowerCase()))
       return res.status(403).json({ error: 'Joueur invalide.' })
+    if (!user.active)
+      return res.status(403).json({ error: 'Ce joueur est inactif et ne peut pas être ajouté à un groupe.' })
 
     try {
       await prisma.phase2GroupMember.deleteMany({ where: { userId: uid } })

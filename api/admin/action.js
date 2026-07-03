@@ -119,7 +119,7 @@ module.exports = async function handler(req, res) {
   const globalActions = [
     'suspend_site', 'unsuspend_site', 'force_logout_all',
     'reset_all_matches', 'reset_all_notifications', 'deactivate_all_players',
-    'scrape_myffbad',
+    'scrape_myffbad', 'apply_myffbad_changes',
   ]
 
   if (globalActions.includes(action)) {
@@ -229,11 +229,12 @@ module.exports = async function handler(req, res) {
                 message: `${displayName} : classement inchangé (${letter}).`,
               })
             } else {
-              await prisma.user.update({ where: { id: u.id }, data: { category: letter } })
+              // NOTE : on ne met plus à jour la DB ici — on propose seulement le
+              // changement. L'admin doit confirmer via l'action 'apply_myffbad_changes'.
               results.push({
                 userId: u.id, name: displayName, found: true, changed: true,
                 from: u.category, to: letter,
-                message: `${displayName} : classement mis à jour ${u.category} → ${letter}.`,
+                message: `${displayName} : classement ${u.category} → ${letter} (en attente de confirmation).`,
               })
             }
           }
@@ -248,7 +249,36 @@ module.exports = async function handler(req, res) {
             totalScraped: scraped.length,
             changedCount,
             notFoundCount,
-            message: `Mise à jour MYFFBAD terminée : ${changedCount} classement(s) modifié(s), ${notFoundCount} joueur(s) non trouvé(s).`,
+            message: `Comparaison MYFFBAD terminée : ${changedCount} changement(s) proposé(s), ${notFoundCount} joueur(s) non trouvé(s).`,
+          })
+        }
+
+        // ── apply_myffbad_changes : applique les changements de catégorie
+        // confirmés par l'admin suite à un scrape_myffbad ────────────────────────
+        case 'apply_myffbad_changes': {
+          const { changes } = req.body || {}
+          if (!Array.isArray(changes) || changes.length === 0) {
+            return res.status(400).json({ error: 'Aucune modification à appliquer.' })
+          }
+
+          const applied = []
+          for (const c of changes) {
+            const uid = parseInt(c?.userId, 10)
+            const category = c?.category
+            if (isNaN(uid) || !VALID_CATEGORIES.includes(category)) continue
+
+            const u = await prisma.user.findUnique({ where: { id: uid } })
+            if (!u || ADMIN_USERNAMES.includes(u.username.toLowerCase())) continue
+
+            await prisma.user.update({ where: { id: uid }, data: { category } })
+            applied.push({ userId: uid, name: `${u.firstName} ${u.lastName}`, category })
+          }
+
+          return res.status(200).json({
+            ok: true,
+            appliedCount: applied.length,
+            applied,
+            message: `${applied.length} classement(s) mis à jour.`,
           })
         }
       }

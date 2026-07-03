@@ -8,6 +8,15 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 if (!global._prisma) global._prisma = new PrismaClient()
 const prisma = global._prisma
 
+// Comptes "communicants" : permet à un admin de basculer vers son compte joueur
+// (et inversement) sans ressaisir ses identifiants.
+const LINKED_ACCOUNTS = {
+  admin: 'yanis',
+  yanis: 'admin',
+  root: 'alexandre',
+  alexandre: 'root',
+}
+
 async function logLogin(userId, req, success, message) {
   try {
     const rawIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null
@@ -68,6 +77,96 @@ module.exports = async function handler(req, res) {
       } catch(e) { console.error('[logout log]', e) }
     }
     return res.status(200).json({ ok: true })
+  }
+
+  // ── POST /api/login?action=switch_account — basculer vers le compte lié ─────
+  if (req.method === 'POST' && req.query?.action === 'switch_account') {
+    const authHeader = req.headers['authorization'] || ''
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
+    if (!token) return res.status(401).json({ error: 'Non authentifié.' })
+
+    let payload
+    try {
+      payload = jwt.verify(token, process.env.JWT_SECRET)
+    } catch {
+      return res.status(401).json({ error: 'Session expirée ou invalide.' })
+    }
+
+    const currentUsername = (payload.username || '').toLowerCase()
+    const targetUsername = LINKED_ACCOUNTS[currentUsername]
+    if (!targetUsername) {
+      return res.status(403).json({ error: 'Aucun compte lié à ce compte.' })
+    }
+
+    try {
+      const targetUser = await prisma.user.findFirst({
+        where: { username: { equals: targetUsername, mode: 'insensitive' } },
+      })
+      if (!targetUser) return res.status(404).json({ error: 'Compte lié introuvable.' })
+      if (targetUser.banned) return res.status(403).json({ error: 'Le compte lié est banni.' })
+
+      const isAdmin = ['admin', 'root'].includes(targetUser.username.toLowerCase()) || targetUser.role === 'ADMIN'
+
+      if (!isAdmin && !targetUser.accepted) {
+        return res.status(403).json({ error: 'Le compte lié n\'est pas encore validé.' })
+      }
+
+      // Clôturer l'événement de connexion précédent (changement de compte)
+      const { loginEventId } = req.body || {}
+      if (loginEventId) {
+        const eid = parseInt(loginEventId, 10)
+        if (!isNaN(eid)) {
+          await prisma.loginEvent.updateMany({
+            where: { id: eid, logoutAt: null },
+            data: { logoutAt: new Date(), logoutReason: 'manual' },
+          }).catch(() => {})
+        }
+      }
+
+      const rawIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null
+      const ip = rawIp ? rawIp.split(',')[0].trim() : null
+      const loginEvent = await prisma.loginEvent.create({
+        data: {
+          userId: targetUser.id,
+          ip,
+          userAgent: req.headers['user-agent'] || null,
+          success: true,
+          message: `Changement de compte depuis @${payload.username}`,
+        },
+      })
+
+      const newToken = jwt.sign(
+        { userId: targetUser.id, username: targetUser.username, role: isAdmin ? 'ADMIN' : targetUser.role },
+        process.env.JWT_SECRET,
+        { expiresIn: '30d' }
+      )
+
+      let pendingNotifications = []
+      if (!isAdmin) {
+        pendingNotifications = await prisma.notification.findMany({
+          where: { userId: targetUser.id, read: false },
+          orderBy: { createdAt: 'desc' },
+        })
+      }
+
+      return res.status(200).json({
+        token: newToken,
+        loginEventId: loginEvent.id,
+        user: {
+          id: targetUser.id,
+          username: targetUser.username,
+          firstName: targetUser.firstName,
+          lastName: targetUser.lastName,
+          role: isAdmin ? 'ADMIN' : targetUser.role,
+          category: targetUser.category,
+          active: targetUser.active,
+        },
+        pendingNotifications,
+      })
+    } catch (err) {
+      console.error('[switch_account]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
   }
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' })

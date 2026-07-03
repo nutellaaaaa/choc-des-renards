@@ -1,46 +1,22 @@
-- Corriges les problèmes d'alignement de la section "Charte" (situés dans les différents articles de la charte)
-- Revoir ce qui est mis en gras dans la Charte (exemple pour l'article 3, on met en gras "le dernier samedi" car c'est la date qui est importante)
-- Historique des demandes de connexion refusées par l'admin (comme affichage pour sa propre satisfaction, sans plus d'intérêt particulier)
-- Dans l'affichage des Sets, remplacer les +X par X (ex, +3 devient 3)
-- Les matchs fait par chaque joueurs dans le classement général doit toujours être affiché en Live, c'est le calcul du classement qui doit être actualisé par l'admin. Par exemple, si je viens de faire un match, mon match devient visible par les autres utilisateurs lorsqu'il est publié par l'admin, mes points me sont attribués, mais je ne bouge pas dans le classement avant que le classement ne soit défigé. Ca évite les problèmes lors de la phase de ronde suisse par exemple. 
-- Dans les logs de connexions de la section "Connexions" auquelle a accès l'admin, ajoute l'heure de déconnexion à l'heure de connexion des joueurs. Si un joueur s'est déconnecté manuellement, l'heure de déconnexion est celle indiquée. Si le joueur a été déconnecté par inactivité, retires 15 minutes à l'heure pour avoir la vraie heure à laquelle il a arrêté d'utiliser le site. 
-- Rajouter un onglet "Matchs à venir" pour l'admin. Les matchs à venir sont calculées comme suit : lorsque la phase 2 commence, à la fin de chaque ronde le 1er affronte le 2e, le 3e le 4e, etc (dans les deux groupes renards choquants/renards choqués) pour le calcul des matchs de la phase 1, on verra ça plus tard. Dans cet onglet l'admin peut consulter les maths à venir et choisir du moment où il envoie une convocation (lorsqu'il lance la convocation pour un match, il notifie les deux joueurs en même temps et le match apparaît dans les rencontres prévues). L'admin a la possibilité d'envoyer les convocations à tout le monde en même temps. 
-- Lorsque l'admin ajoute un match à des joueurs, il a la possibilité de mettre une note optionnelle. Je voudrai qu'il ait également la possibilité de rajouter une/plusieurs photos. Elles seront alors visibles par tous dans le classement, en cliquant sur un joueur, dans le match en question de l'historique des matchs joués de ce joueur. Il sera possible de cliquer sur ces images pour les ouvrir en grand. 
-- Avoir la possibilité d'envoyer une notification à plusieurs joueurs en même temps (petites cases à cocher + case "tout le monde")
-- Toutes les photos sont stockées dans la base de donnée et sont consultables publiquement dans un onglet "souvenirs" à côté de l'onglet "classement" (en plus dêtre présentes dans l'historique des matchs des joueurs)
-- Possibilité de rajouter des malus à certains joueurs, menu déroulant présent dans "rencontre" ou dans "publication des matchs". Concrètement, l'admin ira dans les matchs à venir, et aura un menu déroulant pour ajouter un malus parmis : 
-♡ Interdiction de smasher ou de tendre droit
-♡ Porter un cache-œil
-♡ Interdiction de taper le volant au dessus de la bande
-♡ Jouer en demi-terrain pour le joueur le moins bien class´e (le demi-terrain
-change selon le service en cours)
-♡ Jouer avec une raquette courte
-♡ Jouer avec une raquette lest´ee
-♡ Jouer avec une raquette de pr´ecision
-♡ Jouer avec un bras dans le dos constamment
-♡ Interdiction de faire un coup droit
-♡ Interdiction de faire un revers
-♡ Annoncer chaque coup `a voix haute avant de le jouer
-♡ Les couloirs font partie du terrain du joueur le plus class´e
-♡ Les points du joueur le moins class´e comptent double
-♡ Le point est marqu´e par le joueur le mieux class´e uniquement s’il touche
-le sol avant la raquette de l’adversaire
-♡ Le point est marqu´e par le joueur le moins class´e
-♡ Le joueur le mieux class´e marque si le volant touche le sol uniquement
-dans une zone donn´ee ; la zone change `a set : rivi`ere, box, couloir du
-fond, box puis rivi`ere
-Par défaut, le malus est none. 
+---------- Fonctionnalités en cours d'implémentation ----------
+- Dans "actions et autre", une fois le scrapping terminé, il faudrait que la console affiche un message "souhaitez-vous mettre à jour les n joueurs suivants (Y/N)" afin de demander confirmation à l'admin. Lorsque l'admin accepte, on pourrait mettre une petite barre de chargement fictive en mode "chargement des modifications en cours" pour faire quelque chose d'un peu stylé. 
+- Les admins ont un compte "admin" et un compte "utilisateur", il faudrait qu'il puisse passer de l'un à l'autre facilement. Par exemple, en haut de la page, un toggle switch compte admin / compte utilisateur. Les comptes communicants sont yanis <-> admin et alexandre <-> root. Fais en sorte qu'il n'y ait pas besoin de ressaisir les identifiants de connexion pour passer de l'un à l'autre. 
+- Dans le classement, on n'a pas de classement général, c'est Poules / Rondes suisses. Le bon onglet doit être cliqué par défaut selon la phase en cours. Si je suis à la Phase 1, le classement par défaut qui apparait lorsque je vais dans "classement" est Poules. Inversement si je suis à la Phase 2. Pour la phase 0, un message apparaît "La saison [année actuelle]-[année actuelle +1] n'a pas encore débutée. 
 
+- Côté front-end : Retirer le bouton "voir le classement" page d'accueil ; Retirer l'information page des classements si c'est mis à jour en temps réel par l'admin ou pas ; Remplacer "mis à jour en temps réel" ou "classement figé" par "Phase en cours : [nom de la phase]
+
+
+
+---------- Bugs en cours de réparation ----------
+- Les joueurs inactifs apparaissent quand même dans les poules et les classements, ça ne fois pas être le cas. Les joueurs inactifs doivent être totalement transparents dans les fonctionnalités de "jeux". Ils apparaissent seulement dans la modération admin. Les joueurs inactifs ne jouent pas, ils peuvent seulement consulter le site.
+- Logo : Le premier plan fait apparaître les lettres, mais il faudrait revoir comment celles-ci sont découpées. En effet, la découpe, trop rectangulaire, fait apparaitre un bout du renard sur le haut et il manque un bout des lettres en bas. Peut-être qu'à la place de découper un rectange on pourrait découper selon la forme des lettres, comment puis-je aider pour cela ? Aussi, le texte "le choc des renards est transparent et ne se voit pas assez". Lorsque le haut du renard apparaît, un volant noir est présent en haut à droite, il est à retirer. 
 
 
 ---------- Fonctionnalités supplémentaires -----------
  - Envoyer des messages aux participants sur WhatsApp pour les matchs 
- - Ajouter la Politique de confidentialité et les Mentions légales
  - Transformer le site en une appli mobile
- - Récupérer les infos du classement des joueurs sur le site MYFFBAD
- https://myffbad.fr/recherche/joueur?league=12&committee=67&club=2359&isFirstLoad=false&page=2
- - Revoir le format mobile
- - Créer des joueurs
+ - Revoir le format mobile (responsive)
+ - Ajouter des animations
 
 
 ---------- Done ----------
@@ -70,12 +46,6 @@ Par défaut, le malus est none.
 - Avoir la possibilité de supprimer définitivement un joueur banni (une petite icône poubelle apparaît à-côté de l'option débannir)
 - La liste des rencontres qui doivent avoir lieux est affichée pour l'admin dans une section "scores à renseigner". Comme ça, l'admin a un moyen plus simple et plus rapide d'ajouter un match à des gens puisque l'adversaire etc sont des informations déjà spécifiées
 
-
----------- Bugs en cours de réparation ----------
-- Dans l'onglet "publication match", "en attente", l'admin renseigne le score pour les deux joueurs. C'est à dire qu'on ne lui propose pas de renseigner le score joueur 1 ou le score joueur 2 mais juste "renseigner le score" et l'adversaire n'est pas à choisir parmi la liste des utilisateurs, c'est l'adversaire du match et ça ne peut être autrement. 
-- Les matchs en attente de publication (qui n'ont donc pas encore été joués) peuvent être modifiés (malus, date) ou supprimé. 
-
-
 - Dans l'onglet "publication match", "en attente", l'admin renseigne le score pour les deux joueurs. C'est à dire qu'on ne lui propose pas de renseigner le score joueur 1 ou le score joueur 2 mais juste "renseigner le score" et l'adversaire n'est pas à choisir parmi la liste des utilisateurs, c'est l'adversaire du match et ça ne peut être autrement. 
 - Les matchs en attente de publication (qui n'ont donc pas encore été joués) peuvent être modifiés (malus, date) ou supprimé. 
 - Corriges les problèmes d'alignement de la section "Charte" (situés dans les différents articles de la charte)
@@ -83,29 +53,26 @@ Par défaut, le malus est none.
 - Historique des demandes de connexion refusées par l'admin (comme affichage pour sa propre satisfaction, sans plus d'intérêt particulier)
 - Dans l'affichage des Sets, remplacer les +X par X (ex, +3 devient 3)
 - Les matchs fait par chaque joueurs dans le classement général doit toujours être affiché en Live, c'est le calcul du classement qui doit être actualisé par l'admin. Par exemple, si je viens de faire un match, mon match devient visible par les autres utilisateurs lorsqu'il est publié par l'admin, mes points me sont attribués, mais je ne bouge pas dans le classement avant que le classement ne soit défigé. Ca évite les problèmes lors de la phase de ronde suisse par exemple. 
-- Dans les logs de connexions de la section "Connexions" auquelle a accès l'admin, ajoute l'heure de déconnexion à l'heure de connexion des joueurs. Si un joueur s'est déconnecté manuellement, l'heure de déconnexion est celle indiquée. Si le joueur a été déconnecté par inactivité, retires 15 minutes à l'heure pour avoir la vraie heure à laquelle il a arrêté d'utiliser le site. 
 - Lorsque l'admin ajoute un match à des joueurs, il a la possibilité de mettre une note optionnelle. Je voudrai qu'il ait également la possibilité de rajouter une/plusieurs photos. Elles seront alors visibles par tous dans le classement, en cliquant sur un joueur, dans le match en question de l'historique des matchs joués de ce joueur. Il sera possible de cliquer sur ces images pour les ouvrir en grand. 
-- Avoir la possibilité d'envoyer une notification à plusieurs joueurs en même temps (petites cases à cocher + case "tout le monde")
 - Toutes les photos sont stockées dans la base de donnée et sont consultables publiquement dans un onglet "souvenirs" à côté de l'onglet "classement" (en plus dêtre présentes dans l'historique des matchs des joueurs)
 - Possibilité de rajouter des malus à certains joueurs, menu déroulant présent dans "rencontre" ou dans "publication des matchs". Concrètement, l'admin ira dans les matchs à venir, et aura un menu déroulant pour ajouter un malus parmis : 
-♡ Interdiction de smasher ou de tendre droit
-♡ Porter un cache-œil
-♡ Interdiction de taper le volant au dessus de la bande
-♡ Jouer en demi-terrain pour le joueur le moins bien class´e (le demi-terrain
-change selon le service en cours)
-♡ Jouer avec une raquette courte
-♡ Jouer avec une raquette lest´ee
-♡ Jouer avec une raquette de pr´ecision
-♡ Jouer avec un bras dans le dos constamment
-♡ Interdiction de faire un coup droit
-♡ Interdiction de faire un revers
-♡ Annoncer chaque coup `a voix haute avant de le jouer
-♡ Les couloirs font partie du terrain du joueur le plus class´e
-♡ Les points du joueur le moins class´e comptent double
-♡ Le point est marqu´e par le joueur le mieux class´e uniquement s’il touche
-le sol avant la raquette de l’adversaire
-♡ Le point est marqu´e par le joueur le moins class´e
-♡ Le joueur le mieux class´e marque si le volant touche le sol uniquement
-dans une zone donn´ee ; la zone change `a set : rivi`ere, box, couloir du
-fond, box puis rivi`ere
-Par défaut, le malus est none. 
+ - Ajouter la Politique de confidentialité et les Mentions légales
+- Récupérer les infos du classement des joueurs sur le site MYFFBAD
+ https://myffbad.fr/recherche/joueur?league=12&committee=67&club=2359&isFirstLoad=false&page=2
+- Retires l'émoiji appareil photo du titre de la section "souvenirs". Fais-en sorte qu'il n'y ait pas de doublons d'images, c'est-à-dire qu'une image d'un match entre deux joueurs peut être consultable sur le profil d'un joueur comme del'autre, mais la photo n'apparait qu'une fois dans "souvenirs"
+- L'image doit pouvoir être ajouté depuis "utilisateurs", mais aussi lorsque je clique sur "renseigner scores" dans "publications matchs"
+- L'historique des matchs publiés est bien modificable, par contre on ne peut pas en supprimer (autrement qu'en les supprimant tous dans l'onglet "actions autres"), rajoute la possibilité de supprimé un match qui aurait été renseigné par erreur
+- Le menu permettant d'envoyer des notifications groupées ne fonctionne pas. Je veux qu'on puisse sélectionner des joueurs dans un menu déroulant, avec la possibilité de sélectionner "tous les joueurs actifs", "tous les joueurs inactifs", "tous les joueurs", "tous les joueurs de [nom des poules]" pour la phase 1, "tous les joueurs de [nom du groupe de joueurs]" pour la phase 2. 
+- Fusionnes l'onglet "Utilisateurs en attente" et "Utilisateurs refusés", tu peux simplement lister les joueurs refusés après la liste des utilisateurs en attente 
+- Dans les logs de connexions, l'heure de déconnexion n'est jamais indiquée
+- Dans "matchs planifiés", on a la possibilité de planifier un match entre deux joueurs, donc je pense qu'il est inutile d'avoir en plus un onglet "rencontre spécialte" puisque cet onglet à la même  fonctionnalité
+Voici un petit récapitulatif des statuts des matchs si jamais ce n'était pas très clair pour toi : 
+- À venir = visible que pour l'admin
+- Planifié = visible pour tout le monde
+- Planifié avec score visible pour l'admin uniquement = le match a été joué et on attend que l'admin décide de rendre le résultat publique
+- Planifié et publié = score visible pour tout le monde  
+- Dans les logs de connexions de la section "Connexions" auquelle a accès l'admin, ajoute l'heure de déconnexion à l'heure de connexion des joueurs. Si un joueur s'est déconnecté manuellement, l'heure de déconnexion est celle indiquée. Si le joueur a été déconnecté par inactivité, retires 15 minutes à l'heure pour avoir la vraie heure à laquelle il a arrêté d'utiliser le site. 
+- Avoir la possibilité d'envoyer une notification à plusieurs joueurs en même temps (petites cases à cocher + case "tout le monde")
+
+
+

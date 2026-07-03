@@ -170,7 +170,12 @@ module.exports = async function handler(req, res) {
       include: { members: { include: { user: { select: { id: true } } } } },
     })
     const phase2Groups = await prisma.phase2Group.findMany({
-      include: { members: { include: { user: { select: { id: true, firstName: true, lastName: true, username: true } } } } },
+      include: {
+        members: {
+          where: { user: { active: true, accepted: true, banned: false } },
+          include: { user: { select: { id: true, firstName: true, lastName: true, username: true } } },
+        },
+      },
     })
 
     const userPouleMap = {}
