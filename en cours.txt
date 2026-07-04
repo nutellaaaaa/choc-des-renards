@@ -6,6 +6,8 @@
 
 ---------- Bugs en cours de réparation ----------
 - Logo : Le premier plan fait apparaître les lettres, mais il faudrait revoir comment celles-ci sont découpées. En effet, la découpe, trop rectangulaire, fait apparaitre un bout du renard sur le haut et il manque un bout des lettres en bas. Peut-être qu'à la place de découper un rectange on pourrait découper selon la forme des lettres, comment puis-je aider pour cela ? Aussi, le texte "le choc des renards est transparent et ne se voit pas assez". Lorsque le haut du renard apparaît, un volant noir est présent en haut à droite, il est à retirer. 
+- FAQ : Si un joueur consulte plusieurs fois une même FAQ, on ne doit le compter qu'une fois dans le nb de consultations totales (par contre il apparaît bien dans l'historique des consultations)
+- Lorsque je suis sur mon compte joueur, le bouton switch account me propose de basculer vers "joueur", revois ça. Il devrait me proposer de basculer vers admin. La fonctionnalité fonctionne bien, le problème est juste le front end. 
 
 
 ---------- Fonctionnalités supplémentaires -----------

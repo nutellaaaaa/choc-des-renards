@@ -676,6 +676,7 @@
       <button class="admin-tab" onclick="adminTab('publication',this)">Publication matchs <span class="badge" id="badge-pending-matches">–</span></button>
       <button class="admin-tab" onclick="adminTab('notifications-list',this)">Notifications <span class="badge" id="badge-notifs">–</span></button>
       <button class="admin-tab" onclick="adminTab('faq',this)">FAQ <span class="badge" id="badge-faq">–</span></button>
+      <button class="admin-tab" onclick="adminTab('contact',this)">Contacts <span class="badge" id="badge-contact">–</span></button>
       <button class="admin-tab" onclick="adminTab('other-actions',this)">Actions autres</button>
     </div>
 
@@ -868,6 +869,18 @@
       <p style="font-size:0.8rem;color:var(--gray);margin-bottom:1.25rem">Glissez-déposez un sujet (⠿) pour changer son ordre d'affichage côté joueurs.</p>
       <div id="faq-admin-list"></div>
       <div id="faq-admin-empty" class="admin-empty" style="display:none">Aucun sujet de FAQ pour l'instant.</div>
+    </div>
+
+    <!-- Contacts -->
+    <div id="admin-contact" class="admin-section">
+      <div class="admin-section-header"><h3>Prises de contact</h3></div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Joueur</th><th>Nature</th><th>Objet</th><th>Message</th><th>Reçu le</th><th>Statut</th><th>Actions</th></tr></thead>
+          <tbody id="tbl-contact"></tbody>
+        </table>
+        <div id="contact-admin-empty" class="admin-empty" style="display:none">Aucune prise de contact pour l'instant.</div>
+      </div>
     </div>
 
     <!-- Actions autres -->
@@ -1230,6 +1243,7 @@
     <button class="nav-btn active" onclick="showPage('accueil',this)">Accueil</button>
     <button class="nav-btn" onclick="showPage('reglement',this)">Charte</button>
     <button class="nav-btn" onclick="showPage('faq',this)">FAQ</button>
+    <button class="nav-btn" onclick="showPage('contact',this)">Contact</button>
     <button class="nav-btn" onclick="showPage('classement',this)">Classement</button>
     <button class="nav-btn" onclick="showPage('souvenirs',this)">Souvenirs</button>
     <button class="nav-btn" onclick="showPage('mes-notifs',this)">Messages</button>
@@ -1339,6 +1353,40 @@
     <h1 class="section-title">F<span>AQ</span></h1>
     <p class="section-subtitle">Questions fréquentes</p>
     <div id="faq-content"><div class="admin-empty">Chargement…</div></div>
+  </div>
+</div>
+
+<!-- PAGE CONTACT -->
+<div id="page-contact" class="page">
+  <div class="section">
+    <h1 class="section-title">Cont<span>act</span></h1>
+    <p class="section-subtitle">Une question, un problème, une idée ? Écrivez à l'organisation.</p>
+    <div style="max-width:560px">
+      <div class="form-group">
+        <label>Nature de la demande</label>
+        <select id="contact-nature">
+          <option value="">— Sélectionner —</option>
+          <option>Informer d'un score</option>
+          <option>Signaler un comportement inapproprié</option>
+          <option>Poser une question</option>
+          <option>Proposer une fonctionnalité sur le site</option>
+          <option>Proposer une idée sur l'organisation du tournoi</option>
+          <option>Signaler un bug sur le site</option>
+          <option>Autre</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Objet</label>
+        <input type="text" id="contact-subject" placeholder="Ex : Score incorrect sur mon dernier match">
+      </div>
+      <div class="form-group">
+        <label>Contenu du message</label>
+        <textarea id="contact-message" rows="6" placeholder="Décrivez votre demande en détail…"></textarea>
+      </div>
+      <div id="contact-error" class="modal-error"></div>
+      <div id="contact-success" class="modal-success"></div>
+      <button class="btn-modal-save" style="width:100%" onclick="submitContactForm()">Envoyer le message</button>
+    </div>
   </div>
 </div>
 
@@ -1566,7 +1614,12 @@ function closePrivacyPreauth() {
   if (navAccueilBtn) navAccueilBtn.classList.add('active')
   // L'auth-overlay n'a jamais été touché : il est toujours là, intact, au premier plan.
 }
-function toggleArticle(el) { el.classList.toggle('open') }
+function toggleArticle(el) {
+  const wasOpen = el.classList.contains('open')
+  const body = el.querySelector('.article-body')
+  el.classList.toggle('open')
+  if (body) body.style.maxHeight = wasOpen ? '' : (body.scrollHeight + 'px')
+}
 
 /* ══════════════ AUTH ══════════════ */
 let currentUser = null
@@ -1614,6 +1667,7 @@ function showApp() {
       const uname = (currentUser.username || '').toLowerCase()
       if (LINKED_USERNAMES[uname]) {
         switchBtn.style.display = ''
+        switchBtn.disabled = false
         switchBtn.textContent = currentUser.role === 'ADMIN' ? '🔁 Compte joueur' : '🔁 Compte admin'
       } else {
         switchBtn.style.display = 'none'
@@ -1638,7 +1692,8 @@ function showApp() {
 
 async function switchAccount() {
   const btn = document.getElementById('nav-switch-btn')
-  if (btn) { btn.disabled = true; var prevLabel = btn.textContent; btn.textContent = '⏳ Changement…' }
+  const prevLabel = btn ? btn.textContent : null
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Changement…' }
   try {
     const eid = localStorage.getItem('cdr_login_event_id')
     const res = await fetch('/api/login?action=switch_account', {
@@ -1649,6 +1704,7 @@ async function switchAccount() {
     const data = await res.json()
     if (!res.ok) {
       alert(data.error || 'Impossible de changer de compte.')
+      if (btn) { btn.disabled = false; btn.textContent = prevLabel }
       return
     }
     localStorage.setItem('cdr_token', data.token)
@@ -1657,11 +1713,10 @@ async function switchAccount() {
     currentUser = data.user
     pendingNotifications = data.pendingNotifications || []
     classementLoaded = false
-    showApp()
+    showApp() // recalcule le libellé du bouton à partir du NOUVEAU compte actif
   } catch (e) {
     alert('Erreur réseau. Réessayez.')
-  } finally {
-    if (btn) { btn.disabled = false; if (prevLabel) btn.textContent = prevLabel }
+    if (btn) { btn.disabled = false; btn.textContent = prevLabel }
   }
 }
 
@@ -2282,7 +2337,15 @@ function faqVoteRowHtml(t) {
 
 function toggleFaqArticle(el, topicId) {
   const wasOpen = el.classList.contains('open')
+  const body = el.querySelector('.article-body')
   el.classList.toggle('open')
+  if (!wasOpen) {
+    // Hauteur réelle du contenu plutôt qu'une valeur fixe : évite de tronquer
+    // les sujets qui contiennent plusieurs paragraphes.
+    if (body) body.style.maxHeight = body.scrollHeight + 'px'
+  } else {
+    if (body) body.style.maxHeight = ''
+  }
   if (!wasOpen && !faqViewedThisSession.has(topicId)) {
     faqViewedThisSession.add(topicId)
     fetch('/api/faq', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'view', topicId }) })
@@ -2308,6 +2371,34 @@ async function faqVote(topicId, useful, btn) {
     }
   } catch (e) {
     buttons.forEach(b => b.disabled = false)
+  }
+}
+
+/* ══════════════ FORMULAIRE DE CONTACT (public) ══════════════ */
+async function submitContactForm() {
+  const errorEl = document.getElementById('contact-error')
+  const successEl = document.getElementById('contact-success')
+  errorEl.textContent = ''
+  successEl.textContent = ''
+
+  const nature = document.getElementById('contact-nature').value
+  const subject = document.getElementById('contact-subject').value.trim()
+  const message = document.getElementById('contact-message').value.trim()
+
+  if (!nature) { errorEl.textContent = 'Merci de choisir la nature de votre demande.'; return }
+  if (!subject) { errorEl.textContent = 'L\'objet est requis.'; return }
+  if (!message) { errorEl.textContent = 'Le message est requis.'; return }
+
+  try {
+    const res = await fetch('/api/contact', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ nature, subject, message }) })
+    const data = await res.json()
+    if (!res.ok) { errorEl.textContent = data.error || 'Erreur serveur.'; return }
+    document.getElementById('contact-nature').value = ''
+    document.getElementById('contact-subject').value = ''
+    document.getElementById('contact-message').value = ''
+    successEl.textContent = 'Votre message a bien été envoyé. L\'organisation reviendra vers vous si nécessaire.'
+  } catch (e) {
+    errorEl.textContent = 'Erreur réseau. Réessayez.'
   }
 }
 
@@ -2394,6 +2485,7 @@ function adminTab(name, btn) {
   if (name === 'history') loadHistory()
   if (name === 'pending') loadRefused()
   if (name === 'faq') loadFaqAdmin()
+  if (name === 'contact') loadContactAdmin()
 }
 
 function pubSubTab(name, btn) {
@@ -3409,6 +3501,67 @@ async function viewFaqHistory(topicId) {
   } catch (e) {
     list.innerHTML = '<div class="admin-empty">Erreur de chargement.</div>'
   }
+}
+
+/* ══════════════ CONTACT (admin) ══════════════ */
+let contactAdminMessages = []
+
+async function loadContactAdmin() {
+  const tbl = document.getElementById('tbl-contact')
+  const empty = document.getElementById('contact-admin-empty')
+  try {
+    const res = await fetch('/api/admin/contact', { headers: authHeaders() })
+    if (!res.ok) return
+    const { messages } = await res.json()
+    contactAdminMessages = messages || []
+    document.getElementById('badge-contact').textContent = contactAdminMessages.filter(m => !m.treated).length
+
+    if (contactAdminMessages.length === 0) {
+      tbl.innerHTML = ''
+      empty.style.display = 'block'
+      return
+    }
+    empty.style.display = 'none'
+    tbl.innerHTML = contactAdminMessages.map(m => `
+      <tr>
+        <td><strong style="color:var(--white)">${esc(m.user?.username || '—')}</strong><br><span style="font-size:0.78rem;color:var(--gray)">${esc(m.user?.firstName || '')} ${esc(m.user?.lastName || '')}</span></td>
+        <td style="color:var(--gray-light);font-size:0.85rem">${esc(m.nature)}</td>
+        <td style="color:var(--gray-light)">${esc(m.subject)}</td>
+        <td style="color:var(--gray-light);font-size:0.85rem;max-width:260px;white-space:pre-wrap">${esc(m.message)}</td>
+        <td style="color:var(--gray);font-size:0.82rem">${fmtDate(m.createdAt)}</td>
+        <td>${m.treated ? '<span class="status-badge status-ok">Traité</span>' : '<span class="status-badge status-wait">Non traité</span>'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn-sm btn-edit" onclick="replyToContact(${m.userId}, ${m.id}, '${esc(m.subject).replace(/'/g,"\\'")}')">Répondre</button>
+          <button class="btn-sm btn-edit" onclick="toggleContactTreated(${m.id}, ${!m.treated})">${m.treated ? 'Marquer non traité' : 'Marquer traité'}</button>
+        </td>
+      </tr>
+    `).join('')
+  } catch (e) {
+    console.error('[loadContactAdmin]', e)
+  }
+}
+
+async function toggleContactTreated(contactId, treated) {
+  try {
+    await fetch('/api/admin/contact', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'mark_treated', contactId, treated }) })
+    await loadContactAdmin()
+  } catch (e) { console.error('[toggleContactTreated]', e) }
+}
+
+function replyToContact(userId, contactId, subject) {
+  // Marque directement la demande comme traitée puisqu'on y répond
+  toggleContactTreated(contactId, true)
+
+  const notifyBtn = document.querySelector('[onclick*="notify"]')
+  adminTab('notify', notifyBtn)
+  setTimeout(() => {
+    document.querySelectorAll('.notify-player-cb').forEach(cb => {
+      cb.checked = parseInt(cb.value) === userId
+    })
+    updateNotifyDropdownLabel()
+    document.getElementById('notify-title').value = `Réponse à ${subject}`
+    document.getElementById('notify-message').focus()
+  }, 150)
 }
 
 /* ── Publication matchs ── */

@@ -64,10 +64,16 @@ module.exports = async function handler(req, res) {
       const topic = await prisma.faqTopic.findUnique({ where: { id: tid } })
       if (!topic) return res.status(404).json({ error: 'Sujet introuvable.' })
 
-      await prisma.$transaction([
-        prisma.faqView.create({ data: { topicId: tid, userId: auth.userId } }),
-        prisma.faqTopic.update({ where: { id: tid }, data: { viewCount: { increment: 1 } } }),
-      ])
+      // Le compteur total ne compte qu'une fois par utilisateur, même si celui-ci
+      // rouvre le sujet plusieurs fois. L'historique, lui, garde bien chaque ouverture.
+      const alreadyViewed = await prisma.faqView.findFirst({
+        where: { topicId: tid, userId: auth.userId },
+      })
+
+      await prisma.faqView.create({ data: { topicId: tid, userId: auth.userId } })
+      if (!alreadyViewed) {
+        await prisma.faqTopic.update({ where: { id: tid }, data: { viewCount: { increment: 1 } } })
+      }
 
       return res.status(200).json({ ok: true })
     } catch (err) {
