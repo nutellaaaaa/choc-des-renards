@@ -6,6 +6,8 @@
     { "source": "/api/admin/notifications", "destination": "/api/admin?resource=notifications" },
     { "source": "/api/admin/phase",         "destination": "/api/admin?resource=phase" },
     { "source": "/api/admin/poules",        "destination": "/api/admin?resource=poules" },
+    { "source": "/api/admin/action",        "destination": "/api/admin?resource=action" },
+    { "source": "/api/admin/match",         "destination": "/api/admin?resource=match" },
 
     { "source": "/api/contact",             "destination": "/api/public?resource=contact" },
     { "source": "/api/faq",                 "destination": "/api/public?resource=faq" },
