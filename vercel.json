@@ -1,0 +1,14 @@
+{
+  "rewrites": [
+    { "source": "/api/admin/contact",       "destination": "/api/admin?resource=contact" },
+    { "source": "/api/admin/faq",           "destination": "/api/admin?resource=faq" },
+    { "source": "/api/admin/history",       "destination": "/api/admin?resource=history" },
+    { "source": "/api/admin/notifications", "destination": "/api/admin?resource=notifications" },
+    { "source": "/api/admin/phase",         "destination": "/api/admin?resource=phase" },
+    { "source": "/api/admin/poules",        "destination": "/api/admin?resource=poules" },
+
+    { "source": "/api/contact",             "destination": "/api/public?resource=contact" },
+    { "source": "/api/faq",                 "destination": "/api/public?resource=faq" },
+    { "source": "/api/notifications",       "destination": "/api/public?resource=notifications" }
+  ]
+}
