@@ -29,14 +29,14 @@
 
   /* LOGO NAV ANIMÉ (fidèle à l'animation d'intro : renard qui frappe le volant) */
   .nav-logo-anim { position: relative; width: 88px; height: 88px; flex-shrink: 0; --nla-cycle: 6.5s; }
-  .nav-logo-anim .nla-glow { position: absolute; inset: -45%; border-radius: 50%; background: radial-gradient(circle, rgba(255,109,0,0.4), transparent 70%); opacity: 0; transition: opacity 0.35s ease; pointer-events: none; z-index: 0; }
+  .nav-logo-anim .nla-glow { position: absolute; top: -45%; right: -45%; bottom: -45%; left: -45%; border-radius: 50%; background: radial-gradient(circle, rgba(255,109,0,0.4), transparent 70%); opacity: 0; transition: opacity 0.35s ease; pointer-events: none; z-index: 0; }
   .nav-logo:hover .nla-glow, .nav-logo:focus-visible .nla-glow { opacity: 1; }
-  .nav-logo-anim .nla-layer { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; user-select: none; }
+  .nav-logo-anim .nla-layer { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; user-select: none; }
 
-  .nla-hold-glow { position: absolute; inset: -12%; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(255,157,46,.28), transparent 65%); opacity: 0; pointer-events: none; z-index: 0; }
+  .nla-hold-glow { position: absolute; top: -12%; right: -12%; bottom: -12%; left: -12%; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(255,157,46,.28), transparent 65%); opacity: 0; pointer-events: none; z-index: 0; }
 
   .nla-letters { z-index: 1; opacity: 1; clip-path: inset(0 100% 0 0); filter: drop-shadow(0 0 0px rgba(255,157,46,0)); }
-  .nla-sweep { position: absolute; inset: 0; width: 6%; height: 100%; left: -8%; background: linear-gradient(90deg,transparent,rgba(255,200,140,.85),transparent); mix-blend-mode: screen; opacity: 0; pointer-events: none; z-index: 2; }
+  .nla-sweep { position: absolute; top: 0; right: 0; bottom: 0; left: -8%; width: 6%; height: 100%; left: -8%; background: linear-gradient(90deg,transparent,rgba(255,200,140,.85),transparent); mix-blend-mode: screen; opacity: 0; pointer-events: none; z-index: 2; }
 
   /* Sous-titre "Le Choc des Renards" — contraste boosté en blanc pour bien ressortir en petit format */
   .nla-subtitle { z-index: 2; opacity: 0; filter: drop-shadow(0 0 5px rgba(255,255,255,.75)) drop-shadow(0 1px 6px rgba(0,0,0,1)) brightness(1.65) contrast(1.35); }
@@ -138,7 +138,7 @@
 
   /* HERO */
   .hero { min-height: calc(100vh - 96px); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 4rem 2rem; position: relative; overflow: hidden; }
-  .hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 80% 60% at 50% 30%, rgba(255,109,0,0.08) 0%, transparent 70%); pointer-events: none; }
+  .hero::before { content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: radial-gradient(ellipse 80% 60% at 50% 30%, rgba(255,109,0,0.08) 0%, transparent 70%); pointer-events: none; }
   .hero::after { content: ''; position: absolute; right: -60px; bottom: -40px; width: 340px; height: 340px; background: url('bondy-badminton-club.png') no-repeat center/contain; opacity: 0.06; pointer-events: none; filter: grayscale(1) brightness(1.2); }
   .hero-logo { width: min(280px, 70vw); margin-bottom: 2rem; filter: drop-shadow(0 0 40px rgba(255,109,0,0.22)); }
   .hero-tagline, .hero-desc, .hero-logo { opacity: 0; transform: translateY(30px) scale(.95); transition: all .8s ease; }
@@ -227,7 +227,7 @@
   .special-card-meta { font-size: 0.82rem; color: var(--gray); display: flex; gap: 1rem; flex-wrap: wrap; }
 
   /* MODAL DÉTAIL JOUEUR */
-  .player-modal-bg { display: none; position: fixed; inset: 0; z-index: 3000; background: rgba(0,0,0,0.8); align-items: flex-start; justify-content: center; padding: 5rem 1rem 2rem; overflow-y: auto; }
+  .player-modal-bg { display: none; position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 3000; background: rgba(0,0,0,0.8); align-items: flex-start; justify-content: center; padding: 5rem 1rem 2rem; overflow-y: auto; }
   .player-modal-bg.open { display: flex; }
   .player-modal { background: var(--dark2); border: 1px solid var(--dark4); border-top: 3px solid var(--orange); border-radius: 14px; padding: 2rem; width: 100%; max-width: 640px; }
   .player-modal-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem; gap: 1rem; }
@@ -264,7 +264,7 @@
   /* PAGE CONFIDENTIALITÉ */
   .privacy-wrap { max-width: 860px; margin: 0 auto; padding: 3rem 2rem 4rem; }
   .privacy-hero { text-align: center; padding: 3rem 2rem 2rem; background: var(--dark2); border: 1px solid var(--dark4); border-top: 3px solid var(--orange); border-radius: 14px; margin-bottom: 2rem; position: relative; overflow: hidden; }
-  .privacy-hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 0%, rgba(255,109,0,0.06) 0%, transparent 65%); pointer-events: none; }
+  .privacy-hero::before { content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: radial-gradient(ellipse at 50% 0%, rgba(255,109,0,0.06) 0%, transparent 65%); pointer-events: none; }
   .privacy-eyebrow { font-family: var(--font-heading); font-size: 0.75rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--orange); margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: center; gap: 0.75rem; }
   .privacy-eyebrow::before, .privacy-eyebrow::after { content: ''; height: 1px; width: 36px; background: var(--orange); opacity: 0.5; }
   .privacy-hero h1 { font-family: var(--font-display); font-size: clamp(2.2rem, 6vw, 3.4rem); letter-spacing: 0.04em; color: var(--white); line-height: 1.1; margin-bottom: 0.5rem; }
@@ -316,20 +316,20 @@
   .checkbox-group-rgpd label a:hover { border-bottom-color: var(--orange); }
 
   /* AUTH OVERLAY */
-  .auth-overlay { position: fixed; inset: 0; z-index: 999; background: var(--dark); display: flex; align-items: center; justify-content: center; padding: 1rem; opacity: 1; transition: opacity 0.3s ease; }
+  .auth-overlay { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 999; background: var(--dark); display: flex; align-items: center; justify-content: center; padding: 1rem; opacity: 1; transition: opacity 0.3s ease; }
   .auth-overlay.fade-out { opacity: 0; pointer-events: none; }
 
   /* INTRO CINÉMATIQUE (après connexion) */
-  .intro-overlay { position: fixed; inset: 0; z-index: 2000; background: #000; overflow: hidden; }
+  .intro-overlay { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 2000; background: #000; overflow: hidden; }
   .intro-overlay.hidden { display: none; }
 
-  .intro-stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.5s ease; }
+  .intro-stage { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.5s ease; }
   .intro-stage.visible { opacity: 1; pointer-events: auto; }
 
   /* Étape 1 : clic pour démarrer */
   .intro-click-gate { flex-direction: column; gap: 1.5rem; cursor: pointer; background: radial-gradient(circle at 50% 40%, rgba(255,109,0,0.1), #000 70%); position: relative; overflow: hidden; }
   .intro-click-label { position: relative; font-family: var(--font-heading); letter-spacing: 0.15em; text-transform: uppercase; color: var(--gray-light); font-size: 0.95rem; padding: 1rem 2.2rem; border-radius: 999px; transition: color 0.3s ease; animation: introLabelPulse 2.4s ease-in-out infinite; }
-  .intro-click-label::after { content: ''; position: absolute; inset: 0; border: 1px solid rgba(255,109,0,0.4); border-radius: 999px; opacity: 0.5; animation: introRingPulse 2.4s ease-in-out infinite; pointer-events: none; }
+  .intro-click-label::after { content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; border: 1px solid rgba(255,109,0,0.4); border-radius: 999px; opacity: 0.5; animation: introRingPulse 2.4s ease-in-out infinite; pointer-events: none; }
   .intro-click-gate:hover .intro-click-label { color: var(--white); }
   @keyframes introLabelPulse { 0%,100% { text-shadow: 0 0 0 rgba(255,109,0,0); } 50% { text-shadow: 0 0 22px rgba(255,109,0,0.55); } }
   @keyframes introRingPulse { 0%,100% { transform: scale(1); opacity: 0.35; } 50% { transform: scale(1.08); opacity: 0.75; } }
@@ -388,7 +388,7 @@
   /* Page confidentialité affichée AVANT authentification : doit rester
      au-dessus de auth-overlay (z-index supérieur) sans jamais cacher
      ni désactiver l'overlay de connexion lui-même. */
-  .page.privacy-preauth { position: fixed; inset: 0; z-index: 1000; background: var(--dark); overflow-y: auto; padding: 2rem 1rem 3rem; }
+  .page.privacy-preauth { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 1000; background: var(--dark); overflow-y: auto; padding: 2rem 1rem 3rem; }
   .privacy-back-btn { display: none; }
   .page.privacy-preauth .privacy-back-btn { display: inline-flex; align-items: center; gap: 0.4rem; margin-bottom: 1.5rem; background: var(--dark3); border: 1px solid var(--dark4); color: var(--gray-light); border-radius: 8px; padding: 0.55rem 1.1rem; font-family: var(--font-heading); font-size: 0.85rem; font-weight: 600; letter-spacing: 0.04em; cursor: pointer; }
   .page.privacy-preauth .privacy-back-btn:hover { border-color: var(--orange); color: var(--orange); }
@@ -428,7 +428,7 @@
   .auth-pending-back:hover { border-color: var(--orange); color: var(--orange); }
 
   /* NOTIFICATION OVERLAY */
-  .notif-overlay { display: none; position: fixed; inset: 0; z-index: 1500; background: rgba(0,0,0,0.9); align-items: center; justify-content: center; padding: 1rem; }
+  .notif-overlay { display: none; position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 1500; background: rgba(0,0,0,0.9); align-items: center; justify-content: center; padding: 1rem; }
   .notif-overlay.open { display: flex; }
   .notif-card { background: var(--dark2); border: 1px solid var(--dark4); border-top: 3px solid var(--orange); border-radius: 16px; padding: 2rem; width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
   .notif-card-icon { font-size: 2.5rem; text-align: center; margin-bottom: 1rem; }
@@ -510,7 +510,7 @@
   .btn-live-active    { background: rgba(100,220,100,0.25) !important; border-color: #6ddc6d !important; color: #6ddc6d !important; box-shadow: inset 0 2px 4px rgba(0,0,0,0.4); }
 
   /* Modals */
-  .admin-modal-bg { display: none; position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; padding: 1rem; }
+  .admin-modal-bg { display: none; position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 2000; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; padding: 1rem; }
   .admin-modal-bg.open { display: flex; }
   .admin-modal { background: var(--dark2); border: 1px solid var(--dark4); border-top: 3px solid var(--orange); border-radius: 14px; padding: 2rem; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
   .admin-modal h3 { font-family: var(--font-display); font-size: 1.4rem; letter-spacing: 0.04em; margin-bottom: 1.5rem; }
@@ -686,7 +686,7 @@
   .admin-photo-thumb { width: 42px; height: 42px; border-radius: 5px; object-fit: cover; cursor: pointer; border: 1px solid var(--dark4); transition: border-color 0.15s; }
   .admin-photo-thumb:hover { border-color: var(--orange); }
   /* Lightbox */
-  .lightbox-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.93); z-index: 9999; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+  .lightbox-bg { position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: rgba(0,0,0,0.93); z-index: 9999; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
   .lightbox-bg.open { opacity: 1; pointer-events: all; }
   .lightbox-bg img { max-width: 90vw; max-height: 86vh; border-radius: 10px; box-shadow: 0 8px 48px rgba(0,0,0,0.7); display: block; }
   .lightbox-close { position: absolute; top: 1.1rem; right: 1.4rem; background: none; border: none; color: #fff; font-size: 2.2rem; cursor: pointer; opacity: 0.7; line-height: 1; }
