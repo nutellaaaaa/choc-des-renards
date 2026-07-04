@@ -54,6 +54,7 @@ model User {
   plannedMatches2 PlannedMatch[] @relation("PlannedPlayer2")
   faqViews       FaqView[]
   faqVotes       FaqVote[]
+  contactMessages ContactMessage[]
 }
 
 model LoginEvent {
@@ -264,4 +265,18 @@ model FaqVote {
   user  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([topicId, userId])
+}
+
+// ═══════════════════ FORMULAIRE DE CONTACT ═══════════════════
+
+model ContactMessage {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  nature    String
+  subject   String
+  message   String
+  treated   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
