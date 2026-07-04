@@ -228,6 +228,44 @@
   /* AUTH OVERLAY */
   .auth-overlay { position: fixed; inset: 0; z-index: 999; background: var(--dark); display: flex; align-items: center; justify-content: center; padding: 1rem; opacity: 1; transition: opacity 0.3s ease; }
   .auth-overlay.fade-out { opacity: 0; pointer-events: none; }
+
+  /* INTRO CINÉMATIQUE (après connexion) */
+  .intro-overlay { position: fixed; inset: 0; z-index: 2000; background: #000; overflow: hidden; }
+  .intro-overlay.hidden { display: none; }
+
+  .intro-stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.5s ease; }
+  .intro-stage.visible { opacity: 1; pointer-events: auto; }
+
+  /* Étape 1 : clic pour démarrer */
+  .intro-click-gate { flex-direction: column; gap: 1.5rem; cursor: pointer; background: radial-gradient(circle at 50% 40%, rgba(255,109,0,0.1), #000 70%); }
+  .intro-click-ring { width: 96px; height: 96px; border-radius: 50%; border: 2px solid var(--orange); display: flex; align-items: center; justify-content: center; animation: introPulse 1.8s ease-in-out infinite; }
+  .intro-click-ring svg { width: 34px; height: 34px; fill: var(--orange); margin-left: 4px; }
+  @keyframes introPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,109,0,0.45); } 50% { box-shadow: 0 0 0 18px rgba(255,109,0,0); } }
+  .intro-click-label { font-family: var(--font-heading); letter-spacing: 0.15em; text-transform: uppercase; color: var(--gray-light); font-size: 0.95rem; }
+
+  /* Étape 2 : vidéo plein écran */
+  .intro-video-wrap video { width: 100%; height: 100%; object-fit: cover; }
+
+  /* Étape 3 : chargement fictif */
+  .intro-loading { flex-direction: column; gap: 1.25rem; background: var(--dark); }
+  .intro-loading-text { font-family: var(--font-heading); letter-spacing: 0.12em; text-transform: uppercase; color: var(--gray-light); font-size: 0.9rem; min-height: 1.4em; }
+  .intro-progress-track { width: min(360px, 70vw); height: 4px; background: var(--dark4); border-radius: 4px; overflow: hidden; }
+  .intro-progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--orange-light), var(--orange)); border-radius: 4px; transition: width 0.2s ease; box-shadow: 0 0 12px var(--orange); }
+
+  /* Étape 4 : bienvenue */
+  .intro-welcome { flex-direction: column; gap: 2rem; background: radial-gradient(circle at 50% 30%, rgba(255,109,0,0.12), var(--dark) 70%); text-align: center; padding: 1rem; }
+  .intro-welcome-sub { font-family: var(--font-heading); letter-spacing: 0.18em; text-transform: uppercase; color: var(--orange); font-size: 0.85rem; }
+  .intro-welcome-title { font-family: var(--font-display); font-size: clamp(2.4rem, 8vw, 4.5rem); letter-spacing: 0.02em; color: var(--white); }
+  .intro-welcome-title em { color: var(--orange); font-style: normal; }
+
+  .btn-continue-fancy { position: relative; overflow: hidden; font-family: var(--font-heading); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; font-size: 1rem; color: var(--white); background: linear-gradient(135deg, #1a1a1a, #101010); border: 1px solid var(--orange); padding: 0.9rem 2.6rem; border-radius: 999px; cursor: pointer; transition: all 0.3s ease; }
+  .btn-continue-fancy::before { content: ''; position: absolute; top: 0; left: -75%; width: 50%; height: 100%; background: linear-gradient(120deg, transparent, rgba(255,255,255,0.35), transparent); transform: skewX(-20deg); transition: left 0.6s ease; }
+  .btn-continue-fancy:hover { background: var(--orange); border-color: var(--orange); color: #101010; box-shadow: 0 0 24px rgba(255,109,0,0.55), 0 0 60px rgba(255,109,0,0.25); transform: translateY(-2px); }
+  .btn-continue-fancy:hover::before { left: 130%; }
+
+  .intro-skip { position: absolute; bottom: 1.5rem; right: 1.75rem; z-index: 2001; font-family: var(--font-heading); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray); background: none; border: none; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+  .intro-skip.visible { opacity: 0.7; pointer-events: auto; }
+  .intro-skip:hover { color: var(--white); opacity: 1; }
   /* Page confidentialité affichée AVANT authentification : doit rester
      au-dessus de auth-overlay (z-index supérieur) sans jamais cacher
      ni désactiver l'overlay de connexion lui-même. */
@@ -657,6 +695,38 @@
     </div>
     <button class="notif-validate-btn" id="notif-validate-btn" disabled onclick="acknowledgeNotification()">Valider et continuer</button>
   </div>
+</div>
+
+<!-- INTRO CINÉMATIQUE (jouée une fois après connexion, joueurs uniquement) -->
+<div id="intro-overlay" class="intro-overlay hidden">
+
+  <!-- Étape 1 : clic pour démarrer (déclenche aussi l'autorisation du son) -->
+  <div id="intro-gate" class="intro-stage intro-click-gate" onclick="introStartVideo()">
+    <div class="intro-click-ring">
+      <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+    </div>
+    <div class="intro-click-label">Cliquez pour commencer</div>
+  </div>
+
+  <!-- Étape 2 : vidéo plein écran, son à fond -->
+  <div id="intro-video-wrap" class="intro-stage intro-video-wrap">
+    <video id="intro-video" src="cdr-animation.mp4" preload="auto" playsinline></video>
+  </div>
+
+  <!-- Étape 3 : chargement fictif -->
+  <div id="intro-loading" class="intro-stage intro-loading">
+    <div id="intro-loading-text" class="intro-loading-text">Chargement du tournoi…</div>
+    <div class="intro-progress-track"><div id="intro-progress-bar" class="intro-progress-bar"></div></div>
+  </div>
+
+  <!-- Étape 4 : bienvenue -->
+  <div id="intro-welcome" class="intro-stage intro-welcome">
+    <div class="intro-welcome-sub">Choc des Renards</div>
+    <div class="intro-welcome-title">Bienvenue <em id="intro-welcome-name"></em></div>
+    <button class="btn-continue-fancy" onclick="introFinish()">Continuer</button>
+  </div>
+
+  <button id="intro-skip" class="intro-skip" onclick="introSkip()">Passer l'intro</button>
 </div>
 
 <!-- TOAST INACTIVITÉ -->
@@ -1800,8 +1870,106 @@ async function handleLogin() {
     if (data.loginEventId) localStorage.setItem('cdr_login_event_id', data.loginEventId)
     currentUser = data.user; pendingNotifications = data.pendingNotifications || []
     showApp()
+    // Intro cinématique réservée aux joueurs (jamais aux admins), uniquement
+    // sur une connexion explicite — pas au rafraîchissement de session.
+    if (currentUser.role !== 'ADMIN') playLoginIntro()
   } catch { errorEl.textContent = 'Erreur réseau. Réessayez.' }
   finally { btn.disabled = false; btn.textContent = 'Se connecter' }
+}
+
+/* ══════════════ INTRO CINÉMATIQUE (après connexion, joueurs uniquement) ══════════════
+ * showApp() a déjà été appelée avant playLoginIntro() : le vrai site se charge en
+ * arrière-plan, caché sous cet overlay (z-index supérieur). Quand l'utilisateur clique
+ * sur "Continuer", on ne fait donc plus qu'un fondu de sortie — aucune attente supplémentaire.
+ */
+function playLoginIntro() {
+  const overlay = document.getElementById('intro-overlay')
+  overlay.classList.remove('hidden')
+  overlay.style.opacity = ''
+  document.querySelectorAll('#intro-overlay .intro-stage').forEach(s => s.classList.remove('visible'))
+  document.getElementById('intro-gate').classList.add('visible')
+  document.getElementById('intro-progress-bar').style.width = '0%'
+  const skipBtn = document.getElementById('intro-skip')
+  skipBtn.classList.remove('visible')
+  setTimeout(() => skipBtn.classList.add('visible'), 1200)
+}
+
+function introStartVideo() {
+  const gate  = document.getElementById('intro-gate')
+  const wrap  = document.getElementById('intro-video-wrap')
+  const video = document.getElementById('intro-video')
+  gate.classList.remove('visible')
+  wrap.classList.add('visible')
+
+  video.muted = false
+  video.volume = 1
+  try { video.currentTime = 0 } catch {}
+
+  const goNext = () => introGoToLoading()
+  video.onended = goNext
+  clearTimeout(video._introFallback)
+  video._introFallback = setTimeout(goNext, 6000) // garde-fou si la vidéo ne se termine pas normalement
+
+  const playPromise = video.play()
+  if (playPromise && playPromise.catch) {
+    playPromise.catch(() => goNext()) // vidéo bloquée/introuvable : on n'immobilise jamais l'utilisateur
+  }
+}
+
+function introGoToLoading() {
+  const video   = document.getElementById('intro-video')
+  const wrap    = document.getElementById('intro-video-wrap')
+  const loading = document.getElementById('intro-loading')
+  video.pause()
+  wrap.classList.remove('visible')
+  loading.classList.add('visible')
+
+  const bar  = document.getElementById('intro-progress-bar')
+  const text = document.getElementById('intro-loading-text')
+  const steps = [
+    'Chargement du tournoi…',
+    'Récupération du classement…',
+    'Préparation de votre espace…',
+    'Presque prêt…',
+  ]
+  let pct = 0
+  text.textContent = steps[0]
+  const interval = setInterval(() => {
+    pct += Math.random() * 18 + 8
+    if (pct >= 100) {
+      pct = 100
+      bar.style.width = '100%'
+      clearInterval(interval)
+      setTimeout(introShowWelcome, 350)
+      return
+    }
+    bar.style.width = pct + '%'
+    text.textContent = steps[Math.min(steps.length - 1, Math.floor((pct / 100) * steps.length))]
+  }, 220)
+}
+
+function introShowWelcome() {
+  document.getElementById('intro-loading').classList.remove('visible')
+  document.getElementById('intro-welcome-name').textContent = (currentUser && (currentUser.firstName || currentUser.username)) || ''
+  document.getElementById('intro-welcome').classList.add('visible')
+}
+
+function introFinish() {
+  const overlay = document.getElementById('intro-overlay')
+  overlay.style.transition = 'opacity 0.5s ease'
+  overlay.style.opacity = '0'
+  setTimeout(() => {
+    overlay.classList.add('hidden')
+    overlay.style.transition = ''; overlay.style.opacity = ''
+    document.querySelectorAll('#intro-overlay .intro-stage').forEach(s => s.classList.remove('visible'))
+    const video = document.getElementById('intro-video')
+    video.pause(); try { video.currentTime = 0 } catch {}
+  }, 500)
+}
+
+function introSkip() {
+  document.getElementById('intro-video').pause()
+  introFinish()
 }
 
 async function handleRegister() {
@@ -1844,6 +2012,7 @@ function showPendingBack() {
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin() })
   document.getElementById('reg-confirm').addEventListener('keydown', e => { if (e.key === 'Enter') handleRegister() })
+  document.getElementById('intro-video').load() // précharge la vidéo pour un démarrage instantané au clic
   initAuth()
 })
 
