@@ -27,28 +27,95 @@
   .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
   .nav-logo img { height: 88px; width: auto; object-fit: contain; }
 
-  /* LOGO NAV ANIMÉ (renard + lettres CDR + sous-titre) */
-  .nav-logo-anim { position: relative; width: 88px; height: 88px; flex-shrink: 0; }
+  /* LOGO NAV ANIMÉ (fidèle à l'animation d'intro : renard qui frappe le volant) */
+  .nav-logo-anim { position: relative; width: 88px; height: 88px; flex-shrink: 0; --nla-cycle: 6.5s; }
   .nav-logo-anim .nla-glow { position: absolute; inset: -45%; border-radius: 50%; background: radial-gradient(circle, rgba(255,109,0,0.4), transparent 70%); opacity: 0; transition: opacity 0.35s ease; pointer-events: none; z-index: 0; }
   .nav-logo:hover .nla-glow, .nav-logo:focus-visible .nla-glow { opacity: 1; }
   .nav-logo-anim .nla-layer { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; user-select: none; }
-  .nla-letters { z-index: 1; opacity: 1; clip-path: inset(0 100% 0 0); }
-  .nla-subtitle { z-index: 2; opacity: 0; }
-  .nla-fox { z-index: 3; transform-origin: 24.4% 41.75%; opacity: 0; transform: scale(0.9); }
 
-  .nav-logo-anim.nla-play .nla-letters { animation: nlaLettersReveal 1s ease forwards, nlaLettersGlow 1s ease forwards; }
-  .nav-logo-anim.nla-play .nla-subtitle { animation: nlaSubtitleFade 0.8s ease forwards 0.45s; }
-  .nav-logo-anim.nla-play .nla-fox { animation: nlaFoxAppear 0.6s ease forwards 0.15s, nlaFoxSwing 1s ease 0.35s 1; }
+  .nla-hold-glow { position: absolute; inset: -12%; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(255,157,46,.28), transparent 65%); opacity: 0; pointer-events: none; z-index: 0; }
 
-  @keyframes nlaLettersReveal { 0% { clip-path: inset(0 100% 0 0); } 100% { clip-path: inset(0 0% 0 0); } }
+  .nla-letters { z-index: 1; opacity: 1; clip-path: inset(0 100% 0 0); filter: drop-shadow(0 0 0px rgba(255,157,46,0)); }
+  .nla-sweep { position: absolute; inset: 0; width: 6%; height: 100%; left: -8%; background: linear-gradient(90deg,transparent,rgba(255,200,140,.85),transparent); mix-blend-mode: screen; opacity: 0; pointer-events: none; z-index: 2; }
+
+  /* Sous-titre "Le Choc des Renards" — contraste boosté en blanc pour bien ressortir en petit format */
+  .nla-subtitle { z-index: 2; opacity: 0; filter: drop-shadow(0 0 5px rgba(255,255,255,.75)) drop-shadow(0 1px 6px rgba(0,0,0,1)) brightness(1.65) contrast(1.35); }
+
+  .nla-fox { z-index: 3; transform-origin: 24.4% 41.75%; opacity: 0; transform: scale(0.93); }
+
+  .nla-shuttle { position: absolute; left: 35.5%; top: 21%; width: 7%; aspect-ratio: 1/1.3; opacity: 0; z-index: 4; }
+  .nla-shuttle-skirt { position: absolute; left: 0; top: 28%; width: 100%; height: 72%; background: #f0ede3; clip-path: polygon(50% 0%,100% 100%,0% 100%); }
+  .nla-shuttle-cork { position: absolute; left: 18%; top: 0; width: 64%; height: 34%; background: radial-gradient(circle at 35% 30%,#ffe2c2,#c98b4f 75%); border-radius: 50% 50% 40% 40%; }
+
+  .nla-trail { position: absolute; left: 35.5%; top: 21%; width: 0; height: .65vw; max-height: 8px; background: linear-gradient(90deg,rgba(255,157,46,0),rgba(255,157,46,1) 50%,#fff8f0); transform-origin: left center; rotate: -25deg; opacity: 0; z-index: 4; filter: blur(.35px) drop-shadow(0 0 5px rgba(255,140,30,.75)); pointer-events: none; }
+
+  .nla-flash { position: absolute; left: 35.5%; top: 21%; width: 11%; aspect-ratio: 1/1; transform: translate(-50%,-50%) scale(0); border-radius: 50%; background: radial-gradient(circle,#fff 0%,rgba(255,193,110,.95) 35%,rgba(255,157,46,0) 72%); opacity: 0; mix-blend-mode: screen; z-index: 5; pointer-events: none; }
+
+  .nla-particle { position: absolute; left: 35.5%; top: 21%; width: .6vw; height: .6vw; max-width: 8px; max-height: 8px; border-radius: 50%; background: var(--orange-light); box-shadow: 0 0 6px rgba(255,157,46,.9); opacity: 0; z-index: 5; --dx: 0px; --dy: 0px; }
+
+  /* Lecture unique, déclenchée au chargement de la page et au survol */
+  .nav-logo-anim.nla-play .nla-hold-glow { animation: nlaHoldGlow var(--nla-cycle) 1 forwards; }
+  .nav-logo-anim.nla-play .nla-letters { animation: nlaLettersReveal var(--nla-cycle) 1 forwards, nlaLettersGlow var(--nla-cycle) 1 forwards; }
+  .nav-logo-anim.nla-play .nla-sweep { animation: nlaSweepMove var(--nla-cycle) 1 forwards; }
+  .nav-logo-anim.nla-play .nla-subtitle { animation: nlaSubtitleFade var(--nla-cycle) 1 forwards; }
+  .nav-logo-anim.nla-play .nla-fox { animation: nlaFoxAppear var(--nla-cycle) 1 forwards, nlaFoxSwing var(--nla-cycle) 1 forwards; }
+  .nav-logo-anim.nla-play .nla-shuttle { animation: nlaShuttleFly var(--nla-cycle) 1 forwards; }
+  .nav-logo-anim.nla-play .nla-trail { animation: nlaTrailGrow var(--nla-cycle) 1 forwards; }
+  .nav-logo-anim.nla-play .nla-flash { animation: nlaFlashPop var(--nla-cycle) 1 forwards; }
+  .nav-logo-anim.nla-play .nla-particle { animation: nlaParticleBurst var(--nla-cycle) 1 forwards; }
+
+  @keyframes nlaHoldGlow { 0%,65% { opacity: 0; } 73% { opacity: 1; } 86% { opacity: .5; } 100% { opacity: 0; } }
+
+  @keyframes nlaLettersReveal { 0%,4% { clip-path: inset(0 100% 0 0); } 24%,100% { clip-path: inset(0 0% 0 0); } }
   @keyframes nlaLettersGlow {
-    0% { filter: drop-shadow(0 0 0px rgba(255,157,46,0)); }
-    55% { filter: drop-shadow(0 0 14px rgba(255,157,46,0.9)); }
-    100% { filter: drop-shadow(0 0 3px rgba(255,157,46,0.25)); }
+    0%,4%  { filter: drop-shadow(0 0 0px rgba(255,157,46,0)); }
+    16%    { filter: drop-shadow(0 0 28px rgba(255,157,46,.9)); }
+    27%,72%{ filter: drop-shadow(0 0 5px rgba(255,157,46,.25)); }
+    80%    { filter: drop-shadow(0 0 20px rgba(255,157,46,.65)); }
+    100%   { filter: drop-shadow(0 0 5px rgba(255,157,46,.2)); }
   }
-  @keyframes nlaSubtitleFade { 0% { opacity: 0; transform: translateY(3px); } 100% { opacity: 1; transform: translateY(0); } }
-  @keyframes nlaFoxAppear { 0% { opacity: 0; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1); } }
-  @keyframes nlaFoxSwing { 0%,100% { rotate: 0deg; } 30% { rotate: -9deg; } 55% { rotate: 14deg; } 75% { rotate: 0deg; } }
+  @keyframes nlaSweepMove { 0%,4% { left: -8%; opacity: 0; } 6% { opacity: .85; } 24% { left: 104%; opacity: .85; } 27%,100% { left: 104%; opacity: 0; } }
+
+  @keyframes nlaSubtitleFade { 0%,28% { opacity: 0; transform: translateY(7px); } 36%,100% { opacity: 1; transform: translateY(0); } }
+
+  @keyframes nlaFoxAppear { 0%,37% { opacity: 0; transform: scale(.93); } 42%,100% { opacity: 1; transform: scale(1); } }
+  @keyframes nlaFoxSwing {
+    0%,46%  { rotate: 0deg; }
+    48%     { rotate: -1.5deg; }
+    50%     { rotate: 0deg; }
+    51.5%   { rotate: -11deg; }
+    53.5%   { rotate: 21deg; }
+    57%     { rotate: 13deg; }
+    63%,100%{ rotate: 0deg; }
+  }
+
+  @keyframes nlaShuttleFly {
+    0%,45%   { opacity: 0; transform: translate(-1900%,-10%) rotate(-30deg) scale(.8); }
+    45.5%    { opacity: 1; }
+    53%      { opacity: 1; transform: translate(0%,0%) rotate(8deg) scale(1.05); }
+    54.2%    { transform: translate(80%,-60%) rotate(-18deg) scale(.95); }
+    60.5%    { opacity: 1; transform: translate(1800%,-980%) rotate(-25deg) scale(.55); }
+    62%,100% { opacity: 0; }
+  }
+
+  @keyframes nlaTrailGrow {
+    0%,52.5%  { width: 0; opacity: 0; }
+    53.5%     { width: 9%; opacity: 1; }
+    58%       { width: 50%; opacity: .85; }
+    63.5%,100%{ width: 65%; opacity: 0; }
+  }
+
+  @keyframes nlaFlashPop {
+    0%,52%   { opacity: 0; transform: translate(-50%,-50%) scale(0); }
+    53.2%    { opacity: 1; transform: translate(-50%,-50%) scale(1.7); }
+    57%,100% { opacity: 0; transform: translate(-50%,-50%) scale(2.7); }
+  }
+
+  @keyframes nlaParticleBurst {
+    0%,52%   { opacity: 0; transform: translate(-50%,-50%) translate(0,0) scale(1); }
+    53.5%    { opacity: 1; transform: translate(-50%,-50%) translate(calc(var(--dx)*.25),calc(var(--dy)*.25)) scale(1); }
+    62%,100% { opacity: 0; transform: translate(-50%,-50%) translate(var(--dx),var(--dy)) scale(.25); }
+  }
   .nav-logo span { font-family: var(--font-display); font-size: 1.4rem; letter-spacing: 0.06em; color: var(--white); }
   .nav-logo span em { color: var(--orange); font-style: normal; }
   .nav-links { display: flex; gap: 4px; }
@@ -267,9 +334,18 @@
   @keyframes introLabelPulse { 0%,100% { text-shadow: 0 0 0 rgba(255,109,0,0); } 50% { text-shadow: 0 0 22px rgba(255,109,0,0.55); } }
   @keyframes introRingPulse { 0%,100% { transform: scale(1); opacity: 0.35; } 50% { transform: scale(1.08); opacity: 0.75; } }
 
-  /* Halo orange qui se répand depuis le point de clic */
-  .intro-click-burst { position: absolute; left: 0; top: 0; width: 20px; height: 20px; border-radius: 50%; transform: translate(-50%,-50%) scale(0); background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,146,0,0.85) 28%, rgba(255,109,0,0.5) 55%, rgba(255,109,0,0) 72%); opacity: 1; pointer-events: none; z-index: 5; mix-blend-mode: screen; animation: introBurstExpand 0.85s cubic-bezier(.2,.7,.3,1) forwards; }
-  @keyframes introBurstExpand { 0% { transform: translate(-50%,-50%) scale(0); opacity: 1; } 55% { opacity: 0.9; } 100% { transform: translate(-50%,-50%) scale(var(--burst-scale, 60)); opacity: 0; } }
+  /* Halo façon jet d'encre orange qui éclate dans toutes les directions */
+  .intro-click-burst-wrap { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: 5; }
+  .intro-ink-core { position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%; transform: translate(-50%,-50%) scale(0); background: radial-gradient(circle, #fff 0%, rgba(255,170,60,.95) 30%, rgba(255,109,0,.55) 60%, rgba(255,109,0,0) 78%); mix-blend-mode: screen; filter: blur(.5px); animation: introInkCorePop 0.6s cubic-bezier(.2,.7,.3,1) forwards; }
+  @keyframes introInkCorePop { 0% { transform: translate(-50%,-50%) scale(0); opacity: 1; } 60% { opacity: 0.9; } 100% { transform: translate(-50%,-50%) scale(var(--core-scale, 7)); opacity: 0; } }
+  .intro-ink-ring { position: absolute; left: 0; top: 0; width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,150,40,.65); transform: translate(-50%,-50%) scale(0); mix-blend-mode: screen; animation: introInkRingExpand 0.85s ease-out forwards; }
+  @keyframes introInkRingExpand { 0% { transform: translate(-50%,-50%) scale(0); opacity: 0.8; } 100% { transform: translate(-50%,-50%) scale(var(--ring-scale, 50)); opacity: 0; } }
+  .intro-ink-drop { position: absolute; left: 0; top: 0; border-radius: 60% 40% 55% 45% / 55% 45% 60% 40%; background: radial-gradient(circle at 30% 30%, #fff, rgba(255,150,20,.95) 35%, rgba(255,100,0,.55) 65%, rgba(255,100,0,0) 80%); filter: blur(.4px); mix-blend-mode: screen; animation: introInkDropFly var(--dur, 0.9s) cubic-bezier(.15,.8,.25,1) forwards; }
+  @keyframes introInkDropFly {
+    0% { transform: translate(-50%,-50%) rotate(var(--ang, 0deg)) translateY(0) scale(0.2); opacity: 1; }
+    70% { opacity: 0.85; }
+    100% { transform: translate(-50%,-50%) rotate(var(--ang, 0deg)) translateY(var(--dist, 220px)) scale(1.4); opacity: 0; }
+  }
 
   /* Étape 2 : vidéo plein écran */
   .intro-video-wrap video { width: 100%; height: 100%; object-fit: cover; }
@@ -1371,9 +1447,15 @@
   <a class="nav-logo" href="#" onclick="showPage('accueil', document.querySelector('.nav-btn')); return false;">
     <span class="nav-logo-anim" id="nav-logo-anim">
       <span class="nla-glow"></span>
+      <span class="nla-hold-glow"></span>
       <img class="nla-layer nla-letters" src="layer-letters.png" alt="">
+      <span class="nla-sweep"></span>
       <img class="nla-layer nla-subtitle" src="layer-subtitle.png" alt="">
       <img class="nla-layer nla-fox" src="layer-fox.png" alt="Logo CDR">
+      <span class="nla-trail"></span>
+      <span class="nla-shuttle"><span class="nla-shuttle-skirt"></span><span class="nla-shuttle-cork"></span></span>
+      <span class="nla-flash"></span>
+      <span class="nla-particles" id="nla-particles"></span>
     </span>
     <span>Le Choc des <em>Renards</em></span>
   </a>
@@ -1945,13 +2027,42 @@ function introClickBurst(e) {
   const x = (e && e.clientX != null) ? e.clientX - rect.left : rect.width / 2
   const y = (e && e.clientY != null) ? e.clientY - rect.top  : rect.height / 2
   const diag = Math.sqrt(rect.width * rect.width + rect.height * rect.height)
-  const burst = document.createElement('div')
-  burst.className = 'intro-click-burst'
-  burst.style.left = x + 'px'
-  burst.style.top  = y + 'px'
-  burst.style.setProperty('--burst-scale', ((diag / 20) * 1.15).toFixed(2))
-  gate.appendChild(burst)
-  burst.addEventListener('animationend', () => burst.remove())
+
+  const wrap = document.createElement('div')
+  wrap.className = 'intro-click-burst-wrap'
+  wrap.style.left = x + 'px'
+  wrap.style.top  = y + 'px'
+  gate.appendChild(wrap)
+
+  const core = document.createElement('div')
+  core.className = 'intro-ink-core'
+  core.style.setProperty('--core-scale', (diag / 20).toFixed(2))
+  wrap.appendChild(core)
+
+  const ring = document.createElement('div')
+  ring.className = 'intro-ink-ring'
+  ring.style.setProperty('--ring-scale', ((diag / 16) * 0.9).toFixed(2))
+  wrap.appendChild(ring)
+
+  const N = 18
+  for (let i = 0; i < N; i++) {
+    const drop = document.createElement('div')
+    drop.className = 'intro-ink-drop'
+    const angle = (360 / N) * i + (Math.random() * 26 - 13)
+    const dist  = diag * (0.22 + Math.random() * 0.36)
+    const w     = 10 + Math.random() * 10
+    const h     = w * (1.4 + Math.random() * 0.5)
+    const dur   = 0.7 + Math.random() * 0.5
+    drop.style.width  = w.toFixed(0) + 'px'
+    drop.style.height = h.toFixed(0) + 'px'
+    drop.style.setProperty('--ang', angle.toFixed(1) + 'deg')
+    drop.style.setProperty('--dist', dist.toFixed(0) + 'px')
+    drop.style.setProperty('--dur', dur.toFixed(2) + 's')
+    drop.style.animationDelay = (Math.random() * 0.05).toFixed(2) + 's'
+    wrap.appendChild(drop)
+  }
+
+  setTimeout(() => wrap.remove(), 1500)
 }
 
 function introStartVideo(e) {
@@ -2024,6 +2135,7 @@ function introFinish() {
   const overlay = document.getElementById('intro-overlay')
   overlay.style.transition = 'opacity 0.5s ease'
   overlay.style.opacity = '0'
+  if (typeof window.playNavLogoAnim === 'function') window.playNavLogoAnim()
   setTimeout(() => {
     overlay.classList.add('hidden')
     overlay.style.transition = ''; overlay.style.opacity = ''
@@ -4475,15 +4587,31 @@ function animateHero() {
 }
 window.addEventListener('load', animateHero)
 
-/* ── Logo animé de la nav (renard + CDR) : joué au chargement et au survol ── */
+/* ── Logo animé de la nav (renard qui frappe le volant) : joué au chargement et au survol ── */
 ;(function () {
   const el = document.getElementById('nav-logo-anim')
   if (!el) return
+
+  // Génère les particules une seule fois (comme dans l'animation d'intro)
+  const particlesContainer = document.getElementById('nla-particles')
+  const N = 10
+  for (let i = 0; i < N; i++) {
+    const p = document.createElement('span')
+    p.className = 'nla-particle'
+    const a = (Math.PI * 2 * i / N) + (Math.random() * .5 - .25)
+    const d = 30 + Math.random() * 50
+    p.style.setProperty('--dx', (Math.cos(a) * d).toFixed(1) + 'px')
+    p.style.setProperty('--dy', (Math.sin(a) * d * .65 - 14).toFixed(1) + 'px')
+    particlesContainer.appendChild(p)
+  }
+
   function playLogoAnim() {
     el.classList.remove('nla-play')
     void el.offsetWidth // force le reflow pour pouvoir rejouer l'animation
     el.classList.add('nla-play')
   }
+  window.playNavLogoAnim = playLogoAnim
+
   window.addEventListener('load', () => setTimeout(playLogoAnim, 300))
   el.addEventListener('mouseenter', playLogoAnim)
 })()
