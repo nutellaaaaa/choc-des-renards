@@ -26,6 +26,29 @@
   nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(12,12,12,0.92); backdrop-filter: blur(12px); border-bottom: 1px solid var(--dark4); display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; height: 96px; }
   .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
   .nav-logo img { height: 88px; width: auto; object-fit: contain; }
+
+  /* LOGO NAV ANIMÉ (renard + lettres CDR + sous-titre) */
+  .nav-logo-anim { position: relative; width: 88px; height: 88px; flex-shrink: 0; }
+  .nav-logo-anim .nla-glow { position: absolute; inset: -45%; border-radius: 50%; background: radial-gradient(circle, rgba(255,109,0,0.4), transparent 70%); opacity: 0; transition: opacity 0.35s ease; pointer-events: none; z-index: 0; }
+  .nav-logo:hover .nla-glow, .nav-logo:focus-visible .nla-glow { opacity: 1; }
+  .nav-logo-anim .nla-layer { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; user-select: none; }
+  .nla-letters { z-index: 1; opacity: 1; clip-path: inset(0 100% 0 0); }
+  .nla-subtitle { z-index: 2; opacity: 0; }
+  .nla-fox { z-index: 3; transform-origin: 24.4% 41.75%; opacity: 0; transform: scale(0.9); }
+
+  .nav-logo-anim.nla-play .nla-letters { animation: nlaLettersReveal 1s ease forwards, nlaLettersGlow 1s ease forwards; }
+  .nav-logo-anim.nla-play .nla-subtitle { animation: nlaSubtitleFade 0.8s ease forwards 0.45s; }
+  .nav-logo-anim.nla-play .nla-fox { animation: nlaFoxAppear 0.6s ease forwards 0.15s, nlaFoxSwing 1s ease 0.35s 1; }
+
+  @keyframes nlaLettersReveal { 0% { clip-path: inset(0 100% 0 0); } 100% { clip-path: inset(0 0% 0 0); } }
+  @keyframes nlaLettersGlow {
+    0% { filter: drop-shadow(0 0 0px rgba(255,157,46,0)); }
+    55% { filter: drop-shadow(0 0 14px rgba(255,157,46,0.9)); }
+    100% { filter: drop-shadow(0 0 3px rgba(255,157,46,0.25)); }
+  }
+  @keyframes nlaSubtitleFade { 0% { opacity: 0; transform: translateY(3px); } 100% { opacity: 1; transform: translateY(0); } }
+  @keyframes nlaFoxAppear { 0% { opacity: 0; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1); } }
+  @keyframes nlaFoxSwing { 0%,100% { rotate: 0deg; } 30% { rotate: -9deg; } 55% { rotate: 14deg; } 75% { rotate: 0deg; } }
   .nav-logo span { font-family: var(--font-display); font-size: 1.4rem; letter-spacing: 0.06em; color: var(--white); }
   .nav-logo span em { color: var(--orange); font-style: normal; }
   .nav-links { display: flex; gap: 4px; }
@@ -237,11 +260,16 @@
   .intro-stage.visible { opacity: 1; pointer-events: auto; }
 
   /* Étape 1 : clic pour démarrer */
-  .intro-click-gate { flex-direction: column; gap: 1.5rem; cursor: pointer; background: radial-gradient(circle at 50% 40%, rgba(255,109,0,0.1), #000 70%); }
-  .intro-click-ring { width: 96px; height: 96px; border-radius: 50%; border: 2px solid var(--orange); display: flex; align-items: center; justify-content: center; animation: introPulse 1.8s ease-in-out infinite; }
-  .intro-click-ring svg { width: 34px; height: 34px; fill: var(--orange); margin-left: 4px; }
-  @keyframes introPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,109,0,0.45); } 50% { box-shadow: 0 0 0 18px rgba(255,109,0,0); } }
-  .intro-click-label { font-family: var(--font-heading); letter-spacing: 0.15em; text-transform: uppercase; color: var(--gray-light); font-size: 0.95rem; }
+  .intro-click-gate { flex-direction: column; gap: 1.5rem; cursor: pointer; background: radial-gradient(circle at 50% 40%, rgba(255,109,0,0.1), #000 70%); position: relative; overflow: hidden; }
+  .intro-click-label { position: relative; font-family: var(--font-heading); letter-spacing: 0.15em; text-transform: uppercase; color: var(--gray-light); font-size: 0.95rem; padding: 1rem 2.2rem; border-radius: 999px; transition: color 0.3s ease; animation: introLabelPulse 2.4s ease-in-out infinite; }
+  .intro-click-label::after { content: ''; position: absolute; inset: 0; border: 1px solid rgba(255,109,0,0.4); border-radius: 999px; opacity: 0.5; animation: introRingPulse 2.4s ease-in-out infinite; pointer-events: none; }
+  .intro-click-gate:hover .intro-click-label { color: var(--white); }
+  @keyframes introLabelPulse { 0%,100% { text-shadow: 0 0 0 rgba(255,109,0,0); } 50% { text-shadow: 0 0 22px rgba(255,109,0,0.55); } }
+  @keyframes introRingPulse { 0%,100% { transform: scale(1); opacity: 0.35; } 50% { transform: scale(1.08); opacity: 0.75; } }
+
+  /* Halo orange qui se répand depuis le point de clic */
+  .intro-click-burst { position: absolute; left: 0; top: 0; width: 20px; height: 20px; border-radius: 50%; transform: translate(-50%,-50%) scale(0); background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,146,0,0.85) 28%, rgba(255,109,0,0.5) 55%, rgba(255,109,0,0) 72%); opacity: 1; pointer-events: none; z-index: 5; mix-blend-mode: screen; animation: introBurstExpand 0.85s cubic-bezier(.2,.7,.3,1) forwards; }
+  @keyframes introBurstExpand { 0% { transform: translate(-50%,-50%) scale(0); opacity: 1; } 55% { opacity: 0.9; } 100% { transform: translate(-50%,-50%) scale(var(--burst-scale, 60)); opacity: 0; } }
 
   /* Étape 2 : vidéo plein écran */
   .intro-video-wrap video { width: 100%; height: 100%; object-fit: cover; }
@@ -254,9 +282,24 @@
 
   /* Étape 4 : bienvenue */
   .intro-welcome { flex-direction: column; gap: 2rem; background: radial-gradient(circle at 50% 30%, rgba(255,109,0,0.12), var(--dark) 70%); text-align: center; padding: 1rem; }
-  .intro-welcome-sub { font-family: var(--font-heading); letter-spacing: 0.18em; text-transform: uppercase; color: var(--orange); font-size: 0.85rem; }
-  .intro-welcome-title { font-family: var(--font-display); font-size: clamp(2.4rem, 8vw, 4.5rem); letter-spacing: 0.02em; color: var(--white); }
-  .intro-welcome-title em { color: var(--orange); font-style: normal; }
+  .intro-welcome-sub { font-family: var(--font-heading); letter-spacing: 0.18em; text-transform: uppercase; color: var(--orange); font-size: 0.85rem; opacity: 0; transform: translateY(18px); }
+  .intro-welcome-title { font-family: var(--font-display); font-size: clamp(2.4rem, 8vw, 4.5rem); letter-spacing: 0.02em; color: var(--white); opacity: 0; transform: translateY(18px); }
+  .intro-welcome-title em {
+    font-style: normal;
+    background: linear-gradient(90deg, var(--orange-light), var(--orange), var(--orange-light));
+    background-size: 200% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .intro-welcome.visible .intro-welcome-sub { animation: introWelcomeUp 0.6s ease forwards 0.05s; }
+  .intro-welcome.visible .intro-welcome-title { animation: introWelcomeUp 0.7s ease forwards 0.22s; }
+  .intro-welcome.visible .intro-welcome-title em { animation: introNameShine 2.6s ease-in-out 0.9s infinite; }
+  .intro-welcome .btn-continue-fancy { opacity: 0; transform: translateY(18px); }
+  .intro-welcome.visible .btn-continue-fancy { animation: introWelcomeUp 0.6s ease forwards 0.55s; }
+  @keyframes introWelcomeUp { 0% { opacity: 0; transform: translateY(18px); } 100% { opacity: 1; transform: translateY(0); } }
+  @keyframes introNameShine {
+    0%,100% { background-position: 0% 50%; filter: drop-shadow(0 0 0 rgba(255,109,0,0)); }
+    50% { background-position: 100% 50%; filter: drop-shadow(0 0 18px rgba(255,109,0,0.55)); }
+  }
 
   .btn-continue-fancy { position: relative; overflow: hidden; font-family: var(--font-heading); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; font-size: 1rem; color: var(--white); background: linear-gradient(135deg, #1a1a1a, #101010); border: 1px solid var(--orange); padding: 0.9rem 2.6rem; border-radius: 999px; cursor: pointer; transition: all 0.3s ease; }
   .btn-continue-fancy::before { content: ''; position: absolute; top: 0; left: -75%; width: 50%; height: 100%; background: linear-gradient(120deg, transparent, rgba(255,255,255,0.35), transparent); transform: skewX(-20deg); transition: left 0.6s ease; }
@@ -701,10 +744,7 @@
 <div id="intro-overlay" class="intro-overlay hidden">
 
   <!-- Étape 1 : clic pour démarrer (déclenche aussi l'autorisation du son) -->
-  <div id="intro-gate" class="intro-stage intro-click-gate" onclick="introStartVideo()">
-    <div class="intro-click-ring">
-      <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-    </div>
+  <div id="intro-gate" class="intro-stage intro-click-gate" onclick="introStartVideo(event)">
     <div class="intro-click-label">Cliquez pour commencer</div>
   </div>
 
@@ -1329,7 +1369,12 @@
 <!-- NAV -->
 <nav>
   <a class="nav-logo" href="#" onclick="showPage('accueil', document.querySelector('.nav-btn')); return false;">
-    <img src="cdr-logo.png" alt="Logo">
+    <span class="nav-logo-anim" id="nav-logo-anim">
+      <span class="nla-glow"></span>
+      <img class="nla-layer nla-letters" src="layer-letters.png" alt="">
+      <img class="nla-layer nla-subtitle" src="layer-subtitle.png" alt="">
+      <img class="nla-layer nla-fox" src="layer-fox.png" alt="Logo CDR">
+    </span>
     <span>Le Choc des <em>Renards</em></span>
   </a>
   <div class="nav-links">
@@ -1894,12 +1939,27 @@ function playLoginIntro() {
   setTimeout(() => skipBtn.classList.add('visible'), 1200)
 }
 
-function introStartVideo() {
+function introClickBurst(e) {
+  const gate = document.getElementById('intro-gate')
+  const rect = gate.getBoundingClientRect()
+  const x = (e && e.clientX != null) ? e.clientX - rect.left : rect.width / 2
+  const y = (e && e.clientY != null) ? e.clientY - rect.top  : rect.height / 2
+  const diag = Math.sqrt(rect.width * rect.width + rect.height * rect.height)
+  const burst = document.createElement('div')
+  burst.className = 'intro-click-burst'
+  burst.style.left = x + 'px'
+  burst.style.top  = y + 'px'
+  burst.style.setProperty('--burst-scale', ((diag / 20) * 1.15).toFixed(2))
+  gate.appendChild(burst)
+  burst.addEventListener('animationend', () => burst.remove())
+}
+
+function introStartVideo(e) {
   const gate  = document.getElementById('intro-gate')
   const wrap  = document.getElementById('intro-video-wrap')
   const video = document.getElementById('intro-video')
-  gate.classList.remove('visible')
-  wrap.classList.add('visible')
+
+  introClickBurst(e)
 
   video.muted = false
   video.volume = 1
@@ -1914,6 +1974,12 @@ function introStartVideo() {
   if (playPromise && playPromise.catch) {
     playPromise.catch(() => goNext()) // vidéo bloquée/introuvable : on n'immobilise jamais l'utilisateur
   }
+
+  // Laisse le halo se déployer à l'écran avant de basculer vers la vidéo
+  setTimeout(() => {
+    gate.classList.remove('visible')
+    wrap.classList.add('visible')
+  }, 420)
 }
 
 function introGoToLoading() {
@@ -4408,6 +4474,19 @@ function animateHero() {
   })
 }
 window.addEventListener('load', animateHero)
+
+/* ── Logo animé de la nav (renard + CDR) : joué au chargement et au survol ── */
+;(function () {
+  const el = document.getElementById('nav-logo-anim')
+  if (!el) return
+  function playLogoAnim() {
+    el.classList.remove('nla-play')
+    void el.offsetWidth // force le reflow pour pouvoir rejouer l'animation
+    el.classList.add('nla-play')
+  }
+  window.addEventListener('load', () => setTimeout(playLogoAnim, 300))
+  el.addEventListener('mouseenter', playLogoAnim)
+})()
 </script>
 <!-- LIGHTBOX -->
 <div id="lightbox" class="lightbox-bg" onclick="lbClickOutside(event)">
