@@ -30,6 +30,9 @@ const ADMIN_USERNAMES = ['admin', 'root']
 const VALID_CATEGORIES = ['N', 'R', 'D', 'P', 'NC']
 const MYFFBAD_BASE = 'https://myffbad.fr/recherche/joueur?league=12&committee=67&club=2359&isFirstLoad=false'
 
+// Format d'un hash Argon2 encodé (ex: $argon2id$v=19$m=65536,t=3,p=1$<salt>$<hash>)
+const ARGON2_HASH_REGEX = /^\$argon2(id|i|d)\$v=\d+\$m=\d+,t=\d+,p=\d+\$[A-Za-z0-9+/]+\$[A-Za-z0-9+/]+$/
+
 const MALUS_LIST = [
   'Interdiction de smasher ou de tendre droit',
   'Porter un cache-œil',
@@ -1045,6 +1048,30 @@ async function handleAction(req, res) {
       case 'deactivate': {
         await prisma.user.update({ where: { id }, data: { active: false } })
         return res.status(200).json({ ok: true, message: 'Utilisateur désactivé.' })
+      }
+
+      // ── reset_password : remplace le mot de passe par un hash déjà calculé
+      // par le joueur (l'admin n'a jamais connaissance du mot de passe en clair) ──
+      case 'reset_password': {
+        const { newPasswordHash } = req.body || {}
+        if (!newPasswordHash || typeof newPasswordHash !== 'string')
+          return res.status(400).json({ error: 'newPasswordHash requis.' })
+
+        const hash = newPasswordHash.trim()
+        if (hash.length > 200 || !ARGON2_HASH_REGEX.test(hash)) {
+          return res.status(400).json({
+            error: 'Format de hash invalide. Le hash doit être un hash Argon2 encodé complet (commence par $argon2id$, $argon2i$ ou $argon2d$).',
+          })
+        }
+
+        await prisma.user.update({
+          where: { id },
+          data: { passwordHash: hash, forceLogout: true },
+        })
+        return res.status(200).json({
+          ok: true,
+          message: 'Mot de passe remplacé. Le joueur a été déconnecté de toutes ses sessions actives.',
+        })
       }
 
       case 'update': {

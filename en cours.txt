@@ -1,7 +1,10 @@
 ---------- Fonctionnalités en cours d'implémentation ----------
 - Dans le classement, on n'a pas de classement général, c'est Poules / Rondes suisses. Le bon onglet doit être cliqué par défaut selon la phase en cours. Si je suis à la Phase 1, le classement par défaut qui apparait lorsque je vais dans "classement" est Poules. Inversement si je suis à la Phase 2. Pour la phase 0, un message apparaît "La saison [année actuelle]-[année actuelle +1] n'a pas encore débutée. 
 
-
+- Formulaire de contact
+- FAQ 
+- Modification mot de passe --> Session en cours a.fillon256
+- Animation site
 
 
 ---------- Bugs en cours de réparation ----------

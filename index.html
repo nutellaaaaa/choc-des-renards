@@ -330,6 +330,8 @@
   .btn-match:hover   { background: var(--orange-dim); }
   .btn-notif   { background: rgba(130,180,255,0.1); color: #82B4FF; border-color: rgba(130,180,255,0.25); }
   .btn-notif:hover   { background: rgba(130,180,255,0.2); }
+  .btn-password { background: rgba(180,120,255,0.1); color: #B478FF; border-color: rgba(180,120,255,0.25); }
+  .btn-password:hover { background: rgba(180,120,255,0.2); }
   .btn-publish { background: rgba(100,220,100,0.12); color: #6ddc6d; border-color: rgba(100,220,100,0.3); }
   .btn-publish:hover { background: rgba(100,220,100,0.22); }
   .btn-danger  { background: rgba(255,100,100,0.12); color: #ff7070; border-color: rgba(255,100,100,0.3); }
@@ -994,6 +996,27 @@
     <div class="modal-actions">
       <button class="btn-modal-cancel" onclick="closeEditModal()">Annuler</button>
       <button class="btn-modal-save" onclick="saveEditModal()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL REMPLACER MOT DE PASSE -->
+<div id="password-modal" class="admin-modal-bg">
+  <div class="admin-modal">
+    <h3>Mot de passe de <span id="password-modal-title-name"></span></h3>
+    <input type="hidden" id="password-modal-user-id">
+    <p style="color:var(--gray);font-size:0.85rem;margin:0 0 0.75rem">
+      Collez ici le hash Argon2 transmis par le joueur (jamais le mot de passe en clair).
+      Le joueur sera automatiquement déconnecté de toutes ses sessions.
+    </p>
+    <div class="form-group">
+      <label>Hash Argon2 ($argon2id$...)</label>
+      <textarea id="password-modal-hash" rows="3" style="width:100%;resize:vertical;font-family:monospace;font-size:0.8rem" placeholder="$argon2id$v=19$m=65536,t=3,p=1$..."></textarea>
+    </div>
+    <div id="password-modal-error" class="modal-error"></div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closePasswordModal()">Annuler</button>
+      <button class="btn-modal-save" onclick="savePasswordModal()">Remplacer</button>
     </div>
   </div>
 </div>
@@ -2540,6 +2563,7 @@ async function loadUsers() {
           <td>
             <div class="admin-actions">
               <button class="btn-sm btn-edit" onclick="openEditModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">Modifier</button>
+              <button class="btn-sm btn-password" onclick="openPasswordModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">🔑 Mot de passe</button>
               <button class="btn-sm btn-match" onclick="openMatchModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">+ Match</button>
               <button class="btn-sm btn-notif" onclick="quickNotify(${u.id},'${esc(u.firstName)} ${esc(u.lastName)}')">✉</button>
               ${u.active
@@ -2676,6 +2700,41 @@ async function saveEditModal() {
   } catch { errorEl.textContent = 'Erreur réseau.' }
 }
 document.getElementById('edit-modal').addEventListener('click', function(e) { if (e.target===this) closeEditModal() })
+
+/* ── Remplacement mot de passe (hash collé, fourni par le joueur) ── */
+function openPasswordModal(user) {
+  document.getElementById('password-modal-user-id').value = user.id
+  document.getElementById('password-modal-title-name').textContent = `${user.firstName} ${user.lastName} (@${user.username})`
+  document.getElementById('password-modal-hash').value = ''
+  document.getElementById('password-modal-error').textContent = ''
+  document.getElementById('password-modal').classList.add('open')
+}
+function closePasswordModal() { document.getElementById('password-modal').classList.remove('open') }
+async function savePasswordModal() {
+  const userId = parseInt(document.getElementById('password-modal-user-id').value, 10)
+  const errorEl = document.getElementById('password-modal-error')
+  errorEl.textContent = ''
+  const newPasswordHash = document.getElementById('password-modal-hash').value.trim()
+
+  if (!newPasswordHash) { errorEl.textContent = 'Le hash est requis.'; return }
+  if (!/^\$argon2(id|i|d)\$/.test(newPasswordHash)) {
+    errorEl.textContent = 'Ça ne ressemble pas à un hash Argon2 (doit commencer par $argon2id$, $argon2i$ ou $argon2d$).'
+    return
+  }
+  if (!confirm('Remplacer le mot de passe de ce joueur ? Il sera déconnecté de toutes ses sessions.')) return
+
+  try {
+    const res = await fetch('/api/admin/action', {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ action: 'reset_password', userId, newPasswordHash }),
+    })
+    const json = await res.json()
+    if (!res.ok) { errorEl.textContent = json.error || 'Erreur.'; return }
+    closePasswordModal()
+    alert('Mot de passe remplacé avec succès.')
+  } catch { errorEl.textContent = 'Erreur réseau.' }
+}
+document.getElementById('password-modal').addEventListener('click', function(e) { if (e.target===this) closePasswordModal() })
 
 /* ── Phase ── */
 async function loadPhase() {
