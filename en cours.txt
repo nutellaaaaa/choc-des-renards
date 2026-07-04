@@ -1,14 +1,10 @@
 ---------- Fonctionnalités en cours d'implémentation ----------
-- Dans "actions et autre", une fois le scrapping terminé, il faudrait que la console affiche un message "souhaitez-vous mettre à jour les n joueurs suivants (Y/N)" afin de demander confirmation à l'admin. Lorsque l'admin accepte, on pourrait mettre une petite barre de chargement fictive en mode "chargement des modifications en cours" pour faire quelque chose d'un peu stylé. 
-- Les admins ont un compte "admin" et un compte "utilisateur", il faudrait qu'il puisse passer de l'un à l'autre facilement. Par exemple, en haut de la page, un toggle switch compte admin / compte utilisateur. Les comptes communicants sont yanis <-> admin et alexandre <-> root. Fais en sorte qu'il n'y ait pas besoin de ressaisir les identifiants de connexion pour passer de l'un à l'autre. 
 - Dans le classement, on n'a pas de classement général, c'est Poules / Rondes suisses. Le bon onglet doit être cliqué par défaut selon la phase en cours. Si je suis à la Phase 1, le classement par défaut qui apparait lorsque je vais dans "classement" est Poules. Inversement si je suis à la Phase 2. Pour la phase 0, un message apparaît "La saison [année actuelle]-[année actuelle +1] n'a pas encore débutée. 
 
-- Côté front-end : Retirer le bouton "voir le classement" page d'accueil ; Retirer l'information page des classements si c'est mis à jour en temps réel par l'admin ou pas ; Remplacer "mis à jour en temps réel" ou "classement figé" par "Phase en cours : [nom de la phase]
 
 
 
 ---------- Bugs en cours de réparation ----------
-- Les joueurs inactifs apparaissent quand même dans les poules et les classements, ça ne fois pas être le cas. Les joueurs inactifs doivent être totalement transparents dans les fonctionnalités de "jeux". Ils apparaissent seulement dans la modération admin. Les joueurs inactifs ne jouent pas, ils peuvent seulement consulter le site.
 - Logo : Le premier plan fait apparaître les lettres, mais il faudrait revoir comment celles-ci sont découpées. En effet, la découpe, trop rectangulaire, fait apparaitre un bout du renard sur le haut et il manque un bout des lettres en bas. Peut-être qu'à la place de découper un rectange on pourrait découper selon la forme des lettres, comment puis-je aider pour cela ? Aussi, le texte "le choc des renards est transparent et ne se voit pas assez". Lorsque le haut du renard apparaît, un volant noir est présent en haut à droite, il est à retirer. 
 
 
@@ -74,5 +70,9 @@ Voici un petit récapitulatif des statuts des matchs si jamais ce n'était pas t
 - Dans les logs de connexions de la section "Connexions" auquelle a accès l'admin, ajoute l'heure de déconnexion à l'heure de connexion des joueurs. Si un joueur s'est déconnecté manuellement, l'heure de déconnexion est celle indiquée. Si le joueur a été déconnecté par inactivité, retires 15 minutes à l'heure pour avoir la vraie heure à laquelle il a arrêté d'utiliser le site. 
 - Avoir la possibilité d'envoyer une notification à plusieurs joueurs en même temps (petites cases à cocher + case "tout le monde")
 
+- Dans "actions et autre", une fois le scrapping terminé, il faudrait que la console affiche un message "souhaitez-vous mettre à jour les n joueurs suivants (Y/N)" afin de demander confirmation à l'admin. Lorsque l'admin accepte, on pourrait mettre une petite barre de chargement fictive en mode "chargement des modifications en cours" pour faire quelque chose d'un peu stylé. 
+- Les admins ont un compte "admin" et un compte "utilisateur", il faudrait qu'il puisse passer de l'un à l'autre facilement. Par exemple, en haut de la page, un toggle switch compte admin / compte utilisateur. Les comptes communicants sont yanis <-> admin et alexandre <-> root. Fais en sorte qu'il n'y ait pas besoin de ressaisir les identifiants de connexion pour passer de l'un à l'autre. 
+- Côté front-end : Retirer le bouton "voir le classement" page d'accueil ; Retirer l'information page des classements si c'est mis à jour en temps réel par l'admin ou pas ; Remplacer "mis à jour en temps réel" ou "classement figé" par "Phase en cours : [nom de la phase]
+- Les joueurs inactifs apparaissent quand même dans les poules et les classements, ça ne dois pas être le cas. Les joueurs inactifs doivent être totalement transparents dans les fonctionnalités de "jeux". Ils apparaissent seulement dans la modération admin. Les joueurs inactifs ne jouent pas, ils peuvent seulement consulter le site.
 
 

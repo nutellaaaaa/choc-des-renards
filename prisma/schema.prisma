@@ -52,6 +52,8 @@ model User {
   specialMatches2 SpecialMatch[] @relation("Player2")
   plannedMatches1 PlannedMatch[] @relation("PlannedPlayer1")
   plannedMatches2 PlannedMatch[] @relation("PlannedPlayer2")
+  faqViews       FaqView[]
+  faqVotes       FaqVote[]
 }
 
 model LoginEvent {
@@ -210,4 +212,56 @@ model Notification {
   createdAt    DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ═══════════════════ FAQ ═══════════════════
+
+model FaqTopic {
+  id             Int      @id @default(autoincrement())
+  question       String   // titre du sujet
+  order          Int      @default(0)
+  viewCount      Int      @default(0)
+  usefulCount    Int      @default(0)
+  notUsefulCount Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  items FaqItem[]
+  views FaqView[]
+  votes FaqVote[]
+}
+
+model FaqItem {
+  id       Int     @id @default(autoincrement())
+  topicId  Int
+  subtitle String?
+  content  String  // texte avec mise en forme basique (gras/italique/listes)
+  order    Int     @default(0)
+
+  topic FaqTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+}
+
+// Historique des consultations (utilisateur + horodatage)
+model FaqView {
+  id        Int      @id @default(autoincrement())
+  topicId   Int
+  userId    Int?
+  createdAt DateTime @default(now())
+
+  topic FaqTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  user  User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+// Avis "utile" / "pas utile" — un seul vote par utilisateur et par sujet
+model FaqVote {
+  id        Int      @id @default(autoincrement())
+  topicId   Int
+  userId    Int
+  useful    Boolean
+  createdAt DateTime @default(now())
+
+  topic FaqTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  user  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([topicId, userId])
 }
