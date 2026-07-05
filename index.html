@@ -255,6 +255,93 @@
   .match-note { font-size: 0.82rem; color: var(--gray); margin-top: 0.4rem; font-style: italic; }
   .no-matches { text-align: center; padding: 2rem; color: var(--gray); font-family: var(--font-heading); font-size: 0.9rem; letter-spacing: 0.06em; }
 
+  /* ── COURBE DE PROGRESSION (modale détail joueur) ─────────────────── */
+  .progression-panel { border-top: 1px solid var(--dark4); padding-top: 1.75rem; margin-bottom: 1.5rem; }
+  .prog-head { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.1rem; opacity: 0; transform: translateY(8px); }
+  .prog-head.reveal { animation: progUp 0.5s ease forwards; }
+  .prog-eyebrow { font-family: var(--font-heading); font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--orange); margin-bottom: 0.25rem; }
+  .prog-title { font-family: var(--font-display); font-size: 1.4rem; letter-spacing: 0.03em; }
+
+  .prog-tabs { position: relative; display: inline-flex; background: var(--dark3); border: 1px solid var(--dark4); border-radius: 999px; padding: 4px; gap: 2px; pointer-events: none; }
+  .prog-tabs.active { pointer-events: auto; }
+  .prog-tab-indicator { position: absolute; top: 4px; left: 4px; height: calc(100% - 8px); width: 0; background: var(--orange-dim); border: 1px solid var(--orange); border-radius: 999px; transition: transform 0.35s cubic-bezier(.2,.8,.2,1), width 0.35s cubic-bezier(.2,.8,.2,1); z-index: 0; }
+  .prog-tab { position: relative; z-index: 1; background: none; border: none; cursor: pointer; font-family: var(--font-heading); font-size: 0.8rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gray); padding: 0.5rem 1.1rem; border-radius: 999px; transition: color 0.2s; white-space: nowrap; }
+  .prog-tab.on { color: var(--orange); }
+  .prog-tab:not(.on):hover { color: var(--gray-light,#ccc); }
+
+  .prog-headline { display: flex; align-items: baseline; gap: 0.6rem; margin-bottom: 1rem; opacity: 0; transform: translateY(8px); }
+  .prog-headline.reveal { animation: progUp 0.5s ease forwards; }
+  .prog-headline-num { font-family: var(--font-display); font-size: 2.3rem; color: var(--orange); letter-spacing: 0.02em; line-height: 1; }
+  .prog-headline-num.shine { background: linear-gradient(90deg, var(--orange-light), #fff, var(--orange-light)); background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: progHeadlineShine 1.1s ease; }
+  @keyframes progHeadlineShine { 0% { background-position: 0% 50%; } 100% { background-position: 100% 50%; } }
+  .prog-headline-lbl { font-family: var(--font-heading); font-size: 0.82rem; letter-spacing: 0.06em; color: var(--gray-light,#ccc); text-transform: uppercase; }
+
+  .prog-chart-wrap { position: relative; opacity: 0; }
+  .prog-chart-wrap.reveal { animation: progUp 0.4s ease forwards; }
+  .prog-svg { width: 100%; aspect-ratio: 900 / 380; display: block; overflow: visible; }
+  @keyframes progUp { to { opacity: 1; transform: translateY(0); } }
+
+  .prog-grid-line { stroke: var(--dark4); stroke-width: 1; }
+  .prog-tick-label { font-family: var(--font-heading); font-size: 12px; fill: var(--gray); letter-spacing: 0.02em; }
+  .prog-tick-label.x-label { fill: var(--gray); }
+  .prog-axis-group { opacity: 0; transition: opacity 0.3s ease; }
+  .prog-axis-group.on { opacity: 1; }
+
+  .prog-area-path { fill: url(#pdmAreaGradient); opacity: 0.55; }
+  .prog-line-path { fill: none; stroke: url(#pdmLineGradient); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 6px rgba(255,109,0,0.35)); }
+
+  .prog-dot { stroke: var(--dark2); stroke-width: 2; opacity: 0; transform: scale(0); transform-box: fill-box; transform-origin: center;
+    transition: transform 0.35s cubic-bezier(.34,1.56,.64,1), opacity 0.25s ease, r 0.25s ease; cursor: pointer; }
+  .prog-dot.visible { opacity: 1; transform: scale(1); }
+  .prog-dot.hovered { transform: scale(1.5); }
+  .prog-dot.final-pulse { animation: progFinalPulse 2.2s ease-in-out 0.3s infinite; }
+  @keyframes progFinalPulse { 0%,100% { filter: drop-shadow(0 0 0 rgba(255,109,0,0)); } 50% { filter: drop-shadow(0 0 7px rgba(255,109,0,0.85)); } }
+
+  .prog-shuttle { transform-box: fill-box; transform-origin: center; filter: drop-shadow(0 0 5px rgba(255,146,0,0.85)); opacity: 0; }
+  .prog-shuttle.flying { opacity: 1; }
+
+  .prog-ink-burst { transform-box: view-box; transform-origin: center; pointer-events: none; }
+  .prog-ink-core { transform: scale(0); opacity: 0; }
+  .prog-ink-burst.play .prog-ink-core { animation: progInkCorePop 0.6s cubic-bezier(.2,.7,.3,1); }
+  @keyframes progInkCorePop { 0% { transform: scale(0); opacity: 1; } 60% { opacity: .9; } 100% { transform: scale(7); opacity: 0; } }
+  .prog-ink-ring { transform: scale(0); opacity: 0; }
+  .prog-ink-burst.play .prog-ink-ring { animation: progInkRingPop 0.85s ease-out; }
+  @keyframes progInkRingPop { 0% { transform: scale(0); opacity: .8; } 100% { transform: scale(11); opacity: 0; } }
+  .prog-ink-drop { opacity: 0; }
+  .prog-ink-burst.play .prog-ink-drop { animation: progInkDropFly var(--dur,0.8s) cubic-bezier(.15,.8,.25,1); }
+  @keyframes progInkDropFly {
+    0% { transform: rotate(var(--ang,0deg)) translateY(0) scale(0.3); opacity: 1; }
+    70% { opacity: .8; }
+    100% { transform: rotate(var(--ang,0deg)) translateY(var(--dist,26px)) scale(1); opacity: 0; }
+  }
+
+  .prog-guide-line { stroke: var(--orange); stroke-width: 1; stroke-dasharray: 3 4; opacity: 0; pointer-events: none; }
+  .prog-guide-line.on { opacity: 0.55; }
+
+  .prog-tooltip { position: absolute; z-index: 20; background: var(--dark3); border: 1px solid var(--dark4); border-top: 2px solid var(--orange);
+    border-radius: 10px; padding: 0.7rem 0.9rem; min-width: 190px; pointer-events: none; opacity: 0; transform: translate(-50%, -110%); transition: opacity 0.15s ease; }
+  .prog-tooltip.on { opacity: 1; }
+  .prog-tooltip .pt-date { font-family: var(--font-heading); font-size: 0.78rem; letter-spacing: 0.04em; color: var(--gray-light,#ccc); text-transform: capitalize; }
+  .prog-tooltip .pt-opp { font-size: 0.88rem; font-weight: 600; margin: 0.15rem 0 0.35rem; }
+  .prog-tooltip .pt-phase { font-family: var(--font-heading); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gray); margin-bottom: 0.4rem; }
+  .prog-tooltip .pt-sets { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.45rem; }
+  .prog-tooltip .set-chip { font-size: 0.72rem; padding: 0.12rem 0.4rem; }
+  .prog-tooltip .pt-result { display: inline-block; font-family: var(--font-heading); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.1rem 0.5rem; border-radius: 4px; margin-bottom: 0.4rem; }
+  .prog-tooltip .pt-metric { font-size: 0.8rem; color: var(--gray-light,#ccc); border-top: 1px solid var(--dark4); padding-top: 0.4rem; }
+  .prog-tooltip .pt-metric strong { color: var(--white); }
+
+  .prog-caption { margin-top: 1rem; font-size: 0.8rem; color: var(--gray); font-style: italic; opacity: 0; }
+  .prog-caption.reveal { animation: progUp 0.4s ease forwards; }
+  .prog-empty { text-align: center; padding: 1.5rem; color: var(--gray); font-family: var(--font-heading); font-size: 0.85rem; letter-spacing: 0.05em; }
+
+  @media (max-width: 640px) {
+    .prog-head { flex-direction: column; align-items: flex-start; }
+    .prog-headline-num { font-size: 1.9rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .prog-dot.final-pulse { animation: none; }
+  }
+
   /* FOOTER */
   footer { border-top: 1px solid var(--dark4); padding: 2rem; text-align: center; font-family: var(--font-heading); font-size: 0.82rem; letter-spacing: 0.08em; color: var(--gray); }
   footer span { color: var(--orange); }
@@ -1519,6 +1606,76 @@
       <button class="player-modal-close" onclick="closePlayerDetail()">✕ Fermer</button>
     </div>
     <div class="player-stats-row" id="pdm-stats"></div>
+
+    <div class="progression-panel" id="pdm-progression" style="display:none">
+      <div class="prog-head" id="pdm-prog-head">
+        <div>
+          <div class="prog-eyebrow">Analyse de saison</div>
+          <div class="prog-title">Courbe de progression</div>
+        </div>
+        <div class="prog-tabs" id="pdm-prog-tabs">
+          <div class="prog-tab-indicator" id="pdm-tab-indicator"></div>
+          <button type="button" class="prog-tab on" data-metric="points">Points</button>
+          <button type="button" class="prog-tab" data-metric="rang">Classement</button>
+          <button type="button" class="prog-tab" data-metric="forme">Forme</button>
+        </div>
+      </div>
+
+      <div class="prog-headline" id="pdm-prog-headline">
+        <div class="prog-headline-num" id="pdm-headline-num">0</div>
+        <div class="prog-headline-lbl" id="pdm-headline-lbl"></div>
+      </div>
+
+      <div class="prog-chart-wrap" id="pdm-chart-wrap">
+        <svg class="prog-svg" id="pdm-prog-svg" viewBox="0 0 900 380" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <linearGradient id="pdmLineGradient" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#FF9200"/>
+              <stop offset="100%" stop-color="#FF6D00"/>
+            </linearGradient>
+            <linearGradient id="pdmAreaGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#FF6D00" stop-opacity="0.4"/>
+              <stop offset="100%" stop-color="#FF6D00" stop-opacity="0"/>
+            </linearGradient>
+            <radialGradient id="pdmBurstGradient">
+              <stop offset="0%" stop-color="#fff"/>
+              <stop offset="30%" stop-color="rgba(255,170,60,.95)"/>
+              <stop offset="60%" stop-color="rgba(255,109,0,.55)"/>
+              <stop offset="100%" stop-color="rgba(255,109,0,0)"/>
+            </radialGradient>
+            <clipPath id="pdmRevealClip"><rect id="pdm-reveal-rect" x="56" y="0" width="0" height="380"/></clipPath>
+          </defs>
+
+          <g class="prog-axis-group on" id="pdm-grid-y"></g>
+          <g class="prog-axis-group on" id="pdm-grid-x"></g>
+
+          <g id="pdm-series-group" clip-path="url(#pdmRevealClip)">
+            <path class="prog-area-path" id="pdm-area-path" d=""/>
+            <path class="prog-line-path" id="pdm-line-path" d=""/>
+            <g id="pdm-dots-group"></g>
+          </g>
+
+          <line class="prog-guide-line" id="pdm-guide-line" x1="0" y1="0" x2="0" y2="380"/>
+
+          <g class="prog-shuttle" id="pdm-shuttle">
+            <circle r="3.4" cx="0" cy="0" style="fill:var(--orange)"/>
+            <path d="M0,0 L-11,-4 L-9,0 L-11,4 Z" fill="#fff" opacity="0.9"/>
+            <path d="M0,0 L-9,-6 L-6,-1 Z" fill="#ddd" opacity="0.7"/>
+            <path d="M0,0 L-9,6 L-6,1 Z" fill="#ddd" opacity="0.7"/>
+          </g>
+
+          <g class="prog-ink-burst" id="pdm-ink-burst">
+            <circle class="prog-ink-core" r="9" fill="url(#pdmBurstGradient)" style="mix-blend-mode:screen"/>
+            <circle class="prog-ink-ring" r="6" fill="none" stroke="rgba(255,150,40,.65)" stroke-width="2" style="mix-blend-mode:screen"/>
+            <g id="pdm-ink-drops"></g>
+          </g>
+        </svg>
+        <div class="prog-tooltip" id="pdm-prog-tooltip"></div>
+      </div>
+
+      <div class="prog-caption" id="pdm-prog-caption">Basé sur les matchs publiés de la saison. Survolez un point pour le détail du match.</div>
+    </div>
+
     <div class="matches-list" id="pdm-matches"></div>
   </div>
 </div>
@@ -3080,10 +3237,398 @@ function showPlayerDetail(player) {
       </div>`
     }).join('')
   }
+  renderProgressionChart(player)
   document.getElementById('player-detail-modal').classList.add('open')
 }
 function closePlayerDetail() { document.getElementById('player-detail-modal').classList.remove('open') }
 function closePlayerDetailOutside(e) { if (e.target === document.getElementById('player-detail-modal')) closePlayerDetail() }
+
+/* ══════════════════════════ COURBE DE PROGRESSION (modale détail joueur) ══════════════════════════ */
+const pdmProg = { metric: 'points', series: null, matches: [], resizeBound: false }
+const pdmVB = { W: 900, H: 380, PAD_L: 56, PAD_R: 24, PAD_T: 28, PAD_B: 46 }
+const pdmReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+function pdmOrdinalFr(n) { return n === 1 ? '1er' : Math.round(n) + 'e' }
+
+// Résultat W/L d'un match "vu du joueur" (mêmes règles que computeStats côté API)
+function pdmMatchWin(m) {
+  const pw = m.sets.filter(s => s.playerScore > s.opponentScore).length
+  const ow = m.sets.filter(s => s.opponentScore > s.playerScore).length
+  return pw > ow
+}
+
+// Stats agrégées d'un joueur en ne comptant que les matchs publiés à une date donnée ou avant
+function pdmStatsAsOf(matches, cutoff) {
+  let played = 0, wins = 0, losses = 0
+  for (const m of (matches || [])) {
+    if (new Date(m.matchDate) > cutoff) continue
+    played++
+    if (pdmMatchWin(m)) wins++; else losses++
+  }
+  return { played, wins, losses, points: wins * 3 + losses * 1 }
+}
+
+// Reconstitue, pour chaque match du joueur, sa position réelle au classement du club
+// à cette date (mêmes règles de tri que /api/matches : victoires ▼, matchs joués ▲, points ▼, ancienneté ▲)
+function pdmRankHistory(player, sortedMatches) {
+  const pool = (classementPlayers && classementPlayers.length) ? classementPlayers : [player]
+  return sortedMatches.map(m => {
+    const cutoff = new Date(m.matchDate)
+    const standings = pool.map(p => ({ id: p.id, createdAt: p.createdAt, ...pdmStatsAsOf(p.matches, cutoff) }))
+    standings.sort((a, b) => {
+      if (b.wins !== a.wins) return b.wins - a.wins
+      if (a.played !== b.played) return a.played - b.played
+      if (b.points !== a.points) return b.points - a.points
+      return new Date(a.createdAt || 0) - new Date(b.createdAt || 0)
+    })
+    const idx = standings.findIndex(s => s.id === player.id)
+    return idx >= 0 ? idx + 1 : standings.length
+  })
+}
+
+function pdmBuildSeries(player) {
+  const sortedMatches = [...(player.matches || [])]
+    .filter(m => m.matchDate)
+    .sort((a, b) => new Date(a.matchDate) - new Date(b.matchDate))
+  const results = sortedMatches.map(m => pdmMatchWin(m) ? 'W' : 'L')
+
+  let acc = 0
+  const points = results.map(r => { acc += (r === 'W' ? 3 : 1); return acc })
+  const forme = results.map((_, i) => {
+    const slice = results.slice(Math.max(0, i - 4), i + 1)
+    return slice.filter(r => r === 'W').length / slice.length * 100
+  })
+  const rang = pdmRankHistory(player, sortedMatches)
+  const clubSize = (classementPlayers && classementPlayers.length) ? classementPlayers.length : Math.max(...rang, 1)
+
+  return { sortedMatches, results, seriesData: { points, forme, rang }, clubSize }
+}
+
+function pdmMetrics(clubSize) {
+  const maxPts = Math.max(8, Math.ceil((pdmProg.series ? pdmProg.series.seriesData.points.slice(-1)[0] : 8) / 8) * 8)
+  return {
+    points: { domain: [0, maxPts], good: 'high', ticks: [maxPts, Math.round(maxPts*0.75), Math.round(maxPts*0.5), Math.round(maxPts*0.25), 0], format: v => Math.round(v),
+      headline: v => `${Math.round(v)} points cumulés · ${pdmProg.matches.length} match${pdmProg.matches.length>1?'s':''}` },
+    rang: { domain: [1, Math.max(clubSize, 2)], good: 'low', ticks: (() => { const t=[1]; if(clubSize>2) t.push(Math.round(clubSize/2)); t.push(clubSize); return [...new Set(t)] })(), format: v => pdmOrdinalFr(v),
+      headline: v => `${pdmOrdinalFr(v)} place · ${clubSize} joueur${clubSize>1?'s':''}` },
+    forme: { domain: [0, 100], good: 'high', ticks: [100,75,50,25,0], format: v => `${Math.round(v)}%`,
+      headline: v => `${Math.round(v)}% de victoires · 5 derniers matchs` },
+  }
+}
+
+function pdmXFor(i, n, plotW) { return pdmVB.PAD_L + (n <= 1 ? 0 : i * (plotW / (n - 1))) }
+function pdmYFor(metricKey, v, metrics, plotH) {
+  const { domain, good } = metrics[metricKey]
+  const [min, max] = domain
+  const t = good === 'low' ? (v - min) / (max - min) : 1 - (v - min) / (max - min)
+  return pdmVB.PAD_T + Math.max(0, Math.min(1, t)) * plotH
+}
+function pdmCatmullRom(points) {
+  if (points.length < 2) return points.length === 1 ? `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}` : ''
+  let d = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i-1] || points[i], p1 = points[i], p2 = points[i+1], p3 = points[i+2] || p2
+    const c1x = p1.x + (p2.x-p0.x)/6, c1y = p1.y + (p2.y-p0.y)/6
+    const c2x = p2.x - (p3.x-p1.x)/6, c2y = p2.y - (p3.y-p1.y)/6
+    d += ` C ${c1x.toFixed(2)} ${c1y.toFixed(2)} ${c2x.toFixed(2)} ${c2y.toFixed(2)} ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`
+  }
+  return d
+}
+function pdmAreaPath(linePath, points, baseline) {
+  if (points.length < 2) return ''
+  const last = points[points.length-1], first = points[0]
+  return `${linePath} L ${last.x.toFixed(2)} ${baseline} L ${first.x.toFixed(2)} ${baseline} Z`
+}
+
+function pdmTween(duration, easingFn, onFrame, onDone) {
+  if (duration <= 0) { onFrame(1, 1); if (onDone) onDone(); return }
+  const start = performance.now()
+  function step(now) {
+    const raw = Math.min(1, (now - start) / duration)
+    onFrame(easingFn(raw), raw)
+    if (raw < 1) requestAnimationFrame(step); else if (onDone) onDone()
+  }
+  requestAnimationFrame(step)
+}
+function pdmEaseOutCubic(t) { return 1 - Math.pow(1-t, 3) }
+function pdmEaseInOutCubic(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2 }
+function pdmEaseLinear(t) { return t }
+
+function pdmPointsForMetric(metricKey, n, plotW, plotH, metrics) {
+  return pdmProg.series.seriesData[metricKey].map((v, i) => ({ x: pdmXFor(i, n, plotW), y: pdmYFor(metricKey, v, metrics, plotH), v }))
+}
+
+function pdmPhaseLabel(m) {
+  if (m.phase === 'PHASE0') return 'Phase 0'
+  if (m.phase === 'PHASE1') return 'Phase 1'
+  return m.roundNumber ? `Phase 2 · Manche ${m.roundNumber}` : 'Phase 2'
+}
+
+function renderProgressionChart(player) {
+  const panel = document.getElementById('pdm-progression')
+  const matches = (player.matches || []).slice()
+
+  if (matches.length < 2) {
+    panel.style.display = 'block'
+    panel.querySelectorAll('.prog-head, .prog-headline, .prog-chart-wrap, .prog-caption').forEach(el => el.style.display = 'none')
+    let empty = panel.querySelector('.prog-empty')
+    if (!empty) { empty = document.createElement('div'); empty.className = 'prog-empty'; panel.appendChild(empty) }
+    empty.textContent = matches.length === 0 ? 'Aucun match publié pour ce joueur.' : 'Au moins 2 matchs publiés sont nécessaires pour afficher la courbe de progression.'
+    return
+  }
+  panel.style.display = 'block'
+  panel.querySelectorAll('.prog-head, .prog-headline, .prog-chart-wrap, .prog-caption').forEach(el => el.style.display = '')
+  const oldEmpty = panel.querySelector('.prog-empty'); if (oldEmpty) oldEmpty.remove()
+
+  const built = pdmBuildSeries(player)
+  pdmProg.series = built
+  pdmProg.matches = built.sortedMatches
+  pdmProg.metric = 'points'
+
+  document.querySelectorAll('#pdm-prog-tabs .prog-tab').forEach(b => b.classList.toggle('on', b.dataset.metric === 'points'))
+  document.getElementById('pdm-prog-tabs').classList.remove('active')
+  ;['pdm-prog-head','pdm-prog-headline','pdm-chart-wrap','pdm-prog-caption'].forEach(id => document.getElementById(id).classList.remove('reveal'))
+  document.getElementById('pdm-headline-num').textContent = '0'
+  document.getElementById('pdm-headline-num').classList.remove('shine')
+
+  const reveal = () => {
+    document.getElementById('pdm-prog-head').classList.add('reveal')
+    positionTabIndicator(document.querySelector('#pdm-prog-tabs .prog-tab.on'))
+    document.getElementById('pdm-prog-headline').classList.add('reveal')
+    document.getElementById('pdm-chart-wrap').classList.add('reveal')
+    pdmRevealChart('points', () => {
+      document.getElementById('pdm-prog-tabs').classList.add('active')
+      document.getElementById('pdm-prog-caption').classList.add('reveal')
+    })
+    const finalVal = built.seriesData.points[built.sortedMatches.length - 1]
+    pdmTween(pdmReducedMotion ? 0 : 900, pdmEaseOutCubic, (t) => {
+      pdmSetHeadline('points', finalVal * t, false)
+    }, () => pdmSetHeadline('points', finalVal, true))
+  }
+  // léger différé pour laisser la modale elle-même s'ouvrir avant de dessiner
+  setTimeout(reveal, pdmReducedMotion ? 0 : 150)
+
+  if (!pdmProg.resizeBound) {
+    pdmProg.resizeBound = true
+    let t
+    window.addEventListener('resize', () => {
+      clearTimeout(t)
+      t = setTimeout(() => { if (pdmProg.series) pdmRenderAxes(pdmProg.metric) }, 150)
+    })
+    document.querySelectorAll('#pdm-prog-tabs .prog-tab').forEach(btn => {
+      btn.addEventListener('click', () => pdmSwitchMetric(btn.dataset.metric))
+    })
+    document.getElementById('pdm-prog-svg').addEventListener('mousemove', (e) => {
+      if (!pdmProg.series) return
+      const svg = document.getElementById('pdm-prog-svg')
+      const rect = svg.getBoundingClientRect()
+      const scale = svg.clientWidth / pdmVB.W
+      const localX = (e.clientX - rect.left) / scale
+      const n = pdmProg.matches.length
+      const plotW = pdmVB.W - pdmVB.PAD_L - pdmVB.PAD_R
+      let closest = 0, best = Infinity
+      for (let i = 0; i < n; i++) { const d = Math.abs(pdmXFor(i, n, plotW) - localX); if (d < best) { best = d; closest = i } }
+      pdmShowTooltip(closest)
+    })
+    document.getElementById('pdm-chart-wrap').addEventListener('mouseleave', () => {
+      document.getElementById('pdm-prog-tooltip').classList.remove('on')
+      document.getElementById('pdm-guide-line').classList.remove('on')
+      document.querySelectorAll('#pdm-dots-group .prog-dot').forEach(d => d.classList.remove('hovered'))
+    })
+  }
+}
+
+function positionTabIndicator(btn) {
+  if (!btn) return
+  const ind = document.getElementById('pdm-tab-indicator')
+  ind.style.width = btn.offsetWidth + 'px'
+  ind.style.transform = `translateX(${btn.offsetLeft - 4}px)`
+}
+
+function pdmRenderAxes(metricKey) {
+  const n = pdmProg.matches.length
+  const plotW = pdmVB.W - pdmVB.PAD_L - pdmVB.PAD_R, plotH = pdmVB.H - pdmVB.PAD_T - pdmVB.PAD_B
+  const metrics = pdmMetrics(pdmProg.series.clubSize)
+  const { ticks, format } = metrics[metricKey]
+  const gridY = document.getElementById('pdm-grid-y')
+  gridY.innerHTML = ticks.map(v => {
+    const y = pdmYFor(metricKey, v, metrics, plotH)
+    return `<line class="prog-grid-line" x1="${pdmVB.PAD_L}" y1="${y.toFixed(1)}" x2="${pdmVB.PAD_L+plotW}" y2="${y.toFixed(1)}" opacity="0.5"/>
+            <text class="prog-tick-label" x="${pdmVB.PAD_L-10}" y="${(y+4).toFixed(1)}" text-anchor="end">${format(v)}</text>`
+  }).join('')
+
+  const narrow = window.innerWidth < 620
+  const gridX = document.getElementById('pdm-grid-x')
+  gridX.innerHTML = pdmProg.matches.map((m, i) => {
+    const x = pdmXFor(i, n, plotW)
+    const showLabel = !narrow || i % 2 === 0
+    const label = new Date(m.matchDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
+    return `<line class="prog-grid-line" x1="${x.toFixed(1)}" y1="${pdmVB.PAD_T}" x2="${x.toFixed(1)}" y2="${pdmVB.PAD_T+plotH}" opacity="0.18"/>` +
+      (showLabel ? `<text class="prog-tick-label x-label" x="${x.toFixed(1)}" y="${pdmVB.PAD_T+plotH+18}" text-anchor="end" transform="rotate(-40 ${x.toFixed(1)} ${pdmVB.PAD_T+plotH+18})">${label}</text>` : '')
+  }).join('')
+}
+
+function pdmRenderSeries(metricKey, points) {
+  const line = pdmCatmullRom(points)
+  const linePathEl = document.getElementById('pdm-line-path')
+  const areaPathEl = document.getElementById('pdm-area-path')
+  const plotH = pdmVB.H - pdmVB.PAD_T - pdmVB.PAD_B
+  linePathEl.setAttribute('d', line)
+  areaPathEl.setAttribute('d', pdmAreaPath(line, points, pdmVB.PAD_T + plotH))
+  document.getElementById('pdm-shuttle').style.offsetPath = `path("${line}")`
+
+  const dotsGroup = document.getElementById('pdm-dots-group')
+  let dots = dotsGroup.querySelectorAll('.prog-dot')
+  if (dots.length !== points.length) {
+    dotsGroup.innerHTML = points.map((p, i) => {
+      const win = pdmMatchWin(pdmProg.matches[i])
+      const isLast = i === points.length - 1
+      return `<circle class="prog-dot${isLast?' final-pulse':''}" data-i="${i}" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="${isLast?5.5:4}" fill="${win?'#6ddc6d':'#ff7070'}"/>`
+    }).join('')
+    dots = dotsGroup.querySelectorAll('.prog-dot')
+    dots.forEach(d => d.addEventListener('mouseenter', () => pdmShowTooltip(+d.dataset.i)))
+  } else {
+    dots.forEach((d, i) => { d.setAttribute('cx', points[i].x.toFixed(2)); d.setAttribute('cy', points[i].y.toFixed(2)) })
+  }
+}
+
+function pdmSetHeadline(metricKey, value, shine) {
+  const metrics = pdmMetrics(pdmProg.series.clubSize)
+  const numEl = document.getElementById('pdm-headline-num')
+  numEl.textContent = metrics[metricKey].format(value)
+  document.getElementById('pdm-headline-lbl').textContent = metrics[metricKey].headline(value)
+  if (shine) { numEl.classList.remove('shine'); void numEl.offsetWidth; numEl.classList.add('shine') }
+}
+
+function pdmRevealChart(metricKey, onDone) {
+  pdmRenderAxes(metricKey)
+  const n = pdmProg.matches.length
+  const plotW = pdmVB.W - pdmVB.PAD_L - pdmVB.PAD_R, plotH = pdmVB.H - pdmVB.PAD_T - pdmVB.PAD_B
+  const metrics = pdmMetrics(pdmProg.series.clubSize)
+  const points = pdmPointsForMetric(metricKey, n, plotW, plotH, metrics)
+  pdmRenderSeries(metricKey, points)
+
+  const revealRect = document.getElementById('pdm-reveal-rect')
+  const shuttleEl = document.getElementById('pdm-shuttle')
+  revealRect.setAttribute('width', 0)
+  shuttleEl.classList.add('flying')
+  shuttleEl.style.offsetDistance = '0%'
+
+  const dots = document.querySelectorAll('#pdm-dots-group .prog-dot')
+  dots.forEach(d => d.classList.remove('visible'))
+  const revealed = new Array(points.length).fill(false)
+
+  pdmTween(pdmReducedMotion ? 0 : 1300, pdmEaseLinear, (t) => {
+    revealRect.setAttribute('width', (t * plotW).toFixed(2))
+    shuttleEl.style.offsetDistance = (t * 100).toFixed(2) + '%'
+    points.forEach((p, i) => {
+      const threshold = points.length <= 1 ? 0 : i / (points.length - 1)
+      if (!revealed[i] && t >= threshold) { revealed[i] = true; dots[i] && dots[i].classList.add('visible') }
+    })
+  }, () => {
+    revealRect.setAttribute('width', plotW)
+    dots.forEach(d => d.classList.add('visible'))
+    shuttleEl.classList.remove('flying')
+    pdmTriggerBurst(points[points.length - 1])
+    if (onDone) onDone()
+  })
+}
+
+function pdmTriggerBurst(finalPoint) {
+  const inkDrops = document.getElementById('pdm-ink-drops')
+  if (!inkDrops.children.length) {
+    let html = ''
+    for (let k = 0; k < 7; k++) {
+      const ang = (360/7*k + (k%2?12:-8))
+      const dist = 20 + (k%3)*6
+      html += `<circle class="prog-ink-drop" r="2.4" style="--ang:${ang}deg;--dist:${dist}px" fill="url(#pdmBurstGradient)"/>`
+    }
+    inkDrops.innerHTML = html
+  }
+  const inkBurst = document.getElementById('pdm-ink-burst')
+  inkBurst.setAttribute('transform', `translate(${finalPoint.x.toFixed(2)},${finalPoint.y.toFixed(2)})`)
+  inkBurst.classList.remove('play'); void inkBurst.offsetWidth; inkBurst.classList.add('play')
+}
+
+function pdmSwitchMetric(newKey) {
+  if (!pdmProg.series || newKey === pdmProg.metric || !document.getElementById('pdm-prog-tabs').classList.contains('active')) return
+  const oldKey = pdmProg.metric
+  pdmProg.metric = newKey
+
+  document.querySelectorAll('#pdm-prog-tabs .prog-tab').forEach(b => b.classList.toggle('on', b.dataset.metric === newKey))
+  positionTabIndicator(document.querySelector(`#pdm-prog-tabs .prog-tab[data-metric="${newKey}"]`))
+
+  const n = pdmProg.matches.length
+  const plotW = pdmVB.W - pdmVB.PAD_L - pdmVB.PAD_R, plotH = pdmVB.H - pdmVB.PAD_T - pdmVB.PAD_B
+  const metrics = pdmMetrics(pdmProg.series.clubSize)
+  const fromPoints = pdmPointsForMetric(oldKey, n, plotW, plotH, metrics)
+  const toPoints = pdmPointsForMetric(newKey, n, plotW, plotH, metrics)
+  const fromVal = pdmProg.series.seriesData[oldKey][n-1], toVal = pdmProg.series.seriesData[newKey][n-1]
+
+  const gridY = document.getElementById('pdm-grid-y')
+  gridY.classList.remove('on')
+  setTimeout(() => { pdmRenderAxes(newKey); gridY.classList.add('on') }, pdmReducedMotion ? 0 : 150)
+
+  const dots = document.querySelectorAll('#pdm-dots-group .prog-dot')
+  const linePathEl = document.getElementById('pdm-line-path')
+  const areaPathEl = document.getElementById('pdm-area-path')
+  pdmTween(pdmReducedMotion ? 0 : 650, pdmEaseInOutCubic, (t) => {
+    const interp = fromPoints.map((p, i) => ({ x: p.x, y: p.y + (toPoints[i].y - p.y) * t }))
+    const line = pdmCatmullRom(interp)
+    linePathEl.setAttribute('d', line)
+    areaPathEl.setAttribute('d', pdmAreaPath(line, interp, pdmVB.PAD_T + plotH))
+    dots.forEach((d, i) => d.setAttribute('cy', interp[i].y.toFixed(2)))
+    pdmSetHeadline(newKey, fromVal + (toVal - fromVal) * t, false)
+  }, () => {
+    pdmSetHeadline(newKey, toVal, true)
+    if (pdmReducedMotion) { pdmTriggerBurst(toPoints[toPoints.length-1]); return }
+    const line = pdmCatmullRom(toPoints)
+    const shuttleEl = document.getElementById('pdm-shuttle')
+    shuttleEl.style.offsetPath = `path("${line}")`
+    shuttleEl.classList.add('flying')
+    shuttleEl.style.offsetDistance = '0%'
+    pdmTween(600, pdmEaseOutCubic, (t) => { shuttleEl.style.offsetDistance = (t*100).toFixed(2)+'%' }, () => {
+      shuttleEl.classList.remove('flying')
+      pdmTriggerBurst(toPoints[toPoints.length-1])
+    })
+  })
+}
+
+function pdmShowTooltip(i) {
+  const m = pdmProg.matches[i]
+  if (!m) return
+  const n = pdmProg.matches.length
+  const plotW = pdmVB.W - pdmVB.PAD_L - pdmVB.PAD_R, plotH = pdmVB.H - pdmVB.PAD_T - pdmVB.PAD_B
+  const metrics = pdmMetrics(pdmProg.series.clubSize)
+  const points = pdmPointsForMetric(pdmProg.metric, n, plotW, plotH, metrics)
+  const p = points[i]
+  const win = pdmMatchWin(m)
+  const setChips = [...m.sets].sort((a,b)=>a.setNumber-b.setNumber).map(s =>
+    `<span class="set-chip ${s.playerScore > s.opponentScore ? 'set-win' : 'set-loss'}">${s.playerScore}–${s.opponentScore}</span>`).join('')
+  const longDate = new Date(m.matchDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+
+  const tooltip = document.getElementById('pdm-prog-tooltip')
+  tooltip.innerHTML = `
+    <div class="pt-date">${longDate}</div>
+    <div class="pt-opp">vs ${esc(m.opponentFirstName)} ${esc(m.opponentLastName)}</div>
+    <div class="pt-phase">${pdmPhaseLabel(m)}</div>
+    <div class="pt-sets">${setChips}</div>
+    <div class="pt-result ${win ? 'result-win' : 'result-loss'}">${win ? 'Victoire' : 'Défaite'}</div>
+    <div class="pt-metric">${pdmProg.metric === 'points' ? 'Points cumulés' : pdmProg.metric === 'rang' ? 'Position au classement' : 'Forme (5 derniers matchs)'} : <strong>${metrics[pdmProg.metric].format(p.v)}</strong></div>`
+
+  const svg = document.getElementById('pdm-prog-svg')
+  const scale = svg.clientWidth / pdmVB.W
+  tooltip.style.left = (p.x * scale) + 'px'
+  tooltip.style.top = (p.y * scale) + 'px'
+  tooltip.classList.add('on')
+
+  const guideLine = document.getElementById('pdm-guide-line')
+  guideLine.setAttribute('x1', p.x); guideLine.setAttribute('x2', p.x)
+  guideLine.setAttribute('y1', pdmVB.PAD_T); guideLine.setAttribute('y2', pdmVB.PAD_T + plotH)
+  guideLine.classList.add('on')
+
+  document.querySelectorAll('#pdm-dots-group .prog-dot').forEach((d, idx) => d.classList.toggle('hovered', idx === i))
+}
 
 /* ══════════════ ADMIN ══════════════ */
 function adminTab(name, btn) {
