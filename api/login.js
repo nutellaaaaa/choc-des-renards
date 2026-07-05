@@ -169,22 +169,44 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // ── POST /api/login?action=forgot_username — retrouver son pseudo ───────────
+  if (req.method === 'POST' && req.query?.action === 'forgot_username') {
+    const { firstName, lastName, phone } = req.body || {}
+    if (!firstName || !lastName || !phone) {
+      return res.status(400).json({ error: 'Prénom, nom et téléphone requis.' })
+    }
+    try {
+      const normalizedPhone = phone.replace(/[\s.\-]/g, '')
+      const user = await prisma.user.findFirst({
+        where: {
+          firstName: { equals: firstName.trim(), mode: 'insensitive' },
+          lastName:  { equals: lastName.trim(),  mode: 'insensitive' },
+        },
+      })
+      const userPhone = user?.phone ? user.phone.replace(/[\s.\-]/g, '') : null
+      if (!user || userPhone !== normalizedPhone) {
+        return res.status(404).json({ error: 'Aucun compte ne correspond à ces informations.' })
+      }
+      return res.status(200).json({ username: user.username })
+    } catch (err) {
+      console.error('[forgot_username]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' })
 
-  const { firstName, lastName, password } = req.body || {}
+  const { username, password } = req.body || {}
 
-  if (!firstName || !lastName || !password) {
-    return res.status(400).json({ error: 'Prénom, nom et mot de passe requis.' })
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Pseudo et mot de passe requis.' })
   }
 
   try {
     const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
 
     const user = await prisma.user.findFirst({
-      where: {
-        firstName: { equals: firstName.trim(), mode: 'insensitive' },
-        lastName:  { equals: lastName.trim(),  mode: 'insensitive' },
-      },
+      where: { username: { equals: username.trim(), mode: 'insensitive' } },
     })
 
     if (!user) {

@@ -48,6 +48,8 @@ module.exports = async function handler(req, res) {
       return handleFaq(req, res)
     case 'notifications':
       return handleNotifications(req, res)
+    case 'convocations':
+      return handleConvocations(req, res)
     default:
       return res.status(400).json({ error: 'resource invalide ou manquant.' })
   }
@@ -244,4 +246,209 @@ async function handleNotifications(req, res) {
   }
 
   return res.status(400).json({ error: 'Action invalide.' })
+}
+
+/* ============================================================
+ * CONVOCATIONS — "Score du match" : un joueur convoqué (rencontre
+ * spéciale OU match planifié par l'admin) renseigne lui-même le score
+ * avant la date limite. Le match apparaît alors automatiquement, non
+ * publié, dans la liste des matchs à publier de l'admin.
+ * ============================================================ */
+async function handleConvocations(req, res) {
+  const auth = requireAuth(req, res)
+  if (!auth) return
+  const uid = auth.userId
+
+  if (req.method === 'GET') {
+    try {
+      const [specials, planned] = await Promise.all([
+        prisma.specialMatch.findMany({
+          where: { resolved: false, OR: [{ player1Id: uid }, { player2Id: uid }] },
+          orderBy: { endDate: 'asc' },
+        }),
+        prisma.plannedMatch.findMany({
+          where: { OR: [{ player1Id: uid }, { player2Id: uid }] },
+          orderBy: { scheduledDate: 'asc' },
+        }),
+      ])
+
+      async function enrich(list, type, deadlineField, deadlineBlocks) {
+        return Promise.all(list.map(async (m) => {
+          const opponentId = m.player1Id === uid ? m.player2Id : m.player1Id
+          const opponent = await prisma.user.findUnique({
+            where: { id: opponentId },
+            select: { id: true, firstName: true, lastName: true, username: true },
+          })
+          const deadline = m[deadlineField] || null
+          return {
+            type,
+            id: m.id,
+            opponent,
+            deadline,
+            expired: !!(deadlineBlocks && deadline && new Date(deadline) < new Date()),
+            phase: m.phase || null,
+            roundNumber: m.roundNumber || null,
+            reason: m.reason || null,
+            note: m.note || null,
+          }
+        }))
+      }
+
+      // Pour les rencontres spéciales, la date limite (endDate) bloque réellement la saisie.
+      // Pour les matchs planifiés, scheduledDate est juste indicative (pas de blocage dur).
+      const specialConv = await enrich(specials, 'special', 'endDate', true)
+      const plannedConv = await enrich(planned, 'planned', 'scheduledDate', false)
+
+      const convocations = [...specialConv, ...plannedConv].sort((a, b) => {
+        if (!a.deadline) return 1
+        if (!b.deadline) return -1
+        return new Date(a.deadline) - new Date(b.deadline)
+      })
+
+      return res.status(200).json({ convocations })
+    } catch (err) {
+      console.error('[convocations GET]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' })
+
+  const { action } = req.body || {}
+  if (action !== 'submit') return res.status(400).json({ error: 'Action invalide.' })
+
+  const { convType, convId, matchDate, sets, note } = req.body || {}
+  const cid = parseInt(convId, 10)
+
+  if (!['special', 'planned'].includes(convType) || isNaN(cid)) {
+    return res.status(400).json({ error: 'Convocation invalide.' })
+  }
+  if (!Array.isArray(sets) || sets.length === 0 || sets.length > 5) {
+    return res.status(400).json({ error: 'Entre 1 et 5 sets requis.' })
+  }
+  for (const s of sets) {
+    if (typeof s.setNumber !== 'number' || typeof s.playerScore !== 'number' || typeof s.opponentScore !== 'number') {
+      return res.status(400).json({ error: 'Scores de sets invalides.' })
+    }
+  }
+
+  try {
+    if (convType === 'special') {
+      const sm = await prisma.specialMatch.findUnique({ where: { id: cid } })
+      if (!sm) return res.status(404).json({ error: 'Convocation introuvable.' })
+      if (sm.player1Id !== uid && sm.player2Id !== uid)
+        return res.status(403).json({ error: 'Ce match ne vous concerne pas.' })
+      if (sm.resolved)
+        return res.status(409).json({ error: 'Le score de ce match a déjà été renseigné.' })
+      if (sm.endDate && new Date(sm.endDate) < new Date())
+        return res.status(410).json({ error: 'La date limite pour renseigner ce score est dépassée. Contactez l\'administrateur.' })
+
+      const [p1, p2] = await Promise.all([
+        prisma.user.findUnique({ where: { id: sm.player1Id } }),
+        prisma.user.findUnique({ where: { id: sm.player2Id } }),
+      ])
+      if (!p1 || !p2) return res.status(404).json({ error: 'Joueur introuvable.' })
+
+      const matchDateObj = matchDate ? new Date(matchDate) : new Date()
+      const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
+      const phase = state?.currentPhase || 'PHASE0'
+      const roundInt = phase === 'PHASE2' ? state?.currentRound : null
+      const noteStr = note ? note.trim() : null
+
+      // Le joueur qui saisit le score renseigne toujours playerScore/opponentScore
+      // depuis SON point de vue → on inverse pour le match miroir de l'adversaire.
+      const scorerIsP1 = sm.player1Id === uid
+
+      await prisma.specialMatch.update({ where: { id: cid }, data: { resolved: true } })
+
+      const [m1, m2] = await Promise.all([
+        prisma.match.create({
+          data: {
+            userId: sm.player1Id, phase, roundNumber: roundInt,
+            matchDate: matchDateObj,
+            opponentFirstName: p2.firstName, opponentLastName: p2.lastName,
+            note: noteStr, published: false, specialMatchId: cid,
+            sets: {
+              create: sets.map(s => ({
+                setNumber: s.setNumber,
+                playerScore: scorerIsP1 ? s.playerScore : s.opponentScore,
+                opponentScore: scorerIsP1 ? s.opponentScore : s.playerScore,
+              })),
+            },
+          },
+        }),
+        prisma.match.create({
+          data: {
+            userId: sm.player2Id, phase, roundNumber: roundInt,
+            matchDate: matchDateObj,
+            opponentFirstName: p1.firstName, opponentLastName: p1.lastName,
+            note: noteStr, published: false, specialMatchId: cid,
+            sets: {
+              create: sets.map(s => ({
+                setNumber: s.setNumber,
+                playerScore: scorerIsP1 ? s.opponentScore : s.playerScore,
+                opponentScore: scorerIsP1 ? s.playerScore : s.opponentScore,
+              })),
+            },
+          },
+        }),
+      ])
+
+      return res.status(201).json({ ok: true, match1: m1, match2: m2 })
+    }
+
+    // convType === 'planned'
+    const pm = await prisma.plannedMatch.findUnique({
+      where: { id: cid },
+      include: { player1: true, player2: true },
+    })
+    if (!pm) return res.status(404).json({ error: 'Ce match a déjà été renseigné ou n\'existe plus.' })
+    if (pm.player1Id !== uid && pm.player2Id !== uid)
+      return res.status(403).json({ error: 'Ce match ne vous concerne pas.' })
+
+    const matchDateObj = matchDate ? new Date(matchDate) : (pm.scheduledDate || new Date())
+    const roundInt = pm.phase === 'PHASE2' ? pm.roundNumber : null
+    const noteStr = note ? note.trim() : (pm.note || null)
+    const scorerIsP1 = pm.player1Id === uid
+
+    const [m1, m2] = await Promise.all([
+      prisma.match.create({
+        data: {
+          userId: pm.player1Id, phase: pm.phase, roundNumber: roundInt,
+          matchDate: matchDateObj,
+          opponentFirstName: pm.player2.firstName, opponentLastName: pm.player2.lastName,
+          note: noteStr, published: false,
+          sets: {
+            create: sets.map(s => ({
+              setNumber: s.setNumber,
+              playerScore: scorerIsP1 ? s.playerScore : s.opponentScore,
+              opponentScore: scorerIsP1 ? s.opponentScore : s.playerScore,
+            })),
+          },
+        },
+      }),
+      prisma.match.create({
+        data: {
+          userId: pm.player2Id, phase: pm.phase, roundNumber: roundInt,
+          matchDate: matchDateObj,
+          opponentFirstName: pm.player1.firstName, opponentLastName: pm.player1.lastName,
+          note: noteStr, published: false,
+          sets: {
+            create: sets.map(s => ({
+              setNumber: s.setNumber,
+              playerScore: scorerIsP1 ? s.opponentScore : s.playerScore,
+              opponentScore: scorerIsP1 ? s.playerScore : s.opponentScore,
+            })),
+          },
+        },
+      }),
+    ])
+
+    await prisma.plannedMatch.delete({ where: { id: cid } })
+
+    return res.status(201).json({ ok: true, match1: m1, match2: m2 })
+  } catch (err) {
+    console.error('[convocations submit]', err)
+    return res.status(500).json({ error: 'Erreur serveur.' })
+  }
 }

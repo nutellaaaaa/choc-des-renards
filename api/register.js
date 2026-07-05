@@ -13,6 +13,14 @@ function slugify(str) {
     .replace(/[^a-z0-9]/g, '')
 }
 
+// Met en forme "jean-pierre" / "JEAN" / "jEan" → "Jean-Pierre" (gère espaces et tirets)
+function capName(str) {
+  if (!str) return str
+  return str.toString().trim().split(/(\s|-)/).map(part =>
+    /^[\s-]$/.test(part) ? part : (part.charAt(0).toLocaleUpperCase('fr-FR') + part.slice(1).toLocaleLowerCase('fr-FR'))
+  ).join('')
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
@@ -67,8 +75,8 @@ module.exports = async function handler(req, res) {
       data: {
         username,
         passwordHash,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
+        firstName: capName(firstName.trim()),
+        lastName: capName(lastName.trim()),
         phone: phone.trim(),
         category: 'NC',
       },

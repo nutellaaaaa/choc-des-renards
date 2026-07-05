@@ -52,6 +52,39 @@ const MALUS_LIST = [
   'Zone restrictive changeant à chaque set : rivière, box, couloir du fond, box puis rivière',
 ]
 
+// Rang de classement, du plus faible au plus fort (FFBad) — utilisé pour le malus automatique
+const CATEGORY_RANK = { NC: 0, P: 1, D: 2, R: 3, N: 4 }
+// Écarts de classement qui déclenchent un malus automatique pour compenser l'écart
+const AUTO_MALUS_PAIRS = [['P', 'R'], ['P', 'N'], ['D', 'N']]
+
+function pickRandomMalus() {
+  return MALUS_LIST[Math.floor(Math.random() * MALUS_LIST.length)]
+}
+
+/**
+ * Calcule un malus automatique si l'écart de classement entre les deux joueurs
+ * correspond à un des écarts significatifs (P/R, P/N, D/N). Le malus est attribué
+ * au joueur le mieux classé pour compenser l'écart. Retourne null si aucun écart
+ * qualifiant n'est trouvé.
+ */
+function computeAutoMalus(cat1, cat2) {
+  const c1 = cat1 || 'NC', c2 = cat2 || 'NC'
+  const qualifies = AUTO_MALUS_PAIRS.some(([a, b]) => (c1 === a && c2 === b) || (c1 === b && c2 === a))
+  if (!qualifies) return null
+  const r1 = CATEGORY_RANK[c1] ?? 0
+  const r2 = CATEGORY_RANK[c2] ?? 0
+  const target = r1 >= r2 ? 1 : 2 // 1 = player1, 2 = player2 — au mieux classé
+  return { malus: pickRandomMalus(), malusTarget: target }
+}
+
+// Met en forme "jean-pierre" / "JEAN" / "jEan" → "Jean-Pierre" (gère espaces et tirets)
+function capName(str) {
+  if (!str) return str
+  return str.toString().trim().split(/(\s|-)/).map(part =>
+    /^[\s-]$/.test(part) ? part : (part.charAt(0).toLocaleUpperCase('fr-FR') + part.slice(1).toLocaleLowerCase('fr-FR'))
+  ).join('')
+}
+
 function computeStats(matches) {
   let played = 0, wins = 0, losses = 0, setDiff = 0
   for (const m of matches) {
@@ -1086,8 +1119,8 @@ async function handleAction(req, res) {
           if (existing) return res.status(409).json({ error: 'Ce pseudo est déjà utilisé.' })
         }
         const updateData = {}
-        if (firstName) updateData.firstName = firstName
-        if (lastName)  updateData.lastName  = lastName
+        if (firstName) updateData.firstName = capName(firstName)
+        if (lastName)  updateData.lastName  = capName(lastName)
         if (username)  updateData.username  = username
         if (phone)     updateData.phone     = phone
         if (category)  updateData.category  = category
@@ -1468,13 +1501,30 @@ async function handleMatch(req, res) {
     if (isNaN(p1id) || isNaN(p2id) || p1id === p2id)
       return res.status(400).json({ error: 'Joueurs invalides.' })
     try {
+      let finalMalus = malus || null
+      let finalMalusTarget = malusTarget ? parseInt(malusTarget, 10) : null
+
+      if (finalMalus === '__RANDOM__') {
+        // Malus "Aléatoire" choisi par l'admin : on tire un malus concret dès l'enregistrement
+        finalMalus = pickRandomMalus()
+        if (!finalMalusTarget) finalMalusTarget = Math.random() < 0.5 ? 1 : 2
+      } else if (!finalMalus) {
+        // Aucun malus fourni : vérifier si l'écart de classement déclenche un malus automatique
+        const [p1, p2] = await Promise.all([
+          prisma.user.findUnique({ where: { id: p1id }, select: { category: true } }),
+          prisma.user.findUnique({ where: { id: p2id }, select: { category: true } }),
+        ])
+        const auto = computeAutoMalus(p1?.category, p2?.category)
+        if (auto) { finalMalus = auto.malus; finalMalusTarget = auto.malusTarget }
+      }
+
       const pm = await prisma.plannedMatch.create({
         data: {
           player1Id: p1id,
           player2Id: p2id,
           scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
-          malus: malus || null,
-          malusTarget: malusTarget ? parseInt(malusTarget, 10) : null,
+          malus: finalMalus,
+          malusTarget: finalMalusTarget,
           note: note ? note.trim() : null,
           phase: phase || 'PHASE1',
           roundNumber: phase === 'PHASE2' ? (parseInt(round, 10) || null) : null,
@@ -1496,12 +1546,18 @@ async function handleMatch(req, res) {
     const pmid = parseInt(plannedMatchId, 10)
     if (isNaN(pmid)) return res.status(400).json({ error: 'plannedMatchId invalide.' })
     try {
+      let finalMalus = malus || null
+      let finalMalusTarget = malusTarget ? parseInt(malusTarget, 10) : null
+      if (finalMalus === '__RANDOM__') {
+        finalMalus = pickRandomMalus()
+        if (!finalMalusTarget) finalMalusTarget = Math.random() < 0.5 ? 1 : 2
+      }
       const pm = await prisma.plannedMatch.update({
         where: { id: pmid },
         data: {
           scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
-          malus: malus || null,
-          malusTarget: malusTarget ? parseInt(malusTarget, 10) : null,
+          malus: finalMalus,
+          malusTarget: finalMalusTarget,
           note: note ? note.trim() : null,
           phase: phase || 'PHASE1',
           roundNumber: phase === 'PHASE2' ? (parseInt(round, 10) || null) : null,

@@ -1,21 +1,34 @@
 ---------- Fonctionnalités en cours d'implémentation ----------
 - Dans le classement, on n'a pas de classement général, c'est Poules / Rondes suisses. Le bon onglet doit être cliqué par défaut selon la phase en cours. Si je suis à la Phase 1, le classement par défaut qui apparait lorsque je vais dans "classement" est Poules. Inversement si je suis à la Phase 2. Pour la phase 0, un message apparaît "La saison [année actuelle]-[année actuelle +1] n'a pas encore débutée. 
 
-- Détourer l'icône de l'onglet du site
+- Détourer l'icône de l'onglet du site (et agrandir)
 
+- Lorsque deux joueurs ont été convoqué à un match, ils ont un nouveau menu "score du match" dans lequel l'un d'eux doit remplir le score du match avant la date limite. Après cela, le match apparaît automatiquement dans la liste des matchs à publier par l'admin. 
+- Connexion par pseudo
+- Dans "Utilisateurs", les boutons "Modifier🔑 Mot de passe +Match ✉ Désactiver Bannir" prennent trop de place et une molette apparaît. Trouve une solution (mets-les à la ligne ou crée un bouton ... qui les ouvre je ne sais pas)
+- Le mot de passe a un oeil qui peut le rendre visible 
+- Mettre un filtrage de joueurs dans la liste des notifications (le même que pour la liste des connexions)
+- Les noms et les prénoms doivent toujours apparaîtrent avec une Majuscule
+- Dans les notifs, 0 => pas de notif, donc on retire le point orange. Indiquer le nb d'utilisateurs et de FAQ autrement que dans un point orange qui indique à l'admin qu'il faut aller voir (alors que pas nécessairement)
+- Dans les malus, rajouter un malus "aléatoire" qui choisit le malus tout seul de manière aléatoire
+- Intégrer une image de renard méchant à la notif de convocation à un match 
+- Lors de la planification auto d'un match, un malus automatique est attribué au joueur ayant un écart de classement de P/R, P/N, D/N 
+--> Session en cours : a.fillon657
 
 ---------- Bugs en cours de réparation ----------
-- Bouton "cliquer pour commencer" pas cliquable partout sur la page
-- Pas de jet orangé
 - Sous-titre "Choc des renards" du logo de bondy à mettre en blanc
+- Retirer le contour du bouton autour de "cliquer pour commencer" qui clignote
 
 
 ---------- Fonctionnalités supplémentaires -----------
  - Envoyer des messages aux participants sur WhatsApp pour les matchs 
  - Transformer le site en une appli mobile
  - Revoir le format mobile (responsive)
- - Ajouter des animations
+ - Musique ? 
 
+ - Historique de progression d'un joueur : un petit graphe (points/victoires dans le temps) sur la modale joueur — tu as déjà tout en base (matches, createdAt), juste à agréger.
+ --> .html de prévisualisation généré
+ - Badge/streak : "3 victoires d'affilée", "meilleure progression du mois" — ludique, pas cher à calculer côté back.
 
 ---------- Done ----------
 - Retirer nb phases et nb mois sur l'accueil
