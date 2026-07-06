@@ -194,14 +194,20 @@ model PlannedMatch {
   roundNumber Int?
   createdAt   DateTime @default(now())
 
+  // ── Planification automatique ──
+  notifiedAt  DateTime? // horodatage d'envoi de la notification "prochain match" (snapshot figé, non resynchronisé)
+  deadlineAt  DateTime? // scheduledDate + cycleLengthDays - deadlineHoursBeforeCycleEnd
+  forfeited   Boolean  @default(false) // passé à true par le balayage automatique (forfait 0-0)
+
   player1 User @relation("PlannedPlayer1", fields: [player1Id], references: [id])
   player2 User @relation("PlannedPlayer2", fields: [player2Id], references: [id])
+  notifications Notification[]
 }
 
 model Notification {
   id           Int      @id @default(autoincrement())
   userId       Int
-  type         String   // 'message' | 'special_match'
+  type         String   // 'message' | 'special_match' | 'next_match'
   title        String
   message      String
   opponentName String?
@@ -212,7 +218,48 @@ model Notification {
   readAt       DateTime?
   createdAt    DateTime @default(now())
 
+  plannedMatchId Int?
+  plannedMatch   PlannedMatch? @relation(fields: [plannedMatchId], references: [id], onDelete: SetNull)
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ═══════════════════ PLANIFICATION AUTOMATIQUE ═══════════════════
+
+// Un jeu de paramètres par phase (PHASE1 / PHASE2), indépendants. Verrouillés
+// (locked = true) dès que la génération a été effectuée ; pour les modifier,
+// l'admin doit d'abord supprimer les matchs planifiés de la phase.
+model SchedulingSettings {
+  id                          Int      @id @default(autoincrement())
+  phase                       Phase    @unique
+  cycleLengthDays             Int      @default(14)
+  deadlineHoursBeforeCycleEnd Int      @default(24)
+  periodStart                 DateTime
+  periodEnd                   DateTime
+  locked                      Boolean  @default(false)
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+}
+
+// Périodes de non-jeu, portée globale à tous les joueurs d'une phase donnée.
+model BlackoutPeriod {
+  id        Int      @id @default(autoincrement())
+  phase     Phase
+  label     String
+  dateStart DateTime
+  dateEnd   DateTime
+  createdAt DateTime @default(now())
+}
+
+// Console de logs — un seul fil actif par phase, vidé et remplacé à chaque
+// nouveau calcul (pas d'historique cumulatif, pas d'onglets datés).
+model SchedulingLog {
+  id        Int      @id @default(autoincrement())
+  phase     Phase
+  type      String   // 'info' | 'question' | 'reponse' | 'avertissement' | 'erreur' | 'commande' | 'action'
+  message   String
+  data      Json?
+  createdAt DateTime @default(now())
 }
 
 // ═══════════════════ FAQ ═══════════════════

@@ -575,6 +575,28 @@
   .admin-table th { font-family: var(--font-heading); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gray); padding: 0.6rem 0.75rem; text-align: left; white-space: nowrap; }
   .admin-table td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--dark4); color: var(--gray-light); vertical-align: middle; }
   .admin-table tbody tr:hover { background: var(--dark2); }
+
+  /* Console de planification — style terminal Ubuntu */
+  .planning-terminal { background: #1a1a1a; border: 1px solid #333; border-radius: 8px 8px 0 0; padding: 1rem 1.1rem; height: 440px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 0.86rem; line-height: 1.55; }
+  .planning-terminal-line { white-space: pre-wrap; word-break: break-word; }
+  .pt-info { color: #d8d8d8; }
+  .pt-avertissement { color: #e6c229; }
+  .pt-erreur { color: #ff5c5c; }
+  .pt-question { color: #4fc3f7; font-weight: 700; }
+  .pt-reponse { color: #7ee787; }
+  .pt-commande { color: #7ee787; }
+  .pt-commande::before { content: "$ "; opacity: 0.6; }
+  .pt-action { color: #ff9f43; font-weight: 600; }
+  .pt-prefix { opacity: 0.55; margin-right: 0.4rem; }
+  .planning-terminal-input-row { display: flex; align-items: center; gap: 0.5rem; background: #111; border: 1px solid #333; border-top: none; border-radius: 0 0 8px 8px; padding: 0.6rem 1.1rem; }
+  .planning-terminal-prompt { font-family: 'Courier New', monospace; color: #7ee787; font-size: 0.86rem; white-space: nowrap; }
+  #planning-command-input { flex: 1; background: transparent; border: none; outline: none; color: #e8e8e8; font-family: 'Courier New', monospace; font-size: 0.86rem; }
+  .planning-question-box { background: var(--dark2); border: 1px solid #4fc3f7; border-radius: 8px; padding: 1rem; margin: 0.75rem 0; }
+  .planning-question-box .q-text { color: #4fc3f7; font-weight: 700; margin-bottom: 0.75rem; }
+  .planning-question-box .q-options { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+  .blackout-chip { display: inline-flex; align-items: center; gap: 0.5rem; background: var(--dark2); border: 1px solid var(--dark4); border-radius: 20px; padding: 0.35rem 0.9rem; margin: 0 0.4rem 0.4rem 0; font-size: 0.85rem; color: var(--gray-light); }
+  .blackout-chip button { background: none; border: none; color: var(--gray); cursor: pointer; font-size: 0.9rem; line-height: 1; }
+  .blackout-chip button:hover { color: #ff5c5c; }
   .admin-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
   .actions-more { position: relative; display: inline-block; }
   .btn-more { padding: 0.3rem 0.6rem !important; background: var(--dark4); color: var(--gray-light); border-color: var(--dark4); }
@@ -999,6 +1021,7 @@
       <button class="admin-tab" onclick="adminTab('history',this)">Connexions</button>
       <button class="admin-tab" onclick="adminTab('phase',this)">Phase du tournoi</button>
       <button class="admin-tab" onclick="adminTab('poules',this)">Organiser la phase</button>
+      <button class="admin-tab" onclick="adminTab('planning',this)">Planification</button>
       <button class="admin-tab" onclick="adminTab('notify',this)">Notifier un joueur</button>
       <button class="admin-tab" onclick="adminTab('planned',this)">Matchs planifiés <span class="badge badge-info" id="badge-planned">–</span></button>
       <button class="admin-tab" onclick="adminTab('publication',this)">Publication matchs <span class="badge" id="badge-pending-matches" hidden>–</span></button>
@@ -1108,6 +1131,58 @@
           </div>
         </div>
         <div id="groups-list"><div class="admin-empty">Chargement…</div></div>
+      </div>
+    </div>
+
+    <!-- Planification automatique -->
+    <div id="admin-planning" class="admin-section">
+      <div class="admin-tabs" style="margin-bottom:1.5rem">
+        <button class="admin-tab active" onclick="planningSubTab('settings',this)">Paramètres</button>
+        <button class="admin-tab" onclick="planningSubTab('console',this)">Console</button>
+      </div>
+
+      <div id="planning-settings" class="admin-section active">
+        <div class="admin-section-header">
+          <h3>Phase 1 — Paramètres de planification</h3>
+          <span id="planning-lock-badge" class="badge badge-info" hidden>Verrouillé</span>
+        </div>
+        <div id="planning-locked-notice" class="modal-error" style="display:none">
+          Les paramètres sont verrouillés car des matchs sont déjà planifiés. Supprimez-les (bouton ci-dessous ou commande <code>supprimer matchs</code> dans la console) pour pouvoir les modifier.
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;max-width:640px">
+          <div class="form-group"><label>Début de la période</label><input type="date" id="ps-period-start"></div>
+          <div class="form-group"><label>Fin de la période</label><input type="date" id="ps-period-end"></div>
+          <div class="form-group"><label>Durée d'un cycle (jours)</label><input type="number" id="ps-cycle-length" min="1" value="14"></div>
+          <div class="form-group"><label>Deadline avant fin de cycle (heures)</label><input type="number" id="ps-deadline-hours" min="0" value="24"></div>
+        </div>
+        <div id="planning-settings-error" class="modal-error"></div>
+        <button class="btn-modal-save" onclick="saveSchedulingSettings()">Enregistrer les paramètres</button>
+
+        <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--dark4)">
+          <h4 style="font-family:var(--font-heading);font-size:0.9rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--gray);margin-bottom:1rem">Périodes de non-jeu</h4>
+          <div id="blackout-list" style="margin-bottom:1rem"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:0.6rem;max-width:760px;align-items:end">
+            <div class="form-group" style="margin:0"><label>Libellé</label><input type="text" id="bo-label" placeholder="Ex : Vacances de Noël"></div>
+            <div class="form-group" style="margin:0"><label>Début</label><input type="date" id="bo-start"></div>
+            <div class="form-group" style="margin:0"><label>Fin</label><input type="date" id="bo-end"></div>
+            <button class="btn-sm btn-accept" onclick="addBlackout()">+ Ajouter</button>
+          </div>
+        </div>
+
+        <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--dark4);display:flex;gap:0.6rem;flex-wrap:wrap;align-items:center">
+          <button class="btn-modal-save" onclick="computePhase1()">▶ Calculer les matchs (Phase 1)</button>
+          <button class="btn-sm btn-ban" onclick="resetPlannedPhase1()">Supprimer les matchs planifiés</button>
+          <span id="planning-count-info" style="color:var(--gray);font-size:0.9rem"></span>
+        </div>
+      </div>
+
+      <div id="planning-console" class="admin-section">
+        <div id="planning-terminal" class="planning-terminal"></div>
+        <div id="planning-questions"></div>
+        <div class="planning-terminal-input-row">
+          <span class="planning-terminal-prompt">admin@cdr-scheduler:~$</span>
+          <input type="text" id="planning-command-input" autocomplete="off" placeholder="aide · statut · calculer · supprimer matchs" onkeydown="if(event.key==='Enter')sendConsoleCommand()">
+        </div>
       </div>
     </div>
 
@@ -3638,6 +3713,7 @@ function adminTab(name, btn) {
   btn.classList.add('active')
   if (name === 'phase') loadPhase()
   if (name === 'poules') loadPoules()
+  if (name === 'planning') loadScheduling()
   if (name === 'publication') loadPendingMatches()
   if (name === 'planned') loadPlannedMatches()
   if (name === 'notifications-list') loadNotificationsList()
@@ -3659,6 +3735,13 @@ function poulesSubTab(name, btn) {
   document.querySelectorAll('#admin-poules .admin-section').forEach(s => s.classList.remove('active'))
   document.querySelectorAll('#admin-poules > .admin-tabs .admin-tab').forEach(b => b.classList.remove('active'))
   document.getElementById('poules-' + name).classList.add('active')
+  btn.classList.add('active')
+}
+
+function planningSubTab(name, btn) {
+  document.querySelectorAll('#admin-planning .admin-section').forEach(s => s.classList.remove('active'))
+  document.querySelectorAll('#admin-planning > .admin-tabs .admin-tab').forEach(b => b.classList.remove('active'))
+  document.getElementById('planning-' + name).classList.add('active')
   btn.classList.add('active')
 }
 
@@ -4164,6 +4247,133 @@ function renderGroups() {
           <button class="btn-sm btn-accept" onclick="addMemberToGroup(${g.id})">Ajouter</button>
         </div>
       </div>`).join('')
+}
+
+/* ══════════════ PLANIFICATION AUTOMATIQUE ══════════════ */
+let planningPhase = 'PHASE1'
+
+async function loadScheduling() {
+  const res = await fetch(`/api/admin/scheduling?phase=${planningPhase}`, { headers: authHeaders() })
+  const data = await res.json()
+  if (!res.ok) return
+  document.getElementById('ps-period-start').value = data.settings ? toDateInput(data.settings.periodStart) : ''
+  document.getElementById('ps-period-end').value   = data.settings ? toDateInput(data.settings.periodEnd) : ''
+  document.getElementById('ps-cycle-length').value  = data.settings ? data.settings.cycleLengthDays : 14
+  document.getElementById('ps-deadline-hours').value = data.settings ? data.settings.deadlineHoursBeforeCycleEnd : 24
+
+  const locked = !!data.locked
+  document.getElementById('planning-lock-badge').hidden = !locked
+  document.getElementById('planning-locked-notice').style.display = locked ? 'block' : 'none';
+  ['ps-period-start','ps-period-end','ps-cycle-length','ps-deadline-hours'].forEach(id => document.getElementById(id).disabled = locked)
+
+  document.getElementById('planning-count-info').textContent = `${data.plannedCount} match(s) planifié(s) actuellement pour la Phase 1.`
+
+  renderBlackouts(data.blackouts || [])
+  renderTerminal(data.logs || [])
+}
+
+function toDateInput(iso) { return new Date(iso).toISOString().slice(0, 10) }
+
+function renderBlackouts(blackouts) {
+  const el = document.getElementById('blackout-list')
+  if (blackouts.length === 0) { el.innerHTML = '<span style="color:var(--gray);font-size:0.88rem">Aucune période de non-jeu définie.</span>'; return }
+  el.innerHTML = blackouts.map(b => `
+    <span class="blackout-chip">
+      ${esc(b.label)} — ${new Date(b.dateStart).toLocaleDateString('fr-FR')} → ${new Date(b.dateEnd).toLocaleDateString('fr-FR')}
+      <button onclick="deleteBlackout(${b.id})" title="Supprimer">✕</button>
+    </span>`).join('')
+}
+
+async function saveSchedulingSettings() {
+  const errorEl = document.getElementById('planning-settings-error')
+  errorEl.textContent = ''
+  const body = {
+    action: 'save_settings',
+    phase: planningPhase,
+    periodStart: document.getElementById('ps-period-start').value,
+    periodEnd: document.getElementById('ps-period-end').value,
+    cycleLengthDays: document.getElementById('ps-cycle-length').value,
+    deadlineHoursBeforeCycleEnd: document.getElementById('ps-deadline-hours').value,
+  }
+  const res = await fetch('/api/admin/scheduling', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) })
+  const data = await res.json()
+  if (!res.ok) { errorEl.textContent = data.error || 'Erreur.'; return }
+  await loadScheduling()
+}
+
+async function addBlackout() {
+  const label = document.getElementById('bo-label').value.trim()
+  const start = document.getElementById('bo-start').value
+  const end = document.getElementById('bo-end').value
+  if (!label || !start || !end) { alert('Libellé et dates requis.'); return }
+  const res = await fetch('/api/admin/scheduling', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'save_blackout', phase: planningPhase, label, dateStart: start, dateEnd: end }) })
+  const data = await res.json()
+  if (!res.ok) { alert(data.error || 'Erreur.'); return }
+  document.getElementById('bo-label').value = ''
+  document.getElementById('bo-start').value = ''
+  document.getElementById('bo-end').value = ''
+  await loadScheduling()
+  if (data.needsRecompute) planningSubTab('console', document.querySelector('#admin-planning .admin-tab:nth-child(2)'))
+}
+
+async function deleteBlackout(id) {
+  if (!confirm('Supprimer cette période de non-jeu ?')) return
+  await fetch('/api/admin/scheduling', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'delete_blackout', blackoutId: id }) })
+  await loadScheduling()
+}
+
+async function resetPlannedPhase1() {
+  if (!confirm('Supprimer tous les matchs planifiés de la Phase 1 et déverrouiller les paramètres ?')) return
+  await fetch('/api/admin/scheduling', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'reset_phase1' }) })
+  await loadScheduling()
+}
+
+async function computePhase1(answers) {
+  const res = await fetch('/api/admin/scheduling', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'compute_phase1', answers: answers || {} }) })
+  const data = await res.json()
+  renderTerminal(data.logs || [])
+  planningSubTab('console', document.querySelector('#admin-planning .admin-tab:nth-child(2)'))
+  renderQuestions(data.needsInput ? data.questions : [])
+  if (data.ok) await loadScheduling()
+}
+
+async function sendConsoleCommand() {
+  const input = document.getElementById('planning-command-input')
+  const command = input.value.trim()
+  if (!command) return
+  input.value = ''
+  const res = await fetch('/api/admin/scheduling', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'console_command', phase: planningPhase, command }) })
+  await res.json().catch(() => null)
+  const stateRes = await fetch(`/api/admin/scheduling?phase=${planningPhase}`, { headers: authHeaders() })
+  const state = await stateRes.json()
+  renderTerminal(state.logs || [])
+}
+
+function renderQuestions(questions) {
+  const el = document.getElementById('planning-questions')
+  if (!questions || questions.length === 0) { el.innerHTML = ''; return }
+  el.innerHTML = questions.map(q => `
+    <div class="planning-question-box">
+      <div class="q-text">${esc(q.question)}</div>
+      <div class="q-options">
+        ${q.options.map(o => `<button class="btn-sm btn-edit" onclick='answerSchedulingQuestion("${q.key}","${o.value}")'>${esc(o.label)}</button>`).join('')}
+      </div>
+    </div>`).join('')
+}
+
+function answerSchedulingQuestion(key, value) {
+  document.getElementById('planning-questions').innerHTML = ''
+  computePhase1({ [key]: value })
+}
+
+function renderTerminal(logs) {
+  const el = document.getElementById('planning-terminal')
+  const typeClass = { info: 'pt-info', avertissement: 'pt-avertissement', erreur: 'pt-erreur', question: 'pt-question', reponse: 'pt-reponse', commande: 'pt-commande', action: 'pt-action' }
+  el.innerHTML = logs.map(l => {
+    const time = new Date(l.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    return `<div class="planning-terminal-line ${typeClass[l.type] || 'pt-info'}"><span class="pt-prefix">[${time}]</span>${esc(l.message)}</div>`
+  }).join('') || '<div class="planning-terminal-line pt-info" style="opacity:0.5">Aucun calcul lancé pour le moment. Tapez "aide" ci-dessous ou configurez les paramètres puis cliquez sur « Calculer ».</div>'
+  el.scrollTop = el.scrollHeight
 }
 
 function openCreatePouleModal() {

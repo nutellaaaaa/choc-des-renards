@@ -188,6 +188,8 @@ module.exports = async function handler(req, res) {
       return handleAction(req, res)
     case 'match':
       return handleMatch(req, res)
+    case 'scheduling':
+      return handleScheduling(req, res)
     default:
       return res.status(400).json({ error: 'resource invalide ou manquant.' })
   }
@@ -1691,4 +1693,402 @@ async function handleMatch(req, res) {
   }
 
   return res.status(400).json({ error: 'Action invalide.' })
+}
+
+/* ============================================================
+ * SCHEDULING — planification automatique des matchs
+ * ============================================================
+ * resource=scheduling
+ *   GET  ?phase=PHASE1|PHASE2                     → état complet (settings, blackouts, logs, poules, verrouillage)
+ *   POST action=save_settings   { phase, cycleLengthDays, deadlineHoursBeforeCycleEnd, periodStart, periodEnd }
+ *   POST action=save_blackout   { phase, label, dateStart, dateEnd }
+ *   POST action=delete_blackout { blackoutId }
+ *   POST action=compute_phase1  { answers? }       → génère le round-robin par poule (Phase 1)
+ *   POST action=reset_phase1    {}                 → supprime les matchs planifiés Phase 1 et déverrouille
+ *   POST action=console_command { phase, command } → interprète une commande texte de la console
+ * ============================================================ */
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000
+
+function addDays(date, days) { return new Date(date.getTime() + days * MS_PER_DAY) }
+function addHours(date, hours) { return new Date(date.getTime() + hours * 60 * 60 * 1000) }
+function fmtDate(d) { return new Date(d).toLocaleDateString('fr-FR') }
+
+// Décale une date après la fin de toute période de non-jeu qui la contiendrait (en cascade,
+// au cas où deux périodes se chevauchent ou se suivent immédiatement).
+function shiftPastBlackouts(date, blackouts) {
+  let cur = new Date(date)
+  let moved = true
+  let guard = 0
+  while (moved && guard < 50) {
+    moved = false
+    guard++
+    for (const bp of blackouts) {
+      if (cur >= bp.dateStart && cur <= bp.dateEnd) {
+        cur = addDays(bp.dateEnd, 1)
+        moved = true
+      }
+    }
+  }
+  return cur
+}
+
+// Génère un calendrier round-robin (méthode du cercle) pour une liste d'IDs joueurs.
+// Retourne un tableau de rondes, chaque ronde étant un tableau de paires [id1, id2].
+// Si le nombre de joueurs est impair, un "bye" (null) tourne à chaque ronde.
+function generateRoundRobinRounds(playerIds) {
+  const arrBase = [...playerIds]
+  if (arrBase.length % 2 !== 0) arrBase.push(null)
+  const n = arrBase.length
+  if (n < 2) return []
+  const numRounds = n - 1
+  let arr = arrBase.slice()
+  const rounds = []
+  for (let r = 0; r < numRounds; r++) {
+    const pairs = []
+    for (let i = 0; i < n / 2; i++) {
+      const a = arr[i], b = arr[n - 1 - i]
+      if (a !== null && b !== null) pairs.push([a, b])
+    }
+    rounds.push(pairs)
+    const fixed = arr[0]
+    const rest = arr.slice(1)
+    rest.unshift(rest.pop())
+    arr = [fixed, ...rest]
+  }
+  return rounds
+}
+
+// Construit l'ensemble des paires (userId1-userId2, triées) déjà jouées ou en attente de
+// publication pour une phase donnée, à partir des Match existants (comparaison par nom, le
+// modèle Match ne stocke pas d'opponentId — cf. planned_convert plus haut).
+async function getExistingPairKeys(phase, members) {
+  const idByName = new Map()
+  for (const m of members) idByName.set(normName(m.firstName) + '|' + normName(m.lastName), m.id)
+
+  const matches = await prisma.match.findMany({
+    where: { phase, userId: { in: members.map(m => m.id) } },
+    select: { userId: true, opponentFirstName: true, opponentLastName: true },
+  })
+
+  const keys = new Set()
+  for (const m of matches) {
+    const oppId = idByName.get(normName(m.opponentFirstName) + '|' + normName(m.opponentLastName))
+    if (!oppId) continue
+    const key = [m.userId, oppId].sort((a, b) => a - b).join('-')
+    keys.add(key)
+  }
+  return keys
+}
+
+async function handleScheduling(req, res) {
+  const payload = requireAdmin(req, res)
+  if (!payload) return
+
+  if (req.method === 'GET') {
+    const phase = req.query.phase === 'PHASE2' ? 'PHASE2' : 'PHASE1'
+    try {
+      const [settings, blackouts, logs, plannedCount, poules] = await Promise.all([
+        prisma.schedulingSettings.findUnique({ where: { phase } }),
+        prisma.blackoutPeriod.findMany({ where: { phase }, orderBy: { dateStart: 'asc' } }),
+        prisma.schedulingLog.findMany({ where: { phase }, orderBy: { id: 'asc' } }),
+        prisma.plannedMatch.count({ where: { phase } }),
+        prisma.poule.findMany({
+          where: { phase },
+          orderBy: { createdAt: 'asc' },
+          include: {
+            members: {
+              where: { user: { active: true, accepted: true, banned: false } },
+              include: { user: { select: { id: true, firstName: true, lastName: true, username: true, category: true } } },
+            },
+          },
+        }),
+      ])
+      return res.status(200).json({
+        phase, settings, blackouts, logs, plannedCount, poules,
+        locked: !!settings?.locked,
+      })
+    } catch (err) {
+      console.error('[scheduling GET]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' })
+
+  const { action } = req.body || {}
+
+  if (action === 'save_settings') {
+    const { phase, cycleLengthDays, deadlineHoursBeforeCycleEnd, periodStart, periodEnd } = req.body
+    if (!['PHASE1', 'PHASE2'].includes(phase)) return res.status(400).json({ error: 'Phase invalide.' })
+    if (!periodStart || !periodEnd) return res.status(400).json({ error: 'Période (début/fin) requise.' })
+    const cycle = parseInt(cycleLengthDays, 10)
+    const deadlineH = parseInt(deadlineHoursBeforeCycleEnd, 10)
+    if (isNaN(cycle) || cycle < 1) return res.status(400).json({ error: 'Durée de cycle invalide.' })
+    if (isNaN(deadlineH) || deadlineH < 0) return res.status(400).json({ error: 'Délai de deadline invalide.' })
+    const start = new Date(periodStart), end = new Date(periodEnd)
+    if (end <= start) return res.status(400).json({ error: 'La date de fin doit être après la date de début.' })
+
+    try {
+      const existing = await prisma.schedulingSettings.findUnique({ where: { phase } })
+      if (existing?.locked) {
+        return res.status(409).json({ error: 'Les paramètres sont verrouillés : supprimez d\'abord les matchs planifiés de cette phase pour les modifier.' })
+      }
+      const settings = await prisma.schedulingSettings.upsert({
+        where: { phase },
+        update: { cycleLengthDays: cycle, deadlineHoursBeforeCycleEnd: deadlineH, periodStart: start, periodEnd: end },
+        create: { phase, cycleLengthDays: cycle, deadlineHoursBeforeCycleEnd: deadlineH, periodStart: start, periodEnd: end },
+      })
+      return res.status(200).json({ ok: true, settings })
+    } catch (err) {
+      console.error('[scheduling save_settings]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  if (action === 'save_blackout') {
+    const { phase, label, dateStart, dateEnd } = req.body
+    if (!['PHASE1', 'PHASE2'].includes(phase)) return res.status(400).json({ error: 'Phase invalide.' })
+    if (!label?.trim() || !dateStart || !dateEnd) return res.status(400).json({ error: 'Libellé et dates requis.' })
+    const start = new Date(dateStart), end = new Date(dateEnd)
+    if (end < start) return res.status(400).json({ error: 'La date de fin doit être après la date de début.' })
+    try {
+      const bp = await prisma.blackoutPeriod.create({ data: { phase, label: label.trim(), dateStart: start, dateEnd: end } })
+      // Une période de non-jeu ajoutée après génération doit être traitée comme une
+      // régénération manuelle : on prévient l'admin dans la console plutôt que de
+      // recalculer silencieusement (cf. cahier des charges).
+      const settings = await prisma.schedulingSettings.findUnique({ where: { phase } })
+      if (settings?.locked) {
+        await prisma.schedulingLog.create({
+          data: { phase, type: 'avertissement', message: `Période de non-jeu « ${label.trim()} » ajoutée alors que les matchs sont déjà générés. Relancez le calcul (il régénérera en tenant compte des scores déjà saisis) pour l'appliquer.` },
+        })
+      }
+      return res.status(201).json({ ok: true, blackout: bp, needsRecompute: !!settings?.locked })
+    } catch (err) {
+      console.error('[scheduling save_blackout]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  if (action === 'delete_blackout') {
+    const bid = parseInt(req.body.blackoutId, 10)
+    if (isNaN(bid)) return res.status(400).json({ error: 'blackoutId invalide.' })
+    try {
+      await prisma.blackoutPeriod.delete({ where: { id: bid } })
+      return res.status(200).json({ ok: true })
+    } catch (err) {
+      return res.status(500).json({ error: 'Erreur serveur ou période introuvable.' })
+    }
+  }
+
+  if (action === 'reset_phase1') {
+    try {
+      await prisma.plannedMatch.deleteMany({ where: { phase: 'PHASE1' } })
+      await prisma.schedulingSettings.updateMany({ where: { phase: 'PHASE1' }, data: { locked: false } })
+      await prisma.schedulingLog.create({
+        data: { phase: 'PHASE1', type: 'action', message: 'Matchs planifiés Phase 1 supprimés — paramètres déverrouillés.' },
+      })
+      return res.status(200).json({ ok: true })
+    } catch (err) {
+      console.error('[scheduling reset_phase1]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  if (action === 'console_command') {
+    const { phase, command } = req.body
+    const ph = phase === 'PHASE2' ? 'PHASE2' : 'PHASE1'
+    const cmd = (command || '').trim().toLowerCase()
+    await prisma.schedulingLog.create({ data: { phase: ph, type: 'commande', message: command || '' } })
+
+    if (cmd === 'aide' || cmd === 'help') {
+      await prisma.schedulingLog.create({
+        data: { phase: ph, type: 'info', message: 'Commandes disponibles : aide · statut · calculer · supprimer matchs' },
+      })
+      return res.status(200).json({ ok: true })
+    }
+    if (cmd === 'statut') {
+      const [settings, plannedCount] = await Promise.all([
+        prisma.schedulingSettings.findUnique({ where: { phase: ph } }),
+        prisma.plannedMatch.count({ where: { phase: ph } }),
+      ])
+      const msg = settings
+        ? `Période ${fmtDate(settings.periodStart)} → ${fmtDate(settings.periodEnd)} · cycle ${settings.cycleLengthDays}j · ${plannedCount} match(s) planifié(s) · ${settings.locked ? 'verrouillé' : 'non verrouillé'}.`
+        : 'Aucun paramètre configuré pour cette phase.'
+      await prisma.schedulingLog.create({ data: { phase: ph, type: 'info', message: msg } })
+      return res.status(200).json({ ok: true })
+    }
+    if (cmd === 'calculer' && ph === 'PHASE1') {
+      return computePhase1(req, res, {})
+    }
+    if (cmd === 'supprimer matchs') {
+      await prisma.plannedMatch.deleteMany({ where: { phase: ph } })
+      await prisma.schedulingSettings.updateMany({ where: { phase: ph }, data: { locked: false } })
+      await prisma.schedulingLog.create({ data: { phase: ph, type: 'action', message: 'Matchs planifiés supprimés via la console.' } })
+      return res.status(200).json({ ok: true })
+    }
+    await prisma.schedulingLog.create({ data: { phase: ph, type: 'erreur', message: `Commande inconnue : « ${command} ». Tapez "aide" pour la liste des commandes.` } })
+    return res.status(200).json({ ok: true })
+  }
+
+  if (action === 'compute_phase1') {
+    return computePhase1(req, res, req.body?.answers || {})
+  }
+
+  return res.status(400).json({ error: 'Action invalide.' })
+}
+
+// Calcule et enregistre le round-robin de Phase 1 pour toutes les poules.
+// N'écrit les PlannedMatch en base que si le calcul se résout entièrement (pas de
+// question ouverte) — sinon les logs (y compris la question) sont écrits mais aucun
+// match n'est créé, et la fonction retourne needsInput:true.
+async function computePhase1(req, res, answers) {
+  const phase = 'PHASE1'
+  const logEntries = []
+  const log = (type, message) => logEntries.push({ phase, type, message })
+
+  try {
+    const settings = await prisma.schedulingSettings.findUnique({ where: { phase } })
+    if (!settings) {
+      log('erreur', 'Aucun paramètre de planification configuré pour la Phase 1. Configurez la période et le cycle avant de calculer.')
+      await flushLogs(phase, logEntries)
+      return res.status(400).json({ ok: false, error: 'Paramètres manquants.', logs: logEntries })
+    }
+
+    const [blackouts, poules] = await Promise.all([
+      prisma.blackoutPeriod.findMany({ where: { phase }, orderBy: { dateStart: 'asc' } }),
+      prisma.poule.findMany({
+        where: { phase },
+        orderBy: { createdAt: 'asc' },
+        include: {
+          members: {
+            where: { user: { active: true, accepted: true, banned: false } },
+            include: { user: { select: { id: true, firstName: true, lastName: true, username: true, category: true } } },
+          },
+        },
+      }),
+    ])
+
+    if (poules.length === 0) {
+      log('erreur', 'Aucune poule définie pour la Phase 1.')
+      await flushLogs(phase, logEntries)
+      return res.status(400).json({ ok: false, error: 'Aucune poule.', logs: logEntries })
+    }
+
+    log('info', `Début du calcul Phase 1 — période du ${fmtDate(settings.periodStart)} au ${fmtDate(settings.periodEnd)}, cycle de ${settings.cycleLengthDays} jour(s), deadline ${settings.deadlineHoursBeforeCycleEnd}h avant la fin de chaque cycle.`)
+    if (blackouts.length > 0) {
+      log('info', `${blackouts.length} période(s) de non-jeu prise(s) en compte : ${blackouts.map(b => `${b.label} (${fmtDate(b.dateStart)}→${fmtDate(b.dateEnd)})`).join(', ')}.`)
+    }
+
+    // Round-robin par poule (données brutes, sans dates pour l'instant)
+    const pouleData = []
+    let maxRounds = 0
+    for (const p of poules) {
+      const members = p.members.map(m => m.user)
+      if (members.length < 2) {
+        log('avertissement', `Poule « ${p.name} » : moins de 2 joueurs actifs — ignorée.`)
+        continue
+      }
+      const existingKeys = await getExistingPairKeys(phase, members)
+      const rounds = generateRoundRobinRounds(members.map(m => m.id))
+      const byId = new Map(members.map(m => [m.id, m]))
+      let totalPairs = 0, excludedPairs = 0
+      const filteredRounds = rounds.map(roundPairs => roundPairs.filter(([a, b]) => {
+        totalPairs++
+        const key = [a, b].sort((x, y) => x - y).join('-')
+        if (existingKeys.has(key)) { excludedPairs++; return false }
+        return true
+      }))
+      maxRounds = Math.max(maxRounds, filteredRounds.length)
+      if (members.length % 2 !== 0) log('info', `Poule « ${p.name} » : ${members.length} joueurs (nombre impair) — un exempt tournant par ronde.`)
+      log('info', `Poule « ${p.name} » : ${members.length} joueurs, ${filteredRounds.length} ronde(s), ${totalPairs - excludedPairs} match(s) à créer${excludedPairs ? ` (${excludedPairs} paire(s) déjà jouée(s) ou en attente de publication, exclue(s))` : ''}.`)
+      pouleData.push({ poule: p, byId, filteredRounds })
+    }
+
+    if (maxRounds === 0) {
+      log('erreur', 'Aucune ronde à planifier (poules vides ou toutes les paires déjà jouées).')
+      await flushLogs(phase, logEntries)
+      return res.status(400).json({ ok: false, error: 'Rien à planifier.', logs: logEntries })
+    }
+
+    // Dates de ronde, communes à toutes les poules, avec décalage en cascade sur les périodes de non-jeu
+    const roundDates = []
+    let cursor = new Date(settings.periodStart)
+    for (let r = 0; r < maxRounds; r++) {
+      if (r > 0) cursor = addDays(cursor, settings.cycleLengthDays)
+      const raw = new Date(cursor)
+      const shifted = shiftPastBlackouts(cursor, blackouts)
+      if (shifted.getTime() !== raw.getTime()) {
+        log('avertissement', `Ronde ${r + 1} : initialement prévue le ${fmtDate(raw)}, tombe dans une période de non-jeu — décalée au ${fmtDate(shifted)}.`)
+      } else {
+        log('info', `Ronde ${r + 1} : ${fmtDate(shifted)}.`)
+      }
+      cursor = shifted
+      roundDates.push(new Date(cursor))
+    }
+
+    const lastDeadline = addHours(addDays(roundDates[roundDates.length - 1], settings.cycleLengthDays), -settings.deadlineHoursBeforeCycleEnd)
+    if (lastDeadline > settings.periodEnd) {
+      log('avertissement', `La deadline de la dernière ronde (${fmtDate(lastDeadline)}) dépasse la fin de période prévue (${fmtDate(settings.periodEnd)}).`)
+      if (!answers.overrun) {
+        log('question', 'Comment souhaitez-vous résoudre ce dépassement ?')
+        await flushLogs(phase, logEntries)
+        return res.status(200).json({
+          ok: false, needsInput: true,
+          questions: [{ key: 'overrun', question: 'La planification dépasse la date de fin de période. Que faire ?', options: [
+            { value: 'extend', label: `Étendre automatiquement la fin de période au ${fmtDate(lastDeadline)}` },
+            { value: 'abort', label: 'Annuler — je vais ajuster les paramètres ou les périodes de non-jeu moi-même' },
+          ] }],
+          logs: logEntries,
+        })
+      }
+      if (answers.overrun === 'abort') {
+        log('action', 'Calcul annulé par l\'administrateur — aucun match créé.')
+        await flushLogs(phase, logEntries)
+        return res.status(200).json({ ok: false, aborted: true, logs: logEntries })
+      }
+      if (answers.overrun === 'extend') {
+        await prisma.schedulingSettings.update({ where: { phase }, data: { periodEnd: lastDeadline } })
+        log('reponse', `Fin de période étendue automatiquement au ${fmtDate(lastDeadline)}.`)
+      }
+    }
+
+    // Construction des PlannedMatch
+    const toCreate = []
+    for (const { poule, byId, filteredRounds } of pouleData) {
+      filteredRounds.forEach((roundPairs, rIdx) => {
+        const scheduledDate = roundDates[rIdx]
+        const deadlineAt = addHours(addDays(scheduledDate, settings.cycleLengthDays), -settings.deadlineHoursBeforeCycleEnd)
+        for (const [a, b] of roundPairs) {
+          const p1 = byId.get(a), p2 = byId.get(b)
+          const auto = computeAutoMalus(p1.category, p2.category)
+          toCreate.push({
+            player1Id: a, player2Id: b, phase, scheduledDate, deadlineAt,
+            malus: auto?.malus || null, malusTarget: auto?.malusTarget || null,
+          })
+          if (auto) log('info', `Malus automatique appliqué : ${p1.firstName} ${p1.lastName} vs ${p2.firstName} ${p2.lastName} (écart de classement ${p1.category}/${p2.category}).`)
+        }
+      })
+    }
+
+    await prisma.plannedMatch.createMany({ data: toCreate })
+    await prisma.schedulingSettings.update({ where: { phase }, data: { locked: true } })
+    log('action', `${toCreate.length} match(s) planifié(s) créé(s) pour la Phase 1. Paramètres verrouillés.`)
+
+    await flushLogs(phase, logEntries)
+    return res.status(201).json({ ok: true, count: toCreate.length, logs: logEntries })
+  } catch (err) {
+    console.error('[computePhase1]', err)
+    log('erreur', `Erreur inattendue : ${err.message}`)
+    await flushLogs(phase, logEntries).catch(() => {})
+    return res.status(500).json({ ok: false, error: 'Erreur serveur.', logs: logEntries })
+  }
+}
+
+// Remplace le fil de logs actif d'une phase par la nouvelle liste (un seul fil par phase).
+async function flushLogs(phase, entries) {
+  await prisma.schedulingLog.deleteMany({ where: { phase } })
+  if (entries.length > 0) {
+    await prisma.schedulingLog.createMany({ data: entries.map(e => ({ phase: e.phase, type: e.type, message: e.message })) })
+  }
 }
