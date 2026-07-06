@@ -597,6 +597,19 @@
   .blackout-chip { display: inline-flex; align-items: center; gap: 0.5rem; background: var(--dark2); border: 1px solid var(--dark4); border-radius: 20px; padding: 0.35rem 0.9rem; margin: 0 0.4rem 0.4rem 0; font-size: 0.85rem; color: var(--gray-light); }
   .blackout-chip button { background: none; border: none; color: var(--gray); cursor: pointer; font-size: 0.9rem; line-height: 1; }
   .blackout-chip button:hover { color: #ff5c5c; }
+
+  /* Calendrier admin — planification */
+  .planning-calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .pc-weekday { font-family: var(--font-heading); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray); text-align: center; padding-bottom: 4px; }
+  .pc-day { min-height: 92px; background: var(--dark2); border: 1px solid var(--dark4); border-radius: 6px; padding: 4px; position: relative; }
+  .pc-day.pc-outside { opacity: 0.35; }
+  .pc-day.pc-blackout { background: repeating-linear-gradient(135deg, var(--dark3), var(--dark3) 6px, var(--dark4) 6px, var(--dark4) 12px); }
+  .pc-day.pc-dragover { outline: 2px dashed var(--orange); }
+  .pc-day-num { font-size: 0.75rem; color: var(--gray); }
+  .pc-match-chip { font-size: 0.72rem; background: var(--dark4); border-left: 3px solid var(--orange); border-radius: 3px; padding: 2px 4px; margin-top: 3px; cursor: grab; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gray-light); }
+  .pc-match-chip:active { cursor: grabbing; }
+  .pc-legend-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 0.8rem; color: var(--gray-light); }
+  .pc-legend-swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
   .admin-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
   .actions-more { position: relative; display: inline-block; }
   .btn-more { padding: 0.3rem 0.6rem !important; background: var(--dark4); color: var(--gray-light); border-color: var(--dark4); }
@@ -1138,7 +1151,8 @@
     <div id="admin-planning" class="admin-section">
       <div class="admin-tabs" style="margin-bottom:1.5rem">
         <button class="admin-tab active" onclick="planningSubTab('settings',this)">Paramètres</button>
-        <button class="admin-tab" onclick="planningSubTab('console',this)">Console</button>
+        <button class="admin-tab" id="planning-tab-console" onclick="planningSubTab('console',this)">Console</button>
+        <button class="admin-tab" onclick="planningSubTab('calendar',this); loadPlanningCalendar()">Calendrier</button>
       </div>
 
       <div id="planning-settings" class="admin-section active">
@@ -1183,6 +1197,20 @@
           <span class="planning-terminal-prompt">admin@cdr-scheduler:~$</span>
           <input type="text" id="planning-command-input" autocomplete="off" placeholder="aide · statut · calculer · supprimer matchs" onkeydown="if(event.key==='Enter')sendConsoleCommand()">
         </div>
+      </div>
+
+      <div id="planning-calendar" class="admin-section">
+        <div class="admin-section-header">
+          <div style="display:flex;align-items:center;gap:0.75rem">
+            <button class="btn-sm btn-edit" onclick="shiftPlanningMonth(-1)">‹</button>
+            <h3 id="planning-calendar-title" style="min-width:180px;text-align:center">—</h3>
+            <button class="btn-sm btn-edit" onclick="shiftPlanningMonth(1)">›</button>
+          </div>
+          <div id="planning-calendar-legend" style="display:flex;gap:0.6rem;flex-wrap:wrap"></div>
+        </div>
+        <div id="planning-calendar-warning" class="modal-error" style="display:none"></div>
+        <div id="planning-calendar-grid" class="planning-calendar-grid"></div>
+        <p style="color:var(--gray);font-size:0.82rem;margin-top:0.75rem">Glissez-déposez un match vers un autre jour pour le déplacer. Le déplacement est libre : un avertissement s'affiche si la date choisie sort de la période prévue ou tombe dans une période de non-jeu, mais rien n'est bloqué.</p>
       </div>
     </div>
 
@@ -4313,7 +4341,7 @@ async function addBlackout() {
   document.getElementById('bo-start').value = ''
   document.getElementById('bo-end').value = ''
   await loadScheduling()
-  if (data.needsRecompute) planningSubTab('console', document.querySelector('#admin-planning .admin-tab:nth-child(2)'))
+  if (data.needsRecompute) planningSubTab('console', document.getElementById('planning-tab-console'))
 }
 
 async function deleteBlackout(id) {
@@ -4332,7 +4360,7 @@ async function computePhase1(answers) {
   const res = await fetch('/api/admin/scheduling', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'compute_phase1', answers: answers || {} }) })
   const data = await res.json()
   renderTerminal(data.logs || [])
-  planningSubTab('console', document.querySelector('#admin-planning .admin-tab:nth-child(2)'))
+  planningSubTab('console', document.getElementById('planning-tab-console'))
   renderQuestions(data.needsInput ? data.questions : [])
   if (data.ok) await loadScheduling()
 }
@@ -4374,6 +4402,97 @@ function renderTerminal(logs) {
     return `<div class="planning-terminal-line ${typeClass[l.type] || 'pt-info'}"><span class="pt-prefix">[${time}]</span>${esc(l.message)}</div>`
   }).join('') || '<div class="planning-terminal-line pt-info" style="opacity:0.5">Aucun calcul lancé pour le moment. Tapez "aide" ci-dessous ou configurez les paramètres puis cliquez sur « Calculer ».</div>'
   el.scrollTop = el.scrollHeight
+}
+
+/* ── Calendrier de planification ── */
+let pcState = { year: null, month: null, data: null } // month = 0-11
+
+const POULE_COLORS = ['#E95420', '#772953', '#3fa7d6', '#7ee787', '#e6c229', '#ff6f91', '#4fc3f7', '#c792ea']
+function pouleColor(pouleId) {
+  if (!pouleId) return '#888'
+  return POULE_COLORS[pouleId % POULE_COLORS.length]
+}
+
+async function loadPlanningCalendar() {
+  const res = await fetch(`/api/admin/scheduling?phase=${planningPhase}`, { headers: authHeaders() })
+  const data = await res.json()
+  if (!res.ok) return
+  pcState.data = data
+  if (pcState.year === null) {
+    const ref = data.settings ? new Date(data.settings.periodStart) : new Date()
+    pcState.year = ref.getFullYear()
+    pcState.month = ref.getMonth()
+  }
+  renderPlanningCalendarLegend(data.poules || [])
+  renderPlanningCalendar()
+}
+
+function shiftPlanningMonth(delta) {
+  pcState.month += delta
+  if (pcState.month < 0) { pcState.month = 11; pcState.year-- }
+  if (pcState.month > 11) { pcState.month = 0; pcState.year++ }
+  renderPlanningCalendar()
+}
+
+function renderPlanningCalendarLegend(poules) {
+  const el = document.getElementById('planning-calendar-legend')
+  el.innerHTML = poules.map(p => `<span class="pc-legend-chip"><span class="pc-legend-swatch" style="background:${pouleColor(p.id)}"></span>${esc(p.name)}</span>`).join('')
+}
+
+function renderPlanningCalendar() {
+  const { data, year, month } = pcState
+  if (!data) return
+  document.getElementById('planning-calendar-title').textContent =
+    new Date(year, month, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+
+  const blackouts = (data.blackouts || []).map(b => ({ start: new Date(b.dateStart), end: new Date(b.dateEnd), label: b.label }))
+  const matchesByDay = {} // 'YYYY-MM-DD' -> [match,...]
+  for (const m of data.plannedMatches || []) {
+    if (!m.scheduledDate) continue
+    const key = new Date(m.scheduledDate).toISOString().slice(0, 10)
+    ;(matchesByDay[key] = matchesByDay[key] || []).push(m)
+  }
+
+  const firstOfMonth = new Date(year, month, 1)
+  const startWeekday = (firstOfMonth.getDay() + 6) % 7 // lundi = 0
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const gridStart = new Date(year, month, 1 - startWeekday)
+
+  const weekdayNames = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+  let html = weekdayNames.map(w => `<div class="pc-weekday">${w}</div>`).join('')
+
+  const totalCells = Math.ceil((startWeekday + daysInMonth) / 7) * 7
+  for (let i = 0; i < totalCells; i++) {
+    const d = new Date(gridStart); d.setDate(gridStart.getDate() + i)
+    const key = d.toISOString().slice(0, 10)
+    const outside = d.getMonth() !== month
+    const inBlackout = blackouts.find(b => d >= b.start && d <= b.end)
+    const dayMatches = matchesByDay[key] || []
+    html += `<div class="pc-day ${outside ? 'pc-outside' : ''} ${inBlackout ? 'pc-blackout' : ''}"
+      data-date="${key}" ondragover="event.preventDefault();this.classList.add('pc-dragover')"
+      ondragleave="this.classList.remove('pc-dragover')" ondrop="onPlanningDrop(event,'${key}')"
+      title="${inBlackout ? esc(inBlackout.label) : ''}">
+      <div class="pc-day-num">${d.getDate()}</div>
+      ${dayMatches.map(m => `<div class="pc-match-chip" draggable="true" ondragstart="event.dataTransfer.setData('text/plain','${m.id}')"
+        style="border-left-color:${pouleColor(m.pouleId)}" title="${esc(m.player1.firstName)} ${esc(m.player1.lastName)} vs ${esc(m.player2.firstName)} ${esc(m.player2.lastName)}${m.malus ? ' — malus' : ''}">
+        ${esc(m.player1.firstName)} vs ${esc(m.player2.firstName)}
+      </div>`).join('')}
+    </div>`
+  }
+  document.getElementById('planning-calendar-grid').innerHTML = html
+}
+
+async function onPlanningDrop(event, dateKey) {
+  event.preventDefault()
+  event.currentTarget.classList.remove('pc-dragover')
+  const plannedMatchId = parseInt(event.dataTransfer.getData('text/plain'), 10)
+  if (isNaN(plannedMatchId)) return
+  const res = await fetch('/api/admin/scheduling', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'move_planned_match', plannedMatchId, newDate: dateKey }) })
+  const data = await res.json()
+  const warnEl = document.getElementById('planning-calendar-warning')
+  if (data.warning) { warnEl.textContent = data.warning; warnEl.style.display = 'block' }
+  else { warnEl.style.display = 'none' }
+  await loadPlanningCalendar()
 }
 
 function openCreatePouleModal() {

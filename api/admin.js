@@ -1788,7 +1788,7 @@ async function handleScheduling(req, res) {
   if (req.method === 'GET') {
     const phase = req.query.phase === 'PHASE2' ? 'PHASE2' : 'PHASE1'
     try {
-      const [settings, blackouts, logs, plannedCount, poules] = await Promise.all([
+      const [settings, blackouts, logs, plannedCount, poules, plannedMatchesRaw] = await Promise.all([
         prisma.schedulingSettings.findUnique({ where: { phase } }),
         prisma.blackoutPeriod.findMany({ where: { phase }, orderBy: { dateStart: 'asc' } }),
         prisma.schedulingLog.findMany({ where: { phase }, orderBy: { id: 'asc' } }),
@@ -1803,9 +1803,25 @@ async function handleScheduling(req, res) {
             },
           },
         }),
+        prisma.plannedMatch.findMany({
+          where: { phase },
+          orderBy: { scheduledDate: 'asc' },
+          include: {
+            player1: { select: { id: true, firstName: true, lastName: true, username: true, category: true } },
+            player2: { select: { id: true, firstName: true, lastName: true, username: true, category: true } },
+          },
+        }),
       ])
+
+      // Rattache chaque match planifié à la poule de player1 (les deux joueurs d'un
+      // même match sont toujours dans la même poule pour la Phase 1), pour la coloration
+      // du calendrier admin.
+      const pouleIdByUser = new Map()
+      for (const p of poules) for (const m of p.members) pouleIdByUser.set(m.userId, p.id)
+      const plannedMatches = plannedMatchesRaw.map(pm => ({ ...pm, pouleId: pouleIdByUser.get(pm.player1Id) || null }))
+
       return res.status(200).json({
-        phase, settings, blackouts, logs, plannedCount, poules,
+        phase, settings, blackouts, logs, plannedCount, poules, plannedMatches,
         locked: !!settings?.locked,
       })
     } catch (err) {
@@ -1935,10 +1951,62 @@ async function handleScheduling(req, res) {
     return computePhase1(req, res, req.body?.answers || {})
   }
 
+  if (action === 'move_planned_match') {
+    const pmid = parseInt(req.body.plannedMatchId, 10)
+    const { newDate } = req.body
+    if (isNaN(pmid) || !newDate) return res.status(400).json({ error: 'plannedMatchId et newDate requis.' })
+    try {
+      const pm = await prisma.plannedMatch.findUnique({
+        where: { id: pmid },
+        include: {
+          player1: { select: { firstName: true, lastName: true } },
+          player2: { select: { firstName: true, lastName: true } },
+        },
+      })
+      if (!pm) return res.status(404).json({ error: 'Match planifié introuvable.' })
+
+      const target = new Date(newDate)
+      const [settings, blackouts] = await Promise.all([
+        prisma.schedulingSettings.findUnique({ where: { phase: pm.phase } }),
+        prisma.blackoutPeriod.findMany({ where: { phase: pm.phase } }),
+      ])
+
+      // Déplacement libre et isolé : jamais bloqué, jamais de décalage en cascade des
+      // autres matchs — juste un avertissement informatif si la date choisie sort du
+      // cadre prévu (cf. §3 du cahier des charges).
+      let warning = null
+      if (settings && (target < settings.periodStart || target > settings.periodEnd)) {
+        warning = `Le ${fmtDate(target)} est hors de la période de planification définie (${fmtDate(settings.periodStart)} → ${fmtDate(settings.periodEnd)}).`
+      } else {
+        const inBlackout = blackouts.find(b => target >= b.dateStart && target <= b.dateEnd)
+        if (inBlackout) warning = `Le ${fmtDate(target)} tombe dans la période de non-jeu « ${inBlackout.label} ».`
+      }
+
+      const updated = await prisma.plannedMatch.update({ where: { id: pmid }, data: { scheduledDate: target } })
+
+      await prisma.schedulingLog.create({
+        data: {
+          phase: pm.phase, type: warning ? 'avertissement' : 'action',
+          message: warning
+            ? `Match ${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName} déplacé manuellement au ${fmtDate(target)} — ${warning}`
+            : `Match ${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName} déplacé manuellement au ${fmtDate(target)}.`,
+        },
+      })
+      if (pm.notifiedAt) {
+        await prisma.schedulingLog.create({
+          data: { phase: pm.phase, type: 'avertissement', message: `Ce match avait déjà été notifié aux joueurs le ${fmtDate(pm.notifiedAt)} — la notification existante n'est pas resynchronisée automatiquement, pensez à renotifier si nécessaire.` },
+        })
+      }
+
+      return res.status(200).json({ ok: true, plannedMatch: updated, warning })
+    } catch (err) {
+      console.error('[scheduling move_planned_match]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
   return res.status(400).json({ error: 'Action invalide.' })
 }
-
-// Calcule et enregistre le round-robin de Phase 1 pour toutes les poules.
 // N'écrit les PlannedMatch en base que si le calcul se résout entièrement (pas de
 // question ouverte) — sinon les logs (y compris la question) sont écrits mais aucun
 // match n'est créé, et la fonction retourne needsInput:true.
