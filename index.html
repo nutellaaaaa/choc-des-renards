@@ -503,8 +503,9 @@
   .auth-error { font-size: 0.86rem; color: #ff6b6b; margin-bottom: 0.75rem; min-height: 1.25em; line-height: 1.4; }
   .pw-wrap { position: relative; }
   .pw-wrap input { width: 100%; padding-right: 2.6rem; }
-  .pw-toggle { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1.05rem; opacity: 0.6; padding: 0.3rem; line-height: 1; transition: opacity 0.15s; }
-  .pw-toggle:hover { opacity: 1; }
+  .pw-toggle { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 0.3rem; line-height: 1; display: flex; align-items: center; justify-content: center; color: var(--gray-light); opacity: 0.75; transition: opacity 0.15s, color 0.15s; }
+  .pw-toggle:hover { opacity: 1; color: var(--orange-light); }
+  .pw-eye-icon { display: block; }
   .auth-forgot-link { text-align: right; margin: -0.5rem 0 1rem; }
   .auth-forgot-link a { color: var(--orange); font-size: 0.85rem; text-decoration: none; }
   .auth-forgot-link a:hover { text-decoration: underline; }
@@ -552,8 +553,13 @@
   #inactivity-toast span { color: var(--orange); }
 
   /* PANNEAU ADMIN */
-  #admin-panel { display: none; padding-top: 96px; min-height: 100vh; }
+  #admin-panel { display: none; padding-top: 96px; min-height: 100vh; position: relative; }
   #admin-panel.active { display: block; }
+  .admin-loading-overlay { display: none; position: fixed; inset: 0; z-index: 500; background: var(--dark); flex-direction: column; align-items: center; justify-content: center; gap: 1.25rem; }
+  .admin-loading-overlay.fade-out { opacity: 0; transition: opacity 0.3s ease; }
+  .admin-loading-text { font-family: var(--font-heading); letter-spacing: 0.12em; text-transform: uppercase; color: var(--gray-light); font-size: 0.9rem; min-height: 1.4em; }
+  .admin-loading-track { width: min(360px, 70vw); height: 4px; background: var(--dark4); border-radius: 4px; overflow: hidden; }
+  .admin-loading-bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--orange-light), var(--orange)); border-radius: 4px; transition: width 0.2s ease; box-shadow: 0 0 12px var(--orange); }
   .admin-wrap { max-width: 1100px; margin: 0 auto; padding: 2.5rem 2rem; }
   .admin-title { font-family: var(--font-display); font-size: 2.2rem; letter-spacing: 0.04em; margin-bottom: 0.25rem; }
   .admin-title span { color: var(--orange); }
@@ -900,7 +906,10 @@
         <label for="login-password">Mot de passe</label>
         <div class="pw-wrap">
           <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
-          <button type="button" class="pw-toggle" onclick="togglePasswordVisibility('login-password', this)" aria-label="Afficher le mot de passe">👁</button>
+          <button type="button" class="pw-toggle" onclick="togglePasswordVisibility('login-password', this)" aria-label="Afficher le mot de passe">
+            <svg class="pw-eye-icon pw-eye-open" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="pw-eye-icon pw-eye-closed" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M3 3l18 18"/><path d="M10.58 10.58a2 2 0 0 0 2.83 2.83"/><path d="M9.88 5.09A10.7 10.7 0 0 1 12 5c7 0 11 7 11 7a13.16 13.16 0 0 1-3.17 3.88M6.61 6.61C3.9 8.4 2 12 2 12s4 7 11 7a10.6 10.6 0 0 0 3.39-.56"/></svg>
+          </button>
         </div>
       </div>
       <div class="auth-forgot-link"><a href="#" onclick="openForgotUsername(); return false;">Pseudo oublié ?</a></div>
@@ -950,14 +959,20 @@
         <label for="reg-password">Mot de passe</label>
         <div class="pw-wrap">
           <input type="password" id="reg-password" placeholder="8 caractères minimum" autocomplete="new-password">
-          <button type="button" class="pw-toggle" onclick="togglePasswordVisibility('reg-password', this)" aria-label="Afficher le mot de passe">👁</button>
+          <button type="button" class="pw-toggle" onclick="togglePasswordVisibility('reg-password', this)" aria-label="Afficher le mot de passe">
+            <svg class="pw-eye-icon pw-eye-open" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="pw-eye-icon pw-eye-closed" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M3 3l18 18"/><path d="M10.58 10.58a2 2 0 0 0 2.83 2.83"/><path d="M9.88 5.09A10.7 10.7 0 0 1 12 5c7 0 11 7 11 7a13.16 13.16 0 0 1-3.17 3.88M6.61 6.61C3.9 8.4 2 12 2 12s4 7 11 7a10.6 10.6 0 0 0 3.39-.56"/></svg>
+          </button>
         </div>
       </div>
       <div class="form-group">
         <label for="reg-confirm">Confirmer le mot de passe</label>
         <div class="pw-wrap">
           <input type="password" id="reg-confirm" placeholder="••••••••" autocomplete="new-password">
-          <button type="button" class="pw-toggle" onclick="togglePasswordVisibility('reg-confirm', this)" aria-label="Afficher le mot de passe">👁</button>
+          <button type="button" class="pw-toggle" onclick="togglePasswordVisibility('reg-confirm', this)" aria-label="Afficher le mot de passe">
+            <svg class="pw-eye-icon pw-eye-open" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="pw-eye-icon pw-eye-closed" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M3 3l18 18"/><path d="M10.58 10.58a2 2 0 0 0 2.83 2.83"/><path d="M9.88 5.09A10.7 10.7 0 0 1 12 5c7 0 11 7 11 7a13.16 13.16 0 0 1-3.17 3.88M6.61 6.61C3.9 8.4 2 12 2 12s4 7 11 7a10.6 10.6 0 0 0 3.39-.56"/></svg>
+          </button>
         </div>
       </div>
       <div class="checkbox-group-rgpd">
@@ -1029,6 +1044,10 @@
 
 <!-- PANNEAU ADMIN -->
 <div id="admin-panel">
+  <div id="admin-loading-overlay" class="admin-loading-overlay">
+    <div id="admin-loading-text" class="admin-loading-text">Chargement du panneau admin…</div>
+    <div class="admin-loading-track"><div id="admin-loading-bar" class="admin-loading-bar"></div></div>
+  </div>
   <div class="admin-wrap">
     <h1 class="admin-title">Panneau <span>Admin</span></h1>
     <p class="admin-subtitle">Gestion des utilisateurs &amp; du tournoi — Choc des Renards</p>
@@ -1298,6 +1317,12 @@
     <!-- Notifications envoyées -->
     <div id="admin-notifications-list" class="admin-section">
       <div class="admin-section-header"><h3>Notifications envoyées</h3></div>
+      <div class="history-filter">
+        <label style="font-family:var(--font-heading);font-size:0.78rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--gray)">Filtrer par joueur :</label>
+        <select id="notifs-user-filter" onchange="filterNotifications()">
+          <option value="">— Tous les joueurs —</option>
+        </select>
+      </div>
       <div class="admin-table-wrap">
         <table class="admin-table">
           <thead><tr><th>Joueur</th><th>Type</th><th>Titre</th><th>Envoyée le</th><th>Lu le</th><th>Actions</th></tr></thead>
@@ -2267,7 +2292,7 @@ function showApp() {
     document.getElementById('admin-panel').classList.add('active')
     document.querySelectorAll('.nav-btn').forEach(b => b.style.display = 'none')
     startInactivityTimer()
-    loadAdminData()
+    loadAllAdminDataWithProgress()
     loadHomeStats()
   } else {
     document.getElementById('admin-panel').classList.remove('active')
@@ -2352,7 +2377,12 @@ function togglePasswordVisibility(inputId, btn) {
   const input = document.getElementById(inputId)
   const showing = input.type === 'text'
   input.type = showing ? 'password' : 'text'
-  btn.textContent = showing ? '👁' : '🙈'
+  const openIcon   = btn.querySelector('.pw-eye-open')
+  const closedIcon = btn.querySelector('.pw-eye-closed')
+  if (openIcon && closedIcon) {
+    openIcon.style.display   = showing ? '' : 'none'
+    closedIcon.style.display = showing ? 'none' : ''
+  }
   btn.setAttribute('aria-label', showing ? 'Afficher le mot de passe' : 'Masquer le mot de passe')
 }
 
@@ -3805,6 +3835,53 @@ async function loadAdminData() {
   await Promise.all([loadUsers(), loadHistory()])
 }
 
+/* ── Chargement complet du panneau admin avec barre de progression réelle ──
+ * Charge en une fois toutes les données de tous les onglets (au lieu d'attendre
+ * un clic sur chaque onglet), pendant qu'une barre de progression reflète
+ * l'avancement réel des requêtes réseau. */
+async function loadAllAdminDataWithProgress() {
+  const overlay = document.getElementById('admin-loading-overlay')
+  const bar     = document.getElementById('admin-loading-bar')
+  const text    = document.getElementById('admin-loading-text')
+  if (overlay) { overlay.style.display = 'flex'; overlay.classList.remove('fade-out') }
+
+  const tasks = [
+    { label: 'Utilisateurs…',              fn: loadUsers },
+    { label: 'Historique des connexions…', fn: loadHistory },
+    { label: 'Notifications…',             fn: loadNotificationsList },
+    { label: 'Phase du tournoi…',          fn: loadPhase },
+    { label: 'Poules & groupes…',          fn: loadPoules },
+    { label: 'Planification…',             fn: loadScheduling },
+    { label: 'Matchs planifiés…',          fn: loadPlannedMatches },
+    { label: 'Publication des matchs…',    fn: loadPendingMatches },
+    { label: 'Liste des joueurs…',         fn: loadPlayersForNotify },
+    { label: 'FAQ…',                       fn: loadFaqAdmin },
+    { label: 'Prises de contact…',         fn: loadContactAdmin },
+    { label: 'Demandes en attente…',       fn: loadRefused },
+  ]
+
+  let done = 0
+  const total = tasks.length
+
+  await Promise.all(tasks.map(t =>
+    (async () => {
+      if (text) text.textContent = t.label
+      try { await t.fn() } catch (e) { console.error('[admin-preload]', t.label, e) }
+      done++
+      if (bar) bar.style.width = Math.round((done / total) * 100) + '%'
+    })()
+  ))
+
+  if (overlay) {
+    if (text) text.textContent = 'Prêt.'
+    if (bar) bar.style.width = '100%'
+    setTimeout(() => {
+      overlay.classList.add('fade-out')
+      setTimeout(() => { overlay.style.display = 'none' }, 300)
+    }, 250)
+  }
+}
+
 /* ── Utilisateurs ── */
 async function loadUsers() {
   try {
@@ -4891,12 +4968,42 @@ async function sendSpecialMatch() {
   ;['special-player1','special-player2','special-start','special-end','special-reason','special-note'].forEach(id => { document.getElementById(id).value = '' })
   setTimeout(() => { successEl.textContent = '' }, 4000)
 }
+let notificationsAllList = []
+
 async function loadNotificationsList() {
   const res = await fetch('/api/admin/notifications', { headers: authHeaders() })
   if (!res.ok) return
   const { notifications } = await res.json()
-  const tbl = document.getElementById('tbl-notifications')
+  notificationsAllList = notifications
   setBadge('badge-notifs', notifications.filter(n => !n.read).length)
+
+  // Populate filtre joueur (même principe que le filtre de l'historique des connexions)
+  const filter = document.getElementById('notifs-user-filter')
+  if (filter) {
+    const currentVal = filter.value
+    const seen = new Map()
+    for (const n of notifications) {
+      if (n.user && !seen.has(n.user.id)) seen.set(n.user.id, n.user)
+    }
+    const users = [...seen.values()].sort((a, b) =>
+      (a.firstName || '').localeCompare(b.firstName || ''))
+    filter.innerHTML = '<option value="">— Tous les joueurs —</option>' +
+      users.map(u => `<option value="${u.id}">${esc(capName(u.firstName))} ${esc(capName(u.lastName))} (@${esc(u.username)})</option>`).join('')
+    filter.value = currentVal
+  }
+
+  renderNotifications(notifications)
+}
+
+function filterNotifications() {
+  const userId = document.getElementById('notifs-user-filter').value
+  if (!userId) { renderNotifications(notificationsAllList); return }
+  const uid = parseInt(userId, 10)
+  renderNotifications(notificationsAllList.filter(n => n.user?.id === uid))
+}
+
+function renderNotifications(notifications) {
+  const tbl = document.getElementById('tbl-notifications')
   if (notifications.length === 0) { tbl.innerHTML = ''; document.getElementById('notifs-empty').style.display = 'block'; return }
   document.getElementById('notifs-empty').style.display = 'none'
   tbl.innerHTML = notifications.map(n => `
@@ -4913,6 +5020,7 @@ async function deleteNotif(id) {
   if (!confirm('Supprimer cette notification ?')) return
   await fetch('/api/admin/notifications', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'delete', notificationId: id }) })
   await loadNotificationsList()
+  filterNotifications()
 }
 
 /* ══════════════ FAQ (admin) ══════════════ */
