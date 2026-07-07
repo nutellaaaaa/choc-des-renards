@@ -590,7 +590,11 @@
   .pt-prefix { opacity: 0.55; margin-right: 0.4rem; }
   .planning-terminal-input-row { display: flex; align-items: center; gap: 0.5rem; background: #111; border: 1px solid #333; border-top: none; border-radius: 0 0 8px 8px; padding: 0.6rem 1.1rem; }
   .planning-terminal-prompt { font-family: 'Courier New', monospace; color: #7ee787; font-size: 0.86rem; white-space: nowrap; }
-  #planning-command-input { flex: 1; background: transparent; border: none; outline: none; color: #e8e8e8; font-family: 'Courier New', monospace; font-size: 0.86rem; }
+  .console-input-wrap { position: relative; flex: 1; }
+  .console-ghost { position: absolute; inset: 0; display: flex; align-items: center; pointer-events: none; font-family: 'Courier New', monospace; font-size: 0.86rem; white-space: pre; overflow: hidden; }
+  .console-ghost .ghost-typed { color: transparent; }
+  .console-ghost .ghost-suggestion { color: #6b6b6b; }
+  #planning-command-input { position: relative; z-index: 1; width: 100%; background: transparent; border: none; outline: none; color: #e8e8e8; font-family: 'Courier New', monospace; font-size: 0.86rem; }
   .planning-question-box { background: var(--dark2); border: 1px solid #4fc3f7; border-radius: 8px; padding: 1rem; margin: 0.75rem 0; }
   .planning-question-box .q-text { color: #4fc3f7; font-weight: 700; margin-bottom: 0.75rem; }
   .planning-question-box .q-options { display: flex; gap: 0.6rem; flex-wrap: wrap; }
@@ -1201,7 +1205,10 @@
         <div id="planning-questions"></div>
         <div class="planning-terminal-input-row">
           <span class="planning-terminal-prompt">admin@cdr-scheduler:~$</span>
-          <input type="text" id="planning-command-input" autocomplete="off" placeholder="aide · statut · calculer · verifier · joueur <pseudo>…" onkeydown="if(event.key==='Enter')sendConsoleCommand()">
+          <div class="console-input-wrap">
+            <div class="console-ghost" id="planning-command-ghost" aria-hidden="true"><span class="ghost-typed"></span><span class="ghost-suggestion"></span></div>
+            <input type="text" id="planning-command-input" autocomplete="off" placeholder="aide · statut · calculer · verifier · joueur <pseudo>… (Tab pour compléter)" oninput="updateConsoleGhost()" onkeydown="handleConsoleKeydown(event)">
+          </div>
         </div>
       </div>
 
@@ -1255,7 +1262,10 @@
     <div id="admin-planned" class="admin-section">
       <div class="admin-section-header">
         <h3>Matchs planifiés (à venir)</h3>
-        <button class="btn-sm btn-accept" onclick="openPlannedAddModal()">+ Planifier un match</button>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+          <button class="btn-sm btn-edit" onclick="notifyNextMatches()">🦊 Notifier les joueurs de leur prochain match</button>
+          <button class="btn-sm btn-accept" onclick="openPlannedAddModal()">+ Planifier un match</button>
+        </div>
       </div>
       <div id="planned-matches-list"><div class="admin-empty">Chargement…</div></div>
     </div>
@@ -2624,7 +2634,10 @@ function showNotifOverlay() {
   const notif = pendingNotifications[currentNotifIndex]
   document.getElementById('notif-counter').textContent = `Notification ${currentNotifIndex + 1} / ${pendingNotifications.length}`
   const isSpecial = notif.type === 'special_match'
-  document.getElementById('notif-icon').innerHTML = isSpecial
+  const isNextMatch = notif.type === 'next_match'
+  const isDeadlineReminder = notif.type === 'deadline_reminder'
+  const showFox = isSpecial || isNextMatch || isDeadlineReminder
+  document.getElementById('notif-icon').innerHTML = showFox
     ? '<img class="notif-fox-img" src="fox-convocation.png" alt="Convocation">'
     : '📢'
   const body = document.getElementById('notif-body')
@@ -2634,8 +2647,13 @@ function showNotifOverlay() {
     if (notif.endDate)   metaHtml += `<div>⏰ Avant le : <strong>${new Date(notif.endDate).toLocaleDateString('fr-FR')}</strong></div>`
     if (notif.reason)    metaHtml += `<div>📌 Motif : <strong>${esc(notif.reason)}</strong></div>`
     if (notif.opponentName) metaHtml += `<div>🎯 Adversaire : <strong>${esc(notif.opponentName)}</strong></div>`
+  } else if (isNextMatch || isDeadlineReminder) {
+    if (notif.opponentName) metaHtml += `<div>🎯 Adversaire : <strong>${esc(notif.opponentName)}</strong></div>`
+    if (notif.startDate) metaHtml += `<div>📅 Match prévu le : <strong>${new Date(notif.startDate).toLocaleDateString('fr-FR')}</strong></div>`
+    if (notif.endDate)   metaHtml += `<div>⏰ Deadline de saisie : <strong>${new Date(notif.endDate).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong></div>`
   }
-  body.innerHTML = `<div class="notif-type">${isSpecial ? 'Rencontre spéciale' : 'Message'}</div>
+  const typeLabel = isSpecial ? 'Rencontre spéciale' : isNextMatch ? 'Prochain match' : isDeadlineReminder ? 'Rappel de deadline' : 'Message'
+  body.innerHTML = `<div class="notif-type">${typeLabel}</div>
     <div class="notif-title">${esc(notif.title)}</div>
     <div class="notif-message">${esc(notif.message)}</div>
     ${metaHtml ? `<div class="notif-meta">${metaHtml}</div>` : ''}`
@@ -4407,11 +4425,89 @@ function triggerDownload({ filename, content, mime }) {
   URL.revokeObjectURL(url)
 }
 
+/* ── Autocomplétion "fantôme" de la console de planification ──
+   Affiche en gris, à la suite du texte tapé, la fin probable de la commande
+   (nom de commande, puis gabarit d'arguments une fois la commande complète).
+   Tab accepte la suggestion affichée. En cas d'ambiguïté entre plusieurs
+   commandes partageant le même préfixe (ex. "de" → deadline/deadlines/
+   deplacer/deverrouiller), la première par ordre alphabétique est proposée ;
+   la suggestion se précise automatiquement au fur et à mesure de la saisie. */
+const CONSOLE_COMMANDS = [
+  { base: 'aide' },
+  { base: 'statut' },
+  { base: 'calculer' },
+  { base: 'verifier' },
+  { base: 'deadlines' },
+  { base: 'alerte' },
+  { base: 'liste' },
+  { base: 'exporter' },
+  { base: 'supprimer matchs' },
+  { base: 'verrouiller' },
+  { base: 'deverrouiller' },
+  { base: 'joueur', args: '<pseudo>' },
+  { base: 'poule', args: '<nom>' },
+  { base: 'groupe', args: '<nom>' },
+  { base: 'annuler', args: '<id>' },
+  { base: 'forfait', args: '<id>' },
+  { base: 'deadline', args: '<id> <heures>' },
+  { base: 'deplacer', args: '<id> <jj/mm/aaaa>' },
+  { base: 'notifier', args: '<id>' },
+  { base: 'recalculer ronde', args: '<n>' },
+]
+
+function computeConsoleGhostSuggestion(val) {
+  if (!val) return ''
+  const lower = val.toLowerCase()
+
+  // Commande déjà complète (avec ou sans espace final) → propose le gabarit d'arguments.
+  for (const c of CONSOLE_COMMANDS) {
+    if (!c.args) continue
+    const baseLower = c.base.toLowerCase()
+    if (lower === baseLower) return ' ' + c.args
+    if (lower === baseLower + ' ') return c.args
+  }
+
+  // Ne propose pas de suggestion une fois qu'on tape déjà les arguments d'une commande.
+  const alreadyTypingArgs = CONSOLE_COMMANDS.some(c => lower.startsWith(c.base.toLowerCase() + ' '))
+  if (alreadyTypingArgs) return ''
+
+  // Complétion du nom de commande lui-même.
+  const candidates = CONSOLE_COMMANDS
+    .map(c => c.base)
+    .filter(b => b.toLowerCase().startsWith(lower) && b.toLowerCase() !== lower)
+    .sort()
+  if (candidates.length === 0) return ''
+  return candidates[0].slice(val.length)
+}
+
+function updateConsoleGhost() {
+  const input = document.getElementById('planning-command-input')
+  const ghost = document.getElementById('planning-command-ghost')
+  const val = input.value
+  const suggestion = computeConsoleGhostSuggestion(val)
+  ghost.querySelector('.ghost-typed').textContent = val
+  ghost.querySelector('.ghost-suggestion').textContent = suggestion
+}
+
+function handleConsoleKeydown(event) {
+  if (event.key === 'Enter') { sendConsoleCommand(); return }
+  if (event.key === 'Tab') {
+    const input = document.getElementById('planning-command-input')
+    const suggestion = document.querySelector('#planning-command-ghost .ghost-suggestion').textContent
+    if (suggestion) {
+      event.preventDefault()
+      input.value += suggestion
+      updateConsoleGhost()
+    }
+  }
+}
+
 async function sendConsoleCommand() {
   const input = document.getElementById('planning-command-input')
   const command = input.value.trim()
   if (!command) return
   input.value = ''
+  updateConsoleGhost()
   const res = await fetch('/api/admin/scheduling', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'console_command', phase: planningPhase, command }) })
   const data = await res.json().catch(() => null)
   if (data?.download) triggerDownload(data.download)
@@ -5377,6 +5473,40 @@ async function deletePlannedMatch(pmid) {
   if (!confirm('Supprimer ce match planifié ?')) return
   await fetch('/api/admin/match', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'planned_delete', plannedMatchId: pmid }) })
   await loadPlannedMatches()
+}
+
+/* ── Notifier les joueurs de leur "prochain match" (bouton global) ──
+   Un joueur peut avoir plusieurs matchs planifiés : seul le plus proche dans
+   le temps est notifié (et devient le seul à apparaître dans ses "scores à
+   renseigner"). Un joueur déjà notifié pour son prochain match n'est pas
+   renotifié tant que ce match n'a pas été joué/déplacé. */
+async function notifyNextMatches() {
+  let preview
+  try {
+    const res = await fetch('/api/admin/match', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'notify_next_preview' }) })
+    preview = await res.json()
+    if (!res.ok) { alert(preview.error || 'Erreur.'); return }
+  } catch (e) { alert('Erreur réseau.'); return }
+
+  if (!preview.count || preview.count === 0) {
+    alert('Aucun joueur à notifier : tout le monde a déjà été notifié de son prochain match (ou aucun match planifié n\'a de date).')
+    return
+  }
+
+  const lines = preview.preview.slice(0, 15).map(p =>
+    `• ${p.playerName} — vs ${p.opponentName}${p.scheduledDate ? ' — ' + new Date(p.scheduledDate).toLocaleDateString('fr-FR') : ''}`
+  )
+  const more = preview.count > 15 ? `\n… et ${preview.count - 15} autre(s).` : ''
+  const confirmMsg = `${preview.count} joueur(s) vont recevoir la notification "prochain match" :\n\n${lines.join('\n')}${more}\n\nConfirmer l'envoi ?`
+
+  if (!confirm(confirmMsg)) return
+
+  try {
+    const res = await fetch('/api/admin/match', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'notify_next_send' }) })
+    const data = await res.json()
+    if (!res.ok) { alert(data.error || 'Erreur.'); return }
+    alert(`${data.count} notification(s) "prochain match" envoyée(s).`)
+  } catch (e) { alert('Erreur réseau.') }
 }
 
 function addPlannedSetRow() {

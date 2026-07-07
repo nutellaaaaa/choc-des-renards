@@ -261,16 +261,30 @@ async function handleConvocations(req, res) {
 
   if (req.method === 'GET') {
     try {
-      const [specials, planned] = await Promise.all([
+      const [specials, plannedAll] = await Promise.all([
         prisma.specialMatch.findMany({
           where: { resolved: false, OR: [{ player1Id: uid }, { player2Id: uid }] },
           orderBy: { endDate: 'asc' },
         }),
         prisma.plannedMatch.findMany({
-          where: { OR: [{ player1Id: uid }, { player2Id: uid }] },
+          where: { forfeited: false, OR: [{ player1Id: uid }, { player2Id: uid }] },
           orderBy: { scheduledDate: 'asc' },
         }),
       ])
+
+      // Un joueur peut avoir plusieurs matchs planifiés à venir, mais seul le
+      // plus proche dans le temps doit apparaître comme "à renseigner" — les
+      // autres ne sont pas encore d'actualité. Les matchs sans date programmée
+      // sont classés après ceux qui en ont une ; s'il n'y a que ceux-là, le
+      // premier (le plus ancien créé) sert de "prochain match".
+      const planned = plannedAll.length > 0 ? [
+        [...plannedAll].sort((a, b) => {
+          if (a.scheduledDate && b.scheduledDate) return new Date(a.scheduledDate) - new Date(b.scheduledDate)
+          if (a.scheduledDate) return -1
+          if (b.scheduledDate) return 1
+          return new Date(a.createdAt) - new Date(b.createdAt)
+        })[0],
+      ] : []
 
       async function enrich(list, type, deadlineField, deadlineBlocks) {
         return Promise.all(list.map(async (m) => {

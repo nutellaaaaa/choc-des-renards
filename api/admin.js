@@ -1495,6 +1495,75 @@ async function handleMatch(req, res) {
     }
   }
 
+  // ── notify_next_preview / notify_next_send ──────────────────────────────
+  // "Notifier les joueurs de leur prochain match" (bouton de la liste globale
+  // "Matchs planifiés"). Un joueur peut avoir plusieurs PlannedMatch à venir :
+  // seul le plus proche dans le temps (par joueur, indépendamment de son
+  // adversaire — cf. computeNextMatchTargets) est notifié et devient le match
+  // "à renseigner" côté joueur (voir api/public.js, resource=convocations).
+  if (action === 'notify_next_preview') {
+    try {
+      const targets = await computeNextMatchTargets()
+      return res.status(200).json({
+        ok: true,
+        count: targets.length,
+        preview: targets.map(t => ({
+          userId: t.userId,
+          playerName: `${t.user.firstName} ${t.user.lastName}`,
+          opponentName: `${t.opponent.firstName} ${t.opponent.lastName}`,
+          plannedMatchId: t.plannedMatch.id,
+          scheduledDate: t.plannedMatch.scheduledDate,
+          deadlineAt: t.plannedMatch.deadlineAt,
+        })),
+      })
+    } catch (err) {
+      console.error('[admin/match notify_next_preview]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  if (action === 'notify_next_send') {
+    try {
+      const targets = await computeNextMatchTargets()
+      if (targets.length === 0) return res.status(200).json({ ok: true, count: 0 })
+
+      let count = 0
+      for (const t of targets) {
+        const pm = t.plannedMatch
+        const dateStr = pm.scheduledDate ? fmtDate(pm.scheduledDate) : null
+        const deadlineStr = pm.deadlineAt ? fmtDateTime(pm.deadlineAt) : null
+        const message = `Vous avez un match prévu avec ${t.opponent.firstName} ${t.opponent.lastName}${dateStr ? ` du ${dateStr}` : ''}${deadlineStr ? ` au ${deadlineStr}` : ''}.`
+
+        await prisma.notification.create({
+          data: {
+            userId: t.userId, type: 'next_match', title: 'Prochain match programmé',
+            message,
+            opponentName: `${t.opponent.firstName} ${t.opponent.lastName}`,
+            startDate: pm.scheduledDate, endDate: pm.deadlineAt,
+            plannedMatchId: pm.id,
+          },
+        })
+        count++
+
+        await prisma.schedulingLog.create({
+          data: {
+            phase: pm.phase, type: 'info',
+            message: `Notification "prochain match" envoyée à ${t.user.firstName} ${t.user.lastName} (@${t.user.username}) — vs ${t.opponent.firstName} ${t.opponent.lastName}, match #${pm.id}${dateStr ? `, prévu le ${dateStr}` : ''}${deadlineStr ? `, deadline ${deadlineStr}` : ''}.`,
+          },
+        })
+
+        if (!pm.notifiedAt) {
+          await prisma.plannedMatch.update({ where: { id: pm.id }, data: { notifiedAt: new Date() } }).catch(() => {})
+        }
+      }
+
+      return res.status(200).json({ ok: true, count })
+    } catch (err) {
+      console.error('[admin/match notify_next_send]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
   if (action === 'planned_add') {
     const { player1Id, player2Id, scheduledDate, malus, malusTarget, note, phase, round } = req.body
     if (!player1Id || !player2Id) return res.status(400).json({ error: 'Les deux joueurs sont requis.' })
@@ -2118,6 +2187,50 @@ function fmtDateTime(d) {
   return new Date(d).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+// Détermine, pour chaque joueur ayant au moins un match planifié daté et non
+// forfait, son "prochain match" (le plus proche dans le temps) — tous phases
+// confondues, cohérent avec la liste globale "Matchs planifiés (à venir)".
+// C'est volontairement PAR JOUEUR et non par match : les deux adversaires d'un
+// même PlannedMatch peuvent avoir des "prochains matchs" différents si l'un
+// des deux a un autre match encore plus proche ailleurs (cf. réponse admin).
+// Le statut "déjà notifié" est tracé via l'existence d'une Notification
+// (type='next_match', plannedMatchId, userId) plutôt que via PlannedMatch.notifiedAt,
+// pour permettre une notification asymétrique (un seul des deux joueurs) sans
+// bloquer l'autre plus tard. PlannedMatch.notifiedAt reste mis à jour pour la
+// première notification envoyée sur ce match, à titre informatif (console).
+async function computeNextMatchTargets() {
+  const matches = await prisma.plannedMatch.findMany({
+    where: { forfeited: false, scheduledDate: { not: null } },
+    orderBy: { scheduledDate: 'asc' },
+    include: {
+      player1: { select: { id: true, firstName: true, lastName: true, username: true } },
+      player2: { select: { id: true, firstName: true, lastName: true, username: true } },
+    },
+  })
+
+  const nextByUser = new Map() // userId -> plannedMatch le plus proche (le premier rencontré, déjà trié)
+  for (const pm of matches) {
+    if (!nextByUser.has(pm.player1Id)) nextByUser.set(pm.player1Id, pm)
+    if (!nextByUser.has(pm.player2Id)) nextByUser.set(pm.player2Id, pm)
+  }
+  if (nextByUser.size === 0) return []
+
+  const candidateMatchIds = [...new Set([...nextByUser.values()].map(pm => pm.id))]
+  const alreadySent = await prisma.notification.findMany({
+    where: { type: 'next_match', plannedMatchId: { in: candidateMatchIds } },
+    select: { userId: true, plannedMatchId: true },
+  })
+  const sentKeys = new Set(alreadySent.map(n => `${n.plannedMatchId}-${n.userId}`))
+
+  const targets = []
+  for (const [userId, pm] of nextByUser) {
+    if (sentKeys.has(`${pm.id}-${userId}`)) continue
+    const isP1 = pm.player1Id === userId
+    targets.push({ userId, user: isP1 ? pm.player1 : pm.player2, opponent: isP1 ? pm.player2 : pm.player1, plannedMatch: pm })
+  }
+  return targets
+}
+
 function parseConsoleDate(str) {
   let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(str)
   if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
@@ -2196,12 +2309,28 @@ async function handleConsoleCommand(req, res) {
     // ── aide ──
     if (cmd === 'aide' || cmd === 'help') {
       await say('info', [
-        'Diagnostic  : verifier · deadlines · alerte · joueur <pseudo> · poule <nom>',
+        'Diagnostic  : verifier · deadlines · alerte · liste · joueur <pseudo> · poule <nom>',
         'Actions     : annuler <id> · forfait <id> · deadline <id> <heures> · deplacer <id> <jj/mm/aaaa>',
         'Notifs      : notifier <id>',
         'Calcul      : statut · calculer · recalculer ronde <n> (Phase 2) · supprimer matchs · verrouiller · deverrouiller',
         'Export      : exporter',
       ].join('\n'))
+      return res.status(200).json({ ok: true })
+    }
+
+    // ── liste ── liste des matchs planifiés de la phase avec leur id (pour
+    // pouvoir alimenter les autres commandes qui demandent un <id>).
+    if (cmd === 'liste') {
+      const matches = await prisma.plannedMatch.findMany({
+        where: { phase: ph },
+        orderBy: { scheduledDate: 'asc' },
+        include: { player1: { select: { firstName: true, lastName: true } }, player2: { select: { firstName: true, lastName: true } } },
+      })
+      if (matches.length === 0) { await say('info', 'Aucun match planifié pour cette phase.'); return res.status(200).json({ ok: true }) }
+      await say('info', `${matches.length} match(s) planifié(s) :`)
+      for (const pm of matches) {
+        await say('info', `  #${pm.id} — ${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName} — ${pm.scheduledDate ? fmtDate(pm.scheduledDate) : 'date non définie'}${pm.deadlineAt ? ` (deadline ${fmtDateTime(pm.deadlineAt)})` : ''}${pm.notifiedAt ? ' · notifié' : ''}${pm.forfeited ? ' · forfait' : ''}`)
+      }
       return res.status(200).json({ ok: true })
     }
 
@@ -2408,8 +2537,8 @@ async function handleConsoleCommand(req, res) {
       const dateStr = fmtDate(pm.scheduledDate)
       const deadlineStr = pm.deadlineAt ? fmtDateTime(pm.deadlineAt) : null
       await Promise.all([
-        prisma.notification.create({ data: { userId: pm.player1Id, type: 'next_match', title: 'Prochain match programmé', message: `Vous affrontez ${pm.player2.firstName} ${pm.player2.lastName} le ${dateStr}.${deadlineStr ? ` Merci de saisir le score avant le ${deadlineStr}.` : ''}`, opponentName: `${pm.player2.firstName} ${pm.player2.lastName}`, startDate: pm.scheduledDate, plannedMatchId: pm.id } }),
-        prisma.notification.create({ data: { userId: pm.player2Id, type: 'next_match', title: 'Prochain match programmé', message: `Vous affrontez ${pm.player1.firstName} ${pm.player1.lastName} le ${dateStr}.${deadlineStr ? ` Merci de saisir le score avant le ${deadlineStr}.` : ''}`, opponentName: `${pm.player1.firstName} ${pm.player1.lastName}`, startDate: pm.scheduledDate, plannedMatchId: pm.id } }),
+        prisma.notification.create({ data: { userId: pm.player1Id, type: 'next_match', title: 'Prochain match programmé', message: `Vous affrontez ${pm.player2.firstName} ${pm.player2.lastName} le ${dateStr}.${deadlineStr ? ` Merci de saisir le score avant le ${deadlineStr}.` : ''}`, opponentName: `${pm.player2.firstName} ${pm.player2.lastName}`, startDate: pm.scheduledDate, endDate: pm.deadlineAt, plannedMatchId: pm.id } }),
+        prisma.notification.create({ data: { userId: pm.player2Id, type: 'next_match', title: 'Prochain match programmé', message: `Vous affrontez ${pm.player1.firstName} ${pm.player1.lastName} le ${dateStr}.${deadlineStr ? ` Merci de saisir le score avant le ${deadlineStr}.` : ''}`, opponentName: `${pm.player1.firstName} ${pm.player1.lastName}`, startDate: pm.scheduledDate, endDate: pm.deadlineAt, plannedMatchId: pm.id } }),
       ])
       await prisma.plannedMatch.update({ where: { id }, data: { notifiedAt: new Date() } })
       await say('action', `Notification "prochain match" envoyée à ${pm.player1.firstName} ${pm.player1.lastName} et ${pm.player2.firstName} ${pm.player2.lastName}.`)

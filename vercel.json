@@ -13,5 +13,8 @@
     { "source": "/api/contact",             "destination": "/api/public?resource=contact" },
     { "source": "/api/faq",                 "destination": "/api/public?resource=faq" },
     { "source": "/api/notifications",       "destination": "/api/public?resource=notifications" }
+  ],
+  "crons": [
+    { "path": "/api/cron-deadline-reminders", "schedule": "0 * * * *" }
   ]
 }
