@@ -4,6 +4,10 @@
 - Mettre un filtrage de joueurs dans la liste des notifications (le même que pour la liste des connexions)
 - Historique de progression d'un joueur : un petit graphe (points/victoires dans le temps) sur la modale joueur — tu as déjà tout en base (matches, createdAt), juste à agréger.
  --> .html de prévisualisation généré
+- Automate d'aide à la  planification de matchs auto
+- Création de bots pour tester les fonctionnalités du site
+- Charger automatiquement tout le site (notifs, utilisateurs, etc) sans avoir à cliquer sur chacun des onglets correspondants (chargement à faire pendant la barre de chargement qui était jusque là factice)
+
 
 Je souhaiterai automatiser la planification des matchs sur mon site. 
 Premièrement, supposons qu'on est en Phase 1 et que les Poules ont été crées. 

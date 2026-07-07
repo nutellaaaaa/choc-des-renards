@@ -1149,15 +1149,21 @@
 
     <!-- Planification automatique -->
     <div id="admin-planning" class="admin-section">
-      <div class="admin-tabs" style="margin-bottom:1.5rem">
-        <button class="admin-tab active" onclick="planningSubTab('settings',this)">Paramètres</button>
-        <button class="admin-tab" id="planning-tab-console" onclick="planningSubTab('console',this)">Console</button>
-        <button class="admin-tab" onclick="planningSubTab('calendar',this); loadPlanningCalendar()">Calendrier</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.75rem">
+        <div class="admin-tabs" style="margin:0">
+          <button class="admin-tab active" onclick="planningSubTab('settings',this)">Paramètres</button>
+          <button class="admin-tab" id="planning-tab-console" onclick="planningSubTab('console',this)">Console</button>
+          <button class="admin-tab" onclick="planningSubTab('calendar',this); loadPlanningCalendar()">Calendrier</button>
+        </div>
+        <div class="admin-tabs" style="margin:0">
+          <button class="admin-tab active" id="planning-phase-btn-1" onclick="switchPlanningPhase('PHASE1')">Phase 1</button>
+          <button class="admin-tab" id="planning-phase-btn-2" onclick="switchPlanningPhase('PHASE2')">Phase 2</button>
+        </div>
       </div>
 
       <div id="planning-settings" class="admin-section active">
         <div class="admin-section-header">
-          <h3>Phase 1 — Paramètres de planification</h3>
+          <h3 id="planning-phase-title">Phase 1 — Paramètres de planification</h3>
           <span id="planning-lock-badge" class="badge badge-info" hidden>Verrouillé</span>
         </div>
         <div id="planning-locked-notice" class="modal-error" style="display:none">
@@ -1184,8 +1190,8 @@
         </div>
 
         <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--dark4);display:flex;gap:0.6rem;flex-wrap:wrap;align-items:center">
-          <button class="btn-modal-save" onclick="computePhase1()">▶ Calculer les matchs (Phase 1)</button>
-          <button class="btn-sm btn-ban" onclick="resetPlannedPhase1()">Supprimer les matchs planifiés</button>
+          <button class="btn-modal-save" id="planning-compute-btn" onclick="triggerPlanningCompute()">▶ Calculer les matchs (Phase 1)</button>
+          <button class="btn-sm btn-ban" onclick="resetPlannedPhase()">Supprimer les matchs planifiés</button>
           <span id="planning-count-info" style="color:var(--gray);font-size:0.9rem"></span>
         </div>
       </div>
@@ -1195,7 +1201,7 @@
         <div id="planning-questions"></div>
         <div class="planning-terminal-input-row">
           <span class="planning-terminal-prompt">admin@cdr-scheduler:~$</span>
-          <input type="text" id="planning-command-input" autocomplete="off" placeholder="aide · statut · calculer · supprimer matchs" onkeydown="if(event.key==='Enter')sendConsoleCommand()">
+          <input type="text" id="planning-command-input" autocomplete="off" placeholder="aide · statut · calculer · verifier · joueur <pseudo>…" onkeydown="if(event.key==='Enter')sendConsoleCommand()">
         </div>
       </div>
 
@@ -4279,11 +4285,31 @@ function renderGroups() {
 
 /* ══════════════ PLANIFICATION AUTOMATIQUE ══════════════ */
 let planningPhase = 'PHASE1'
+let planningCurrentRound = null
+
+function switchPlanningPhase(phase) {
+  planningPhase = phase
+  document.getElementById('planning-phase-btn-1').classList.toggle('active', phase === 'PHASE1')
+  document.getElementById('planning-phase-btn-2').classList.toggle('active', phase === 'PHASE2')
+  pcState.year = null; pcState.month = null // recentrer le calendrier sur la nouvelle phase
+  loadScheduling()
+}
 
 async function loadScheduling() {
   const res = await fetch(`/api/admin/scheduling?phase=${planningPhase}`, { headers: authHeaders() })
   const data = await res.json()
   if (!res.ok) return
+  planningCurrentRound = data.currentRound
+
+  const phaseLabel = planningPhase === 'PHASE1' ? 'Phase 1' : 'Phase 2'
+  document.getElementById('planning-phase-title').textContent = `${phaseLabel} — Paramètres de planification`
+  const computeBtn = document.getElementById('planning-compute-btn')
+  if (planningPhase === 'PHASE1') {
+    computeBtn.textContent = '▶ Calculer les matchs (Phase 1)'
+  } else {
+    computeBtn.textContent = planningCurrentRound ? `▶ Calculer la ronde ${planningCurrentRound}` : '▶ Calculer la ronde (définir la ronde dans "Phase du tournoi")'
+  }
+
   document.getElementById('ps-period-start').value = data.settings ? toDateInput(data.settings.periodStart) : ''
   document.getElementById('ps-period-end').value   = data.settings ? toDateInput(data.settings.periodEnd) : ''
   document.getElementById('ps-cycle-length').value  = data.settings ? data.settings.cycleLengthDays : 14
@@ -4294,7 +4320,7 @@ async function loadScheduling() {
   document.getElementById('planning-locked-notice').style.display = locked ? 'block' : 'none';
   ['ps-period-start','ps-period-end','ps-cycle-length','ps-deadline-hours'].forEach(id => document.getElementById(id).disabled = locked)
 
-  document.getElementById('planning-count-info').textContent = `${data.plannedCount} match(s) planifié(s) actuellement pour la Phase 1.`
+  document.getElementById('planning-count-info').textContent = `${data.plannedCount} match(s) planifié(s) actuellement pour ${phaseLabel}${planningPhase === 'PHASE2' && planningCurrentRound ? ` (ronde active : ${planningCurrentRound})` : ''}.`
 
   renderBlackouts(data.blackouts || [])
   renderTerminal(data.logs || [])
@@ -4350,19 +4376,35 @@ async function deleteBlackout(id) {
   await loadScheduling()
 }
 
-async function resetPlannedPhase1() {
-  if (!confirm('Supprimer tous les matchs planifiés de la Phase 1 et déverrouiller les paramètres ?')) return
-  await fetch('/api/admin/scheduling', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'reset_phase1' }) })
+async function resetPlannedPhase() {
+  const label = planningPhase === 'PHASE1' ? 'Phase 1' : 'Phase 2'
+  if (!confirm(`Supprimer tous les matchs planifiés de la ${label} et déverrouiller les paramètres ?`)) return
+  await fetch('/api/admin/scheduling', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: planningPhase === 'PHASE1' ? 'reset_phase1' : 'reset_phase2' }) })
   await loadScheduling()
 }
 
-async function computePhase1(answers) {
-  const res = await fetch('/api/admin/scheduling', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'compute_phase1', answers: answers || {} }) })
+let pendingSchedulingAnswers = {}
+
+async function triggerPlanningCompute(newAnswer) {
+  if (!newAnswer) pendingSchedulingAnswers = {} // nouvel appui sur le bouton = nouvelle tentative
+  else Object.assign(pendingSchedulingAnswers, newAnswer)
+  const action = planningPhase === 'PHASE1' ? 'compute_phase1' : 'compute_phase2_round'
+  const res = await fetch('/api/admin/scheduling', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action, phase: planningPhase, answers: pendingSchedulingAnswers }) })
   const data = await res.json()
   renderTerminal(data.logs || [])
   planningSubTab('console', document.getElementById('planning-tab-console'))
   renderQuestions(data.needsInput ? data.questions : [])
+  if (data.ok || data.aborted) pendingSchedulingAnswers = {}
   if (data.ok) await loadScheduling()
+}
+
+function triggerDownload({ filename, content, mime }) {
+  const blob = new Blob([content], { type: mime || 'text/plain' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = filename
+  document.body.appendChild(a); a.click(); a.remove()
+  URL.revokeObjectURL(url)
 }
 
 async function sendConsoleCommand() {
@@ -4371,7 +4413,8 @@ async function sendConsoleCommand() {
   if (!command) return
   input.value = ''
   const res = await fetch('/api/admin/scheduling', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'console_command', phase: planningPhase, command }) })
-  await res.json().catch(() => null)
+  const data = await res.json().catch(() => null)
+  if (data?.download) triggerDownload(data.download)
   const stateRes = await fetch(`/api/admin/scheduling?phase=${planningPhase}`, { headers: authHeaders() })
   const state = await stateRes.json()
   renderTerminal(state.logs || [])
@@ -4380,18 +4423,18 @@ async function sendConsoleCommand() {
 function renderQuestions(questions) {
   const el = document.getElementById('planning-questions')
   if (!questions || questions.length === 0) { el.innerHTML = ''; return }
-  el.innerHTML = questions.map(q => `
+  el.innerHTML = questions.map((q, qi) => `
     <div class="planning-question-box">
       <div class="q-text">${esc(q.question)}</div>
       <div class="q-options">
-        ${q.options.map(o => `<button class="btn-sm btn-edit" onclick='answerSchedulingQuestion("${q.key}","${o.value}")'>${esc(o.label)}</button>`).join('')}
+        ${q.options.map(o => `<button class="btn-sm btn-edit" onclick='answerSchedulingQuestion(${qi},"${q.key}","${o.value}")'>${esc(o.label)}</button>`).join('')}
       </div>
     </div>`).join('')
 }
 
-function answerSchedulingQuestion(key, value) {
+function answerSchedulingQuestion(qi, key, value) {
   document.getElementById('planning-questions').innerHTML = ''
-  computePhase1({ [key]: value })
+  triggerPlanningCompute({ [key]: value })
 }
 
 function renderTerminal(logs) {

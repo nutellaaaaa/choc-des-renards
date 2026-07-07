@@ -1788,12 +1788,12 @@ async function handleScheduling(req, res) {
   if (req.method === 'GET') {
     const phase = req.query.phase === 'PHASE2' ? 'PHASE2' : 'PHASE1'
     try {
-      const [settings, blackouts, logs, plannedCount, poules, plannedMatchesRaw] = await Promise.all([
+      const [settings, blackouts, logs, plannedCount, poules, groups, state, plannedMatchesRaw] = await Promise.all([
         prisma.schedulingSettings.findUnique({ where: { phase } }),
         prisma.blackoutPeriod.findMany({ where: { phase }, orderBy: { dateStart: 'asc' } }),
         prisma.schedulingLog.findMany({ where: { phase }, orderBy: { id: 'asc' } }),
         prisma.plannedMatch.count({ where: { phase } }),
-        prisma.poule.findMany({
+        phase === 'PHASE1' ? prisma.poule.findMany({
           where: { phase },
           orderBy: { createdAt: 'asc' },
           include: {
@@ -1802,7 +1802,17 @@ async function handleScheduling(req, res) {
               include: { user: { select: { id: true, firstName: true, lastName: true, username: true, category: true } } },
             },
           },
-        }),
+        }) : Promise.resolve([]),
+        phase === 'PHASE2' ? prisma.phase2Group.findMany({
+          orderBy: { createdAt: 'asc' },
+          include: {
+            members: {
+              where: { user: { active: true, accepted: true, banned: false } },
+              include: { user: { select: { id: true, firstName: true, lastName: true, username: true, category: true } } },
+            },
+          },
+        }) : Promise.resolve([]),
+        prisma.tournamentState.upsert({ where: { id: 1 }, update: {}, create: { id: 1, currentPhase: 'PHASE0', currentRound: null } }),
         prisma.plannedMatch.findMany({
           where: { phase },
           orderBy: { scheduledDate: 'asc' },
@@ -1813,15 +1823,17 @@ async function handleScheduling(req, res) {
         }),
       ])
 
-      // Rattache chaque match planifié à la poule de player1 (les deux joueurs d'un
-      // même match sont toujours dans la même poule pour la Phase 1), pour la coloration
-      // du calendrier admin.
-      const pouleIdByUser = new Map()
-      for (const p of poules) for (const m of p.members) pouleIdByUser.set(m.userId, p.id)
-      const plannedMatches = plannedMatchesRaw.map(pm => ({ ...pm, pouleId: pouleIdByUser.get(pm.player1Id) || null }))
+      // Rattache chaque match planifié à sa poule (Phase 1) ou son groupe (Phase 2) — les
+      // deux joueurs d'un même match sont toujours dans la même poule/groupe — pour la
+      // coloration du calendrier admin.
+      const groupings = phase === 'PHASE1' ? poules : groups
+      const groupIdByUser = new Map()
+      for (const g of groupings) for (const m of g.members) groupIdByUser.set(m.userId, g.id)
+      const plannedMatches = plannedMatchesRaw.map(pm => ({ ...pm, pouleId: groupIdByUser.get(pm.player1Id) || null }))
 
       return res.status(200).json({
-        phase, settings, blackouts, logs, plannedCount, poules, plannedMatches,
+        phase, settings, blackouts, logs, plannedCount, poules, groups, plannedMatches,
+        currentPhase: state.currentPhase, currentRound: state.currentRound,
         locked: !!settings?.locked,
       })
     } catch (err) {
@@ -1911,40 +1923,26 @@ async function handleScheduling(req, res) {
     }
   }
 
-  if (action === 'console_command') {
-    const { phase, command } = req.body
-    const ph = phase === 'PHASE2' ? 'PHASE2' : 'PHASE1'
-    const cmd = (command || '').trim().toLowerCase()
-    await prisma.schedulingLog.create({ data: { phase: ph, type: 'commande', message: command || '' } })
-
-    if (cmd === 'aide' || cmd === 'help') {
+  if (action === 'reset_phase2') {
+    try {
+      await prisma.plannedMatch.deleteMany({ where: { phase: 'PHASE2' } })
+      await prisma.schedulingSettings.updateMany({ where: { phase: 'PHASE2' }, data: { locked: false } })
       await prisma.schedulingLog.create({
-        data: { phase: ph, type: 'info', message: 'Commandes disponibles : aide · statut · calculer · supprimer matchs' },
+        data: { phase: 'PHASE2', type: 'action', message: 'Matchs planifiés Phase 2 supprimés — paramètres déverrouillés.' },
       })
       return res.status(200).json({ ok: true })
+    } catch (err) {
+      console.error('[scheduling reset_phase2]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
     }
-    if (cmd === 'statut') {
-      const [settings, plannedCount] = await Promise.all([
-        prisma.schedulingSettings.findUnique({ where: { phase: ph } }),
-        prisma.plannedMatch.count({ where: { phase: ph } }),
-      ])
-      const msg = settings
-        ? `Période ${fmtDate(settings.periodStart)} → ${fmtDate(settings.periodEnd)} · cycle ${settings.cycleLengthDays}j · ${plannedCount} match(s) planifié(s) · ${settings.locked ? 'verrouillé' : 'non verrouillé'}.`
-        : 'Aucun paramètre configuré pour cette phase.'
-      await prisma.schedulingLog.create({ data: { phase: ph, type: 'info', message: msg } })
-      return res.status(200).json({ ok: true })
-    }
-    if (cmd === 'calculer' && ph === 'PHASE1') {
-      return computePhase1(req, res, {})
-    }
-    if (cmd === 'supprimer matchs') {
-      await prisma.plannedMatch.deleteMany({ where: { phase: ph } })
-      await prisma.schedulingSettings.updateMany({ where: { phase: ph }, data: { locked: false } })
-      await prisma.schedulingLog.create({ data: { phase: ph, type: 'action', message: 'Matchs planifiés supprimés via la console.' } })
-      return res.status(200).json({ ok: true })
-    }
-    await prisma.schedulingLog.create({ data: { phase: ph, type: 'erreur', message: `Commande inconnue : « ${command} ». Tapez "aide" pour la liste des commandes.` } })
-    return res.status(200).json({ ok: true })
+  }
+
+  if (action === 'compute_phase2_round') {
+    return computePhase2Round(req, res, req.body?.answers || {}, null)
+  }
+
+  if (action === 'console_command') {
+    return handleConsoleCommand(req, res)
   }
 
   if (action === 'compute_phase1') {
@@ -1955,54 +1953,9 @@ async function handleScheduling(req, res) {
     const pmid = parseInt(req.body.plannedMatchId, 10)
     const { newDate } = req.body
     if (isNaN(pmid) || !newDate) return res.status(400).json({ error: 'plannedMatchId et newDate requis.' })
-    try {
-      const pm = await prisma.plannedMatch.findUnique({
-        where: { id: pmid },
-        include: {
-          player1: { select: { firstName: true, lastName: true } },
-          player2: { select: { firstName: true, lastName: true } },
-        },
-      })
-      if (!pm) return res.status(404).json({ error: 'Match planifié introuvable.' })
-
-      const target = new Date(newDate)
-      const [settings, blackouts] = await Promise.all([
-        prisma.schedulingSettings.findUnique({ where: { phase: pm.phase } }),
-        prisma.blackoutPeriod.findMany({ where: { phase: pm.phase } }),
-      ])
-
-      // Déplacement libre et isolé : jamais bloqué, jamais de décalage en cascade des
-      // autres matchs — juste un avertissement informatif si la date choisie sort du
-      // cadre prévu (cf. §3 du cahier des charges).
-      let warning = null
-      if (settings && (target < settings.periodStart || target > settings.periodEnd)) {
-        warning = `Le ${fmtDate(target)} est hors de la période de planification définie (${fmtDate(settings.periodStart)} → ${fmtDate(settings.periodEnd)}).`
-      } else {
-        const inBlackout = blackouts.find(b => target >= b.dateStart && target <= b.dateEnd)
-        if (inBlackout) warning = `Le ${fmtDate(target)} tombe dans la période de non-jeu « ${inBlackout.label} ».`
-      }
-
-      const updated = await prisma.plannedMatch.update({ where: { id: pmid }, data: { scheduledDate: target } })
-
-      await prisma.schedulingLog.create({
-        data: {
-          phase: pm.phase, type: warning ? 'avertissement' : 'action',
-          message: warning
-            ? `Match ${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName} déplacé manuellement au ${fmtDate(target)} — ${warning}`
-            : `Match ${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName} déplacé manuellement au ${fmtDate(target)}.`,
-        },
-      })
-      if (pm.notifiedAt) {
-        await prisma.schedulingLog.create({
-          data: { phase: pm.phase, type: 'avertissement', message: `Ce match avait déjà été notifié aux joueurs le ${fmtDate(pm.notifiedAt)} — la notification existante n'est pas resynchronisée automatiquement, pensez à renotifier si nécessaire.` },
-        })
-      }
-
-      return res.status(200).json({ ok: true, plannedMatch: updated, warning })
-    } catch (err) {
-      console.error('[scheduling move_planned_match]', err)
-      return res.status(500).json({ error: 'Erreur serveur.' })
-    }
+    const result = await movePlannedMatchCore(pmid, newDate)
+    if (result.error) return res.status(result.status || 500).json({ error: result.error })
+    return res.status(200).json({ ok: true, plannedMatch: result.plannedMatch, warning: result.warning })
   }
 
   return res.status(400).json({ error: 'Action invalide.' })
@@ -2158,5 +2111,554 @@ async function flushLogs(phase, entries) {
   await prisma.schedulingLog.deleteMany({ where: { phase } })
   if (entries.length > 0) {
     await prisma.schedulingLog.createMany({ data: entries.map(e => ({ phase: e.phase, type: e.type, message: e.message })) })
+  }
+}
+
+function fmtDateTime(d) {
+  return new Date(d).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+function parseConsoleDate(str) {
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(str)
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(str)
+  if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]))
+  return null
+}
+
+async function getGroupingsForPhase(ph) {
+  if (ph === 'PHASE1') {
+    return prisma.poule.findMany({
+      where: { phase: 'PHASE1' },
+      include: { members: { where: { user: { active: true, accepted: true, banned: false } }, include: { user: { select: { id: true, firstName: true, lastName: true, username: true, category: true } } } } },
+    })
+  }
+  return prisma.phase2Group.findMany({
+    include: { members: { where: { user: { active: true, accepted: true, banned: false } }, include: { user: { select: { id: true, firstName: true, lastName: true, username: true, category: true } } } } },
+  })
+}
+
+// Logique de déplacement partagée entre le glisser-déposer du calendrier et la commande
+// console "deplacer" — libre et isolée, jamais bloquante (cf. §3 du cahier des charges).
+async function movePlannedMatchCore(pmid, newDate) {
+  const pm = await prisma.plannedMatch.findUnique({
+    where: { id: pmid },
+    include: { player1: { select: { firstName: true, lastName: true } }, player2: { select: { firstName: true, lastName: true } } },
+  })
+  if (!pm) return { error: 'Match planifié introuvable.', status: 404 }
+
+  const target = new Date(newDate)
+  const [settings, blackouts] = await Promise.all([
+    prisma.schedulingSettings.findUnique({ where: { phase: pm.phase } }),
+    prisma.blackoutPeriod.findMany({ where: { phase: pm.phase } }),
+  ])
+
+  let warning = null
+  if (settings && (target < settings.periodStart || target > settings.periodEnd)) {
+    warning = `Le ${fmtDate(target)} est hors de la période de planification définie (${fmtDate(settings.periodStart)} → ${fmtDate(settings.periodEnd)}).`
+  } else {
+    const inBlackout = blackouts.find(b => target >= b.dateStart && target <= b.dateEnd)
+    if (inBlackout) warning = `Le ${fmtDate(target)} tombe dans la période de non-jeu « ${inBlackout.label} ».`
+  }
+
+  const updated = await prisma.plannedMatch.update({ where: { id: pmid }, data: { scheduledDate: target } })
+
+  await prisma.schedulingLog.create({
+    data: {
+      phase: pm.phase, type: warning ? 'avertissement' : 'action',
+      message: warning
+        ? `Match #${pmid} (${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}) déplacé au ${fmtDate(target)} — ${warning}`
+        : `Match #${pmid} (${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}) déplacé au ${fmtDate(target)}.`,
+    },
+  })
+  if (pm.notifiedAt) {
+    await prisma.schedulingLog.create({
+      data: { phase: pm.phase, type: 'avertissement', message: `Ce match avait déjà été notifié aux joueurs le ${fmtDate(pm.notifiedAt)} — pensez à renotifier si nécessaire (la notification existante n'est pas resynchronisée automatiquement).` },
+    })
+  }
+  return { ok: true, plannedMatch: updated, warning }
+}
+
+/* ============================================================
+ * CONSOLE — interprétation des commandes texte de la console de planification.
+ * Organisée en quatre familles : diagnostic (lecture seule), actions ciblées sur un
+ * match précis, notifications, et calcul/verrouillage. Voir "aide" pour la liste.
+ * ============================================================ */
+async function handleConsoleCommand(req, res) {
+  const { phase, command } = req.body
+  const ph = phase === 'PHASE2' ? 'PHASE2' : 'PHASE1'
+  const raw = (command || '').trim()
+  const cmd = raw.toLowerCase()
+  await prisma.schedulingLog.create({ data: { phase: ph, type: 'commande', message: raw } })
+  const say = (type, message) => prisma.schedulingLog.create({ data: { phase: ph, type, message } })
+
+  try {
+    // ── aide ──
+    if (cmd === 'aide' || cmd === 'help') {
+      await say('info', [
+        'Diagnostic  : verifier · deadlines · alerte · joueur <pseudo> · poule <nom>',
+        'Actions     : annuler <id> · forfait <id> · deadline <id> <heures> · deplacer <id> <jj/mm/aaaa>',
+        'Notifs      : notifier <id>',
+        'Calcul      : statut · calculer · recalculer ronde <n> (Phase 2) · supprimer matchs · verrouiller · deverrouiller',
+        'Export      : exporter',
+      ].join('\n'))
+      return res.status(200).json({ ok: true })
+    }
+
+    // ── statut ──
+    if (cmd === 'statut') {
+      const [settings, plannedCount] = await Promise.all([
+        prisma.schedulingSettings.findUnique({ where: { phase: ph } }),
+        prisma.plannedMatch.count({ where: { phase: ph } }),
+      ])
+      const msg = settings
+        ? `Période ${fmtDate(settings.periodStart)} → ${fmtDate(settings.periodEnd)} · cycle ${settings.cycleLengthDays}j · ${plannedCount} match(s) planifié(s) · ${settings.locked ? 'verrouillé' : 'non verrouillé'}.`
+        : 'Aucun paramètre configuré pour cette phase.'
+      await say('info', msg)
+      return res.status(200).json({ ok: true })
+    }
+
+    // ── calculer ──
+    if (cmd === 'calculer') {
+      if (ph === 'PHASE1') return computePhase1(req, res, {})
+      return computePhase2Round(req, res, {}, null)
+    }
+
+    // ── supprimer matchs ──
+    if (cmd === 'supprimer matchs') {
+      await prisma.plannedMatch.deleteMany({ where: { phase: ph } })
+      await prisma.schedulingSettings.updateMany({ where: { phase: ph }, data: { locked: false } })
+      await say('action', 'Matchs planifiés supprimés via la console — paramètres déverrouillés.')
+      return res.status(200).json({ ok: true })
+    }
+
+    // ── verrouiller / deverrouiller ──
+    if (cmd === 'verrouiller') {
+      await prisma.schedulingSettings.updateMany({ where: { phase: ph }, data: { locked: true } })
+      await say('action', 'Paramètres verrouillés manuellement.')
+      return res.status(200).json({ ok: true })
+    }
+    if (cmd === 'deverrouiller') {
+      await prisma.schedulingSettings.updateMany({ where: { phase: ph }, data: { locked: false } })
+      await say('avertissement', 'Paramètres déverrouillés manuellement — les matchs planifiés existants sont conservés. Attention à la cohérence si vous relancez un calcul complet.')
+      return res.status(200).json({ ok: true })
+    }
+
+    // ── verifier ──
+    if (cmd === 'verifier') {
+      const [planned, blackouts] = await Promise.all([
+        prisma.plannedMatch.findMany({ where: { phase: ph }, include: { player1: { select: { firstName: true, lastName: true } }, player2: { select: { firstName: true, lastName: true } } } }),
+        prisma.blackoutPeriod.findMany({ where: { phase: ph } }),
+      ])
+      let issues = 0
+      const seen = new Map()
+      for (const pm of planned) {
+        const key = [pm.player1Id, pm.player2Id].sort((a, b) => a - b).join('-')
+        if (seen.has(key)) { issues++; await say('avertissement', `Doublon : ${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName} apparaît plusieurs fois (matchs #${seen.get(key)} et #${pm.id}).`) }
+        else seen.set(key, pm.id)
+      }
+      for (const pm of planned) {
+        if (!pm.scheduledDate) continue
+        const bp = blackouts.find(b => pm.scheduledDate >= b.dateStart && pm.scheduledDate <= b.dateEnd)
+        if (bp) { issues++; await say('avertissement', `Match #${pm.id} (${pm.player1.firstName} vs ${pm.player2.firstName}) planifié le ${fmtDate(pm.scheduledDate)}, dans la période de non-jeu « ${bp.label} » (probablement ajoutée après coup).`) }
+      }
+      const countByUser = new Map()
+      for (const pm of planned) {
+        countByUser.set(pm.player1Id, (countByUser.get(pm.player1Id) || 0) + 1)
+        countByUser.set(pm.player2Id, (countByUser.get(pm.player2Id) || 0) + 1)
+      }
+      if (countByUser.size > 0) {
+        const counts = [...countByUser.values()]
+        const max = Math.max(...counts), min = Math.min(...counts)
+        if (max - min >= 2) { issues++; await say('avertissement', `Répartition inégale : entre ${min} et ${max} match(s) restant(s) selon les joueurs.`) }
+      }
+      await say('info', issues === 0 ? 'Aucune anomalie détectée.' : `${issues} anomalie(s) signalée(s) ci-dessus.`)
+      return res.status(200).json({ ok: true })
+    }
+
+    // ── deadlines ──
+    if (cmd === 'deadlines') {
+      const overdue = await prisma.plannedMatch.findMany({
+        where: { phase: ph, forfeited: false, deadlineAt: { lt: new Date() } },
+        include: { player1: { select: { firstName: true, lastName: true } }, player2: { select: { firstName: true, lastName: true } } },
+        orderBy: { deadlineAt: 'asc' },
+      })
+      if (overdue.length === 0) { await say('info', 'Aucun match en dépassement de deadline.'); return res.status(200).json({ ok: true }) }
+      for (const pm of overdue) await say('avertissement', `Match #${pm.id} : ${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName} — deadline dépassée le ${fmtDateTime(pm.deadlineAt)}, score non saisi.`)
+      await say('info', `${overdue.length} forfait(s) potentiel(s) — utilisez "forfait <id>" pour trancher.`)
+      return res.status(200).json({ ok: true })
+    }
+
+    // ── alerte ──
+    if (cmd === 'alerte') {
+      const now = new Date()
+      const upcoming = await prisma.plannedMatch.findMany({
+        where: { phase: ph, notifiedAt: null, deadlineAt: { gte: now, lte: addHours(now, 48) } },
+        include: { player1: { select: { firstName: true, lastName: true } }, player2: { select: { firstName: true, lastName: true } } },
+        orderBy: { deadlineAt: 'asc' },
+      })
+      if (upcoming.length === 0) { await say('info', 'Aucune deadline dans les 48h à venir parmi les matchs non notifiés.'); return res.status(200).json({ ok: true }) }
+      for (const pm of upcoming) await say('avertissement', `Match #${pm.id} : ${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName} — deadline le ${fmtDateTime(pm.deadlineAt)}, jamais notifié (« notifier ${pm.id} »).`)
+      return res.status(200).json({ ok: true })
+    }
+
+    // ── joueur <pseudo> ──
+    if (cmd.startsWith('joueur ')) {
+      const username = raw.slice(7).trim()
+      if (!username) { await say('erreur', 'Usage : joueur <pseudo>'); return res.status(200).json({ ok: true }) }
+      const user = await prisma.user.findFirst({ where: { username: { equals: username, mode: 'insensitive' } } })
+      if (!user) { await say('erreur', `Joueur « ${username} » introuvable.`); return res.status(200).json({ ok: true }) }
+      const matches = await prisma.plannedMatch.findMany({
+        where: { phase: ph, OR: [{ player1Id: user.id }, { player2Id: user.id }] },
+        include: { player1: { select: { id: true, firstName: true, lastName: true } }, player2: { select: { id: true, firstName: true, lastName: true } } },
+        orderBy: { scheduledDate: 'asc' },
+      })
+      if (matches.length === 0) { await say('info', `${user.firstName} ${user.lastName} n'a aucun match planifié pour cette phase.`); return res.status(200).json({ ok: true }) }
+      await say('info', `Calendrier de ${user.firstName} ${user.lastName} (@${user.username}) :`)
+      for (const pm of matches) {
+        const opp = pm.player1Id === user.id ? pm.player2 : pm.player1
+        await say('info', `  #${pm.id} — vs ${opp.firstName} ${opp.lastName} — ${pm.scheduledDate ? fmtDate(pm.scheduledDate) : 'date non définie'}${pm.deadlineAt ? ` (deadline ${fmtDateTime(pm.deadlineAt)})` : ''}${pm.malus ? ' — malus' : ''}`)
+      }
+      return res.status(200).json({ ok: true })
+    }
+
+    // ── poule <nom> / groupe <nom> ──
+    if (cmd.startsWith('poule ') || cmd.startsWith('groupe ')) {
+      const name = raw.slice(cmd.startsWith('poule ') ? 6 : 7).trim()
+      if (!name) { await say('erreur', 'Usage : poule <nom>'); return res.status(200).json({ ok: true }) }
+      const groupings = await getGroupingsForPhase(ph)
+      const g = groupings.find(x => x.name.toLowerCase() === name.toLowerCase())
+      if (!g) { await say('erreur', `Poule/groupe « ${name} » introuvable pour cette phase.`); return res.status(200).json({ ok: true }) }
+      const members = g.members.map(m => m.user)
+      const matches = await prisma.match.findMany({ where: { phase: ph, userId: { in: members.map(m => m.id) }, published: true }, include: { sets: true } })
+      const byUser = new Map(members.map(m => [m.id, []]))
+      for (const m of matches) byUser.get(m.userId)?.push(m)
+      const ranked = sortPlayers(members.map(m => ({ ...m, ...computeStats(byUser.get(m.id) || []) })))
+      await say('info', `Poule/groupe « ${g.name} » — classement :`)
+      let rank = 1
+      for (const p of ranked) { await say('info', `  ${rank}. ${p.firstName} ${p.lastName} — ${p.wins}V/${p.losses}D — ${p.points} pts`); rank++ }
+      const remaining = await prisma.plannedMatch.findMany({
+        where: { phase: ph, player1Id: { in: members.map(m => m.id) } },
+        include: { player1: { select: { firstName: true, lastName: true } }, player2: { select: { firstName: true, lastName: true } } },
+      })
+      if (remaining.length === 0) { await say('info', 'Aucun match restant planifié.'); return res.status(200).json({ ok: true }) }
+      await say('info', 'Matchs restants :')
+      for (const pm of remaining) await say('info', `  #${pm.id} — ${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName} — ${pm.scheduledDate ? fmtDate(pm.scheduledDate) : '?'}`)
+      return res.status(200).json({ ok: true })
+    }
+
+    // ── annuler <id> ──
+    if (cmd.startsWith('annuler ')) {
+      const id = parseInt(raw.slice(8).trim(), 10)
+      if (isNaN(id)) { await say('erreur', 'Usage : annuler <id>'); return res.status(200).json({ ok: true }) }
+      const pm = await prisma.plannedMatch.findUnique({ where: { id }, include: { player1: { select: { firstName: true, lastName: true } }, player2: { select: { firstName: true, lastName: true } } } })
+      if (!pm) { await say('erreur', `Match planifié #${id} introuvable.`); return res.status(200).json({ ok: true }) }
+      await prisma.plannedMatch.delete({ where: { id } })
+      await say('action', `Match #${id} (${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}) supprimé.`)
+      return res.status(200).json({ ok: true })
+    }
+
+    // ── forfait <id> ──
+    if (cmd.startsWith('forfait ')) {
+      const id = parseInt(raw.slice(8).trim(), 10)
+      if (isNaN(id)) { await say('erreur', 'Usage : forfait <id>'); return res.status(200).json({ ok: true }) }
+      const pm = await prisma.plannedMatch.findUnique({ where: { id }, include: { player1: true, player2: true } })
+      if (!pm) { await say('erreur', `Match planifié #${id} introuvable.`); return res.status(200).json({ ok: true }) }
+      const matchDateObj = pm.scheduledDate || new Date()
+      await Promise.all([
+        prisma.match.create({ data: { userId: pm.player1Id, phase: pm.phase, roundNumber: pm.roundNumber, matchDate: matchDateObj, opponentFirstName: pm.player2.firstName, opponentLastName: pm.player2.lastName, note: 'Forfait', published: true, sets: { create: [{ setNumber: 1, playerScore: 0, opponentScore: 0 }] } } }),
+        prisma.match.create({ data: { userId: pm.player2Id, phase: pm.phase, roundNumber: pm.roundNumber, matchDate: matchDateObj, opponentFirstName: pm.player1.firstName, opponentLastName: pm.player1.lastName, note: 'Forfait', published: true, sets: { create: [{ setNumber: 1, playerScore: 0, opponentScore: 0 }] } } }),
+      ])
+      await prisma.plannedMatch.delete({ where: { id } })
+      await say('action', `Match #${id} (${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}) déclaré forfait (0-0), publié, retiré des matchs planifiés.`)
+      return res.status(200).json({ ok: true })
+    }
+
+    // ── deadline <id> <heures> ──
+    if (cmd.startsWith('deadline ')) {
+      const parts = raw.split(/\s+/)
+      const id = parseInt(parts[1], 10), hours = parseFloat(parts[2])
+      if (isNaN(id) || isNaN(hours)) { await say('erreur', 'Usage : deadline <id> <heures> (ex : "deadline 42 24" pour +24h, "deadline 42 -12" pour -12h)'); return res.status(200).json({ ok: true }) }
+      const pm = await prisma.plannedMatch.findUnique({ where: { id } })
+      if (!pm) { await say('erreur', `Match planifié #${id} introuvable.`); return res.status(200).json({ ok: true }) }
+      const updated = addHours(pm.deadlineAt || new Date(), hours)
+      await prisma.plannedMatch.update({ where: { id }, data: { deadlineAt: updated } })
+      await say('action', `Deadline du match #${id} ${hours >= 0 ? 'reportée de' : 'avancée de'} ${Math.abs(hours)}h — nouvelle deadline : ${fmtDateTime(updated)}.`)
+      return res.status(200).json({ ok: true })
+    }
+
+    // ── deplacer <id> <date> ──
+    if (cmd.startsWith('deplacer ')) {
+      const parts = raw.split(/\s+/)
+      const id = parseInt(parts[1], 10)
+      const parsed = parts[2] ? parseConsoleDate(parts[2]) : null
+      if (isNaN(id) || !parsed) { await say('erreur', 'Usage : deplacer <id> <jj/mm/aaaa>'); return res.status(200).json({ ok: true }) }
+      const result = await movePlannedMatchCore(id, parsed.toISOString())
+      if (result.error) { await say('erreur', result.error); return res.status(200).json({ ok: true }) }
+      return res.status(200).json({ ok: true })
+    }
+
+    // ── notifier <id> ──
+    if (cmd.startsWith('notifier ')) {
+      const id = parseInt(raw.slice(9).trim(), 10)
+      if (isNaN(id)) { await say('erreur', 'Usage : notifier <id>'); return res.status(200).json({ ok: true }) }
+      const pm = await prisma.plannedMatch.findUnique({ where: { id }, include: { player1: true, player2: true } })
+      if (!pm) { await say('erreur', `Match planifié #${id} introuvable.`); return res.status(200).json({ ok: true }) }
+      if (!pm.scheduledDate) { await say('erreur', `Le match #${id} n'a pas encore de date programmée.`); return res.status(200).json({ ok: true }) }
+      const dateStr = fmtDate(pm.scheduledDate)
+      const deadlineStr = pm.deadlineAt ? fmtDateTime(pm.deadlineAt) : null
+      await Promise.all([
+        prisma.notification.create({ data: { userId: pm.player1Id, type: 'next_match', title: 'Prochain match programmé', message: `Vous affrontez ${pm.player2.firstName} ${pm.player2.lastName} le ${dateStr}.${deadlineStr ? ` Merci de saisir le score avant le ${deadlineStr}.` : ''}`, opponentName: `${pm.player2.firstName} ${pm.player2.lastName}`, startDate: pm.scheduledDate, plannedMatchId: pm.id } }),
+        prisma.notification.create({ data: { userId: pm.player2Id, type: 'next_match', title: 'Prochain match programmé', message: `Vous affrontez ${pm.player1.firstName} ${pm.player1.lastName} le ${dateStr}.${deadlineStr ? ` Merci de saisir le score avant le ${deadlineStr}.` : ''}`, opponentName: `${pm.player1.firstName} ${pm.player1.lastName}`, startDate: pm.scheduledDate, plannedMatchId: pm.id } }),
+      ])
+      await prisma.plannedMatch.update({ where: { id }, data: { notifiedAt: new Date() } })
+      await say('action', `Notification "prochain match" envoyée à ${pm.player1.firstName} ${pm.player1.lastName} et ${pm.player2.firstName} ${pm.player2.lastName}.`)
+      return res.status(200).json({ ok: true })
+    }
+
+    // ── recalculer ronde <n> ──
+    if (cmd.startsWith('recalculer ronde ')) {
+      if (ph !== 'PHASE2') { await say('erreur', 'La commande "recalculer ronde" ne concerne que la Phase 2.'); return res.status(200).json({ ok: true }) }
+      const n = parseInt(raw.split(/\s+/)[2], 10)
+      if (isNaN(n)) { await say('erreur', 'Usage : recalculer ronde <n>'); return res.status(200).json({ ok: true }) }
+      await prisma.plannedMatch.deleteMany({ where: { phase: 'PHASE2', roundNumber: n } })
+      await say('avertissement', `Matchs existants de la ronde ${n} supprimés — recalcul en cours.`)
+      return computePhase2Round(req, res, req.body?.answers || {}, n)
+    }
+
+    // ── exporter ──
+    if (cmd === 'exporter') {
+      const matches = await prisma.plannedMatch.findMany({
+        where: { phase: ph }, orderBy: { scheduledDate: 'asc' },
+        include: { player1: { select: { firstName: true, lastName: true } }, player2: { select: { firstName: true, lastName: true } } },
+      })
+      const rows = matches.map(m => [m.id, m.scheduledDate ? fmtDate(m.scheduledDate) : '', `${m.player1.firstName} ${m.player1.lastName}`, `${m.player2.firstName} ${m.player2.lastName}`, m.deadlineAt ? fmtDateTime(m.deadlineAt) : '', m.malus || ''].join(';'))
+      const csv = 'id;date;joueur1;joueur2;deadline;malus\n' + rows.join('\n')
+      await say('action', `Export CSV généré (${matches.length} match(s)).`)
+      return res.status(200).json({ ok: true, download: { filename: `planification_${ph.toLowerCase()}.csv`, content: csv, mime: 'text/csv' } })
+    }
+
+    await say('erreur', `Commande inconnue : « ${raw} ». Tapez "aide" pour la liste des commandes.`)
+    return res.status(200).json({ ok: true })
+  } catch (err) {
+    console.error('[console_command]', err)
+    await say('erreur', `Erreur inattendue : ${err.message}`)
+    return res.status(200).json({ ok: true })
+  }
+}
+
+// Calcule et enregistre une ronde de Phase 2 (système suisse par groupe). Une seule
+// ronde à la fois — la ronde courante est celle définie dans l'onglet "Phase du
+// tournoi" (TournamentState.currentRound), sauf surcharge explicite (recalculer ronde n).
+async function computePhase2Round(req, res, answers, roundOverride) {
+  const phase = 'PHASE2'
+  const logEntries = []
+  const log = (type, message) => logEntries.push({ phase, type, message })
+
+  try {
+    const [settings, state] = await Promise.all([
+      prisma.schedulingSettings.findUnique({ where: { phase } }),
+      prisma.tournamentState.upsert({ where: { id: 1 }, update: {}, create: { id: 1, currentPhase: 'PHASE0', currentRound: null } }),
+    ])
+    if (!settings) {
+      log('erreur', 'Aucun paramètre de planification configuré pour la Phase 2.')
+      await flushLogs(phase, logEntries)
+      return res.status(400).json({ ok: false, error: 'Paramètres manquants.', logs: logEntries })
+    }
+    const round = roundOverride || state.currentRound
+    if (!round) {
+      log('erreur', 'Aucune ronde active. Définissez le numéro de ronde dans l\'onglet "Phase du tournoi" avant de calculer.')
+      await flushLogs(phase, logEntries)
+      return res.status(400).json({ ok: false, error: 'Ronde non définie.', logs: logEntries })
+    }
+
+    const existingForRound = await prisma.plannedMatch.count({ where: { phase, roundNumber: round } })
+    if (existingForRound > 0 && !answers.regenerate) {
+      log('avertissement', `${existingForRound} match(s) déjà planifié(s) pour la ronde ${round}.`)
+      log('question', 'Des matchs existent déjà pour cette ronde. Que faire ?')
+      await flushLogs(phase, logEntries)
+      return res.status(200).json({
+        ok: false, needsInput: true,
+        questions: [{ key: 'regenerate', question: `Des matchs sont déjà planifiés pour la ronde ${round}. Les régénérer ?`, options: [
+          { value: 'yes', label: 'Supprimer et régénérer la ronde' },
+          { value: 'no', label: 'Annuler' },
+        ] }],
+        logs: logEntries,
+      })
+    }
+    if (answers.regenerate === 'no') {
+      log('action', 'Calcul annulé par l\'administrateur.')
+      await flushLogs(phase, logEntries)
+      return res.status(200).json({ ok: false, aborted: true, logs: logEntries })
+    }
+
+    const groups = await prisma.phase2Group.findMany({
+      orderBy: { createdAt: 'asc' },
+      include: {
+        members: {
+          where: { user: { active: true, accepted: true, banned: false } },
+          include: { user: { select: { id: true, firstName: true, lastName: true, username: true, category: true } } },
+        },
+      },
+    })
+    if (groups.length === 0) {
+      log('erreur', 'Aucun groupe défini pour la Phase 2.')
+      await flushLogs(phase, logEntries)
+      return res.status(400).json({ ok: false, error: 'Aucun groupe.', logs: logEntries })
+    }
+
+    log('info', `Calcul de la ronde ${round} — cycle de ${settings.cycleLengthDays} jour(s), deadline ${settings.deadlineHoursBeforeCycleEnd}h avant la fin du cycle.`)
+
+    const blackouts = await prisma.blackoutPeriod.findMany({ where: { phase } })
+    let cursor = addDays(new Date(settings.periodStart), (round - 1) * settings.cycleLengthDays)
+    const rawDate = new Date(cursor)
+    cursor = shiftPastBlackouts(cursor, blackouts)
+    if (cursor.getTime() !== rawDate.getTime()) log('avertissement', `Ronde ${round} initialement prévue le ${fmtDate(rawDate)} — décalée au ${fmtDate(cursor)} (période de non-jeu).`)
+    else log('info', `Ronde ${round} : ${fmtDate(cursor)}.`)
+    const scheduledDate = cursor
+    const deadlineAt = addHours(addDays(scheduledDate, settings.cycleLengthDays), -settings.deadlineHoursBeforeCycleEnd)
+
+    if (deadlineAt > settings.periodEnd) {
+      log('avertissement', `La deadline de cette ronde (${fmtDateTime(deadlineAt)}) dépasse la fin de période prévue (${fmtDate(settings.periodEnd)}).`)
+      if (!answers.overrun) {
+        log('question', 'Comment souhaitez-vous résoudre ce dépassement ?')
+        await flushLogs(phase, logEntries)
+        return res.status(200).json({
+          ok: false, needsInput: true,
+          questions: [{ key: 'overrun', question: 'La ronde dépasse la date de fin de période. Que faire ?', options: [
+            { value: 'extend', label: `Étendre automatiquement la fin de période au ${fmtDate(deadlineAt)}` },
+            { value: 'abort', label: 'Annuler' },
+          ] }],
+          logs: logEntries,
+        })
+      }
+      if (answers.overrun === 'abort') {
+        log('action', 'Calcul annulé par l\'administrateur.')
+        await flushLogs(phase, logEntries)
+        return res.status(200).json({ ok: false, aborted: true, logs: logEntries })
+      }
+      await prisma.schedulingSettings.update({ where: { phase }, data: { periodEnd: deadlineAt } })
+      log('reponse', `Fin de période étendue au ${fmtDate(deadlineAt)}.`)
+    }
+
+    const toCreatePairs = []
+    const byeMatchesToCreate = []
+    const pendingQuestions = []
+    const usersInfo = new Map()
+    for (const g of groups) for (const m of g.members) usersInfo.set(m.user.id, m.user)
+
+    for (const g of groups) {
+      const members = g.members.map(m => m.user)
+      if (members.length < 2) { log('avertissement', `Groupe « ${g.name} » : moins de 2 joueurs actifs — ignoré.`); continue }
+
+      const matches = await prisma.match.findMany({ where: { phase, userId: { in: members.map(m => m.id) }, published: true }, include: { sets: true } })
+      const byUser = new Map(members.map(m => [m.id, []]))
+      for (const m of matches) byUser.get(m.userId)?.push(m)
+      const ranked = sortPlayers(members.map(m => ({ ...m, ...computeStats(byUser.get(m.id) || []) })))
+      const byId = new Map(ranked.map(p => [p.id, p]))
+      let pool = ranked.map(p => p.id)
+
+      // ── Bye si nombre impair ──
+      if (pool.length % 2 !== 0) {
+        const byeKey = `bye_${g.id}`
+        const byeHistory = await prisma.match.findMany({ where: { phase, userId: { in: pool }, opponentFirstName: 'Exempt' } })
+        const alreadyByed = new Set(byeHistory.map(m => m.userId))
+        let byeUserId = [...pool].reverse().find(id => !alreadyByed.has(id))
+        if (!byeUserId) byeUserId = pool[pool.length - 1]
+
+        if (!answers[byeKey]) {
+          const byePlayer = byId.get(byeUserId)
+          pendingQuestions.push({
+            key: byeKey,
+            question: `Groupe « ${g.name} » : nombre impair de joueurs actifs — ${byePlayer.firstName} ${byePlayer.lastName} serait exempté cette ronde. Quelle convention appliquer ?`,
+            options: [
+              { value: 'gratuit', label: 'Point gratuit (comptabilisé comme une victoire)' },
+              { value: 'nul', label: 'Comptabilisé comme une défaite (0 point)' },
+              { value: 'ignorer', label: 'Aucun impact sur le classement' },
+            ],
+          })
+          continue
+        }
+        const byePlayer = byId.get(byeUserId)
+        pool = pool.filter(id => id !== byeUserId)
+        if (answers[byeKey] !== 'ignorer') byeMatchesToCreate.push({ userId: byeUserId, playerName: `${byePlayer.firstName} ${byePlayer.lastName}`, groupName: g.name, convention: answers[byeKey] })
+        log('info', `Groupe « ${g.name} » : ${byePlayer.firstName} ${byePlayer.lastName} exempté cette ronde (${answers[byeKey] === 'gratuit' ? 'point gratuit' : answers[byeKey] === 'nul' ? 'comptabilisé en défaite' : 'sans impact'}).`)
+      }
+
+      // ── Appariement sans rematch (glouton par proximité de classement, repli forcé si blocage) ──
+      const playedKeys = await getExistingPairKeys(phase, members)
+      const remaining = [...pool]
+      const groupForced = []
+      while (remaining.length > 0) {
+        const a = remaining.shift()
+        let idx = remaining.findIndex(b => !playedKeys.has([a, b].sort((x, y) => x - y).join('-')))
+        let forced = false
+        if (idx === -1) { idx = 0; forced = true }
+        const b = remaining.splice(idx, 1)[0]
+        if (forced) groupForced.push([a, b])
+        toCreatePairs.push({ groupId: g.id, groupName: g.name, player1Id: a, player2Id: b, forced })
+      }
+      if (groupForced.length > 0) {
+        log('avertissement', `Groupe « ${g.name} » : ${groupForced.length} paire(s) sans alternative — rematch inévitable pour ${groupForced.map(([a, b]) => `${byId.get(a).firstName} ${byId.get(a).lastName} vs ${byId.get(b).firstName} ${byId.get(b).lastName}`).join(', ')}.`)
+      }
+    }
+
+    if (pendingQuestions.length > 0) {
+      await flushLogs(phase, logEntries)
+      return res.status(200).json({ ok: false, needsInput: true, questions: pendingQuestions, logs: logEntries })
+    }
+
+    const forcedPairs = toCreatePairs.filter(p => p.forced)
+    if (forcedPairs.length > 0 && !answers.acceptForced) {
+      log('question', 'Des rematchs forcés sont nécessaires. Confirmez-vous ?')
+      await flushLogs(phase, logEntries)
+      return res.status(200).json({
+        ok: false, needsInput: true,
+        questions: [{ key: 'acceptForced', question: `${forcedPairs.length} rematch(s) inévitable(s) (voir avertissements ci-dessus, aucune alternative sans rejouer un adversaire déjà rencontré). Comment procéder ?`, options: [
+          { value: 'yes', label: 'Accepter ces rematchs et générer la ronde' },
+          { value: 'no', label: 'Annuler — ajustement manuel des groupes/matchs' },
+        ] }],
+        logs: logEntries,
+      })
+    }
+    if (answers.acceptForced === 'no') {
+      log('action', 'Calcul annulé par l\'administrateur (rematchs forcés refusés).')
+      await flushLogs(phase, logEntries)
+      return res.status(200).json({ ok: false, aborted: true, logs: logEntries })
+    }
+
+    await prisma.plannedMatch.deleteMany({ where: { phase, roundNumber: round } })
+
+    const toCreate = toCreatePairs.map(p => {
+      const p1 = usersInfo.get(p.player1Id), p2 = usersInfo.get(p.player2Id)
+      const auto = computeAutoMalus(p1.category, p2.category)
+      if (auto) log('info', `Malus automatique appliqué : ${p1.firstName} ${p1.lastName} vs ${p2.firstName} ${p2.lastName} (écart de classement ${p1.category}/${p2.category}).`)
+      return { player1Id: p.player1Id, player2Id: p.player2Id, phase, roundNumber: round, scheduledDate, deadlineAt, malus: auto?.malus || null, malusTarget: auto?.malusTarget || null }
+    })
+    if (toCreate.length > 0) await prisma.plannedMatch.createMany({ data: toCreate })
+
+    for (const b of byeMatchesToCreate) {
+      const win = b.convention === 'gratuit'
+      await prisma.match.create({
+        data: {
+          userId: b.userId, phase, roundNumber: round, matchDate: scheduledDate,
+          opponentFirstName: 'Exempt', opponentLastName: '(bye)',
+          note: `Exemption automatique — ronde ${round}`, published: true,
+          sets: { create: [{ setNumber: 1, playerScore: win ? 21 : 0, opponentScore: win ? 0 : 21 }] },
+        },
+      })
+      log('action', `Match d'exemption créé pour ${b.playerName} (${b.groupName}), ronde ${round}.`)
+    }
+
+    await prisma.schedulingSettings.update({ where: { phase }, data: { locked: true } })
+    log('action', `${toCreate.length} match(s) planifié(s) créé(s) pour la ronde ${round} de Phase 2. Paramètres verrouillés.`)
+
+    await flushLogs(phase, logEntries)
+    return res.status(201).json({ ok: true, count: toCreate.length, round, logs: logEntries })
+  } catch (err) {
+    console.error('[computePhase2Round]', err)
+    log('erreur', `Erreur inattendue : ${err.message}`)
+    await flushLogs(phase, logEntries).catch(() => {})
+    return res.status(500).json({ ok: false, error: 'Erreur serveur.', logs: logEntries })
   }
 }
