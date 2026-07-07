@@ -15,6 +15,6 @@
     { "source": "/api/notifications",       "destination": "/api/public?resource=notifications" }
   ],
   "crons": [
-    { "path": "/api/cron-deadline-reminders", "schedule": "0 * * * *" }
+    { "path": "/api/cron-deadline-reminders", "schedule": "0 8 * * *" }
   ]
 }
