@@ -2882,6 +2882,7 @@ async function handleBots(req, res) {
   if (action === 'create') return createBots(req, res)
   if (action === 'delete_all') return deleteAllBots(req, res)
   if (action === 'tick') return tickBots(req, res)
+  if (action === 'fast_forward') return fastForwardBots(req, res)
 
   return res.status(400).json({ error: 'Action invalide.' })
 }
@@ -2999,32 +3000,57 @@ async function deleteAllBots(req, res) {
   }
 }
 
+// Traite toutes les tâches de bots dues, en plusieurs passes (une tâche
+// traitée peut en programmer une autre déjà due, ex: lecture immédiate au
+// login), puis programme la lecture des nouvelles notifs non lues des bots.
+async function runBotTickLoop() {
+  const now = new Date()
+  let actionsDone = 0
+  for (let pass = 0; pass < 5; pass++) {
+    const dueTasks = await prisma.botTask.findMany({
+      where: { dueAt: { lte: now } },
+      orderBy: { dueAt: 'asc' },
+      take: 300,
+    })
+    if (dueTasks.length === 0) break
+    for (const task of dueTasks) {
+      await processBotTask(task)
+      actionsDone++
+    }
+  }
+  await scheduleUnreadNotificationsForBots()
+  return actionsDone
+}
+
 async function tickBots(req, res) {
   try {
-    const now = new Date()
-    let actionsDone = 0
-
-    // Traite les tâches dues, en plusieurs passes (une tâche traitée peut en
-    // programmer une autre déjà due, ex: lecture immédiate au login).
-    for (let pass = 0; pass < 5; pass++) {
-      const dueTasks = await prisma.botTask.findMany({
-        where: { dueAt: { lte: now } },
-        orderBy: { dueAt: 'asc' },
-        take: 300,
-      })
-      if (dueTasks.length === 0) break
-      for (const task of dueTasks) {
-        await processBotTask(task)
-        actionsDone++
-      }
-    }
-
-    await scheduleUnreadNotificationsForBots()
-
+    const actionsDone = await runBotTickLoop()
     return res.status(200).json({ ok: true, actionsDone })
   } catch (err) {
     console.error('[bots tick]', err)
     return res.status(500).json({ error: 'Erreur serveur lors du tick des bots.' })
+  }
+}
+
+// Fait "avancer le temps" pour les bots : recule l'échéance de TOUTES leurs
+// tâches en attente de N heures, puis traite immédiatement tout ce qui devient
+// dû. Pratique pour dérouler un cycle de test complet sans attendre de
+// vraies heures/jours. N'affecte que les BotTask (aucune autre donnée du
+// site n'est modifiée) — les timestamps enregistrés restent ceux, décalés,
+// des tâches, donc l'historique reste cohérent (juste "plus tôt" que prévu).
+async function fastForwardBots(req, res) {
+  let { hours } = req.body || {}
+  hours = parseFloat(hours)
+  if (isNaN(hours) || hours <= 0 || hours > 720) {
+    return res.status(400).json({ error: "Le nombre d'heures doit être entre 0 et 720 (30 jours)." })
+  }
+  try {
+    await prisma.$executeRaw`UPDATE "BotTask" SET "dueAt" = "dueAt" - (${hours}::float * interval '1 hour')`
+    const actionsDone = await runBotTickLoop()
+    return res.status(200).json({ ok: true, actionsDone, hours })
+  } catch (err) {
+    console.error('[bots fast_forward]', err)
+    return res.status(500).json({ error: "Erreur serveur lors de l'avance du temps." })
   }
 }
 
