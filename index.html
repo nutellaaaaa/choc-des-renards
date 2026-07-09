@@ -1394,6 +1394,16 @@
           <p>Récupère les classements officiels du club sur MYFFBAD et met à jour la catégorie des joueurs (classement Simple).</p>
           <button class="btn-sm btn-edit" onclick="runMyffbadUpdate()">Mettre à jour (MYFFBAD)</button>
         </div>
+        <div class="other-action-card">
+          <h4>🤖 Bots de test</h4>
+          <p>Crée des joueurs fictifs qui se connectent, lisent leurs notifications, jouent leurs matchs et rentrent leur score, consultent la FAQ et envoient des messages de contact — dans des délais réalistes — pour tester le site sans mobiliser de vrais joueurs. Toutes leurs données sont supprimées avec eux.</p>
+          <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;margin-top:0.5rem">
+            <input type="number" id="bots-count-input" min="1" max="100" value="10" style="width:80px;background:var(--dark2);border:1px solid var(--dark4);border-radius:6px;color:var(--white);padding:0.4rem 0.6rem;font-family:var(--font-body)">
+            <button class="btn-sm btn-accept" onclick="createBots()">Créer les bots</button>
+            <button class="btn-sm btn-danger" onclick="deleteAllBots()">Supprimer les bots</button>
+          </div>
+          <div id="bots-status" style="margin-top:0.6rem;font-size:0.82rem;color:var(--gray)"></div>
+        </div>
       </div>
       <div id="other-actions-feedback" class="modal-success" style="margin-top:1rem"></div>
     </div>
@@ -3858,6 +3868,7 @@ async function loadAllAdminDataWithProgress() {
     { label: 'FAQ…',                       fn: loadFaqAdmin },
     { label: 'Prises de contact…',         fn: loadContactAdmin },
     { label: 'Demandes en attente…',       fn: loadRefused },
+    { label: 'Simulation des bots de test…', fn: tickBotsAndRefresh },
   ]
 
   let done = 0
@@ -5937,6 +5948,89 @@ async function otherAction(action, confirmMsg) {
       feedback.textContent = '✓ ' + (data.message || 'Opération effectuée.')
       feedback.style.color = '#6ddc6d'
       await loadUsers()
+    } else {
+      feedback.textContent = '✗ ' + (data.error || 'Erreur.')
+      feedback.style.color = '#ff7070'
+    }
+  } catch {
+    feedback.textContent = '✗ Erreur réseau.'
+    feedback.style.color = '#ff7070'
+  }
+  setTimeout(() => { feedback.textContent = ''; feedback.style.color = '' }, 5000)
+}
+
+/* ── Bots de test ── */
+// Déclenché à chaque connexion admin (préchargement) : traite toutes les
+// actions de bots arrivées à échéance, puis rafraîchit les onglets que ces
+// actions peuvent avoir modifiés.
+async function tickBotsAndRefresh() {
+  try {
+    const res = await fetch('/api/admin/bots', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'tick' }) })
+    if (res.ok) {
+      const { actionsDone } = await res.json()
+      if (actionsDone > 0) {
+        await Promise.all([
+          loadUsers(), loadHistory(), loadNotificationsList(),
+          loadPendingMatches(), loadPlannedMatches(), loadContactAdmin(), loadFaqAdmin(),
+        ])
+      }
+    }
+  } catch (e) { console.error('[bots tick]', e) }
+  await loadBotsStatus()
+}
+
+async function loadBotsStatus() {
+  const status = document.getElementById('bots-status')
+  if (!status) return
+  try {
+    const res = await fetch('/api/admin/bots', { headers: authHeaders() })
+    if (!res.ok) return
+    const { count, pendingTasks } = await res.json()
+    status.textContent = count > 0
+      ? `${count} bot(s) actif(s) — ${pendingTasks} action(s) programmée(s) en attente.`
+      : 'Aucun bot actif actuellement.'
+  } catch { /* silencieux */ }
+}
+
+async function createBots() {
+  const input = document.getElementById('bots-count-input')
+  const count = parseInt(input.value, 10)
+  if (isNaN(count) || count < 1 || count > 100) {
+    alert('Le nombre de bots doit être entre 1 et 100.')
+    return
+  }
+  if (!confirm(`Créer ${count} bot(s) de test ?`)) return
+  const feedback = document.getElementById('other-actions-feedback')
+  feedback.textContent = 'Création des bots…'; feedback.style.color = 'var(--orange)'
+  try {
+    const res = await fetch('/api/admin/bots', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'create', count }) })
+    const data = await res.json()
+    if (res.ok) {
+      feedback.textContent = '✓ ' + (data.message || 'Bots créés.')
+      feedback.style.color = '#6ddc6d'
+      await Promise.all([loadUsers(), loadBotsStatus()])
+    } else {
+      feedback.textContent = '✗ ' + (data.error || 'Erreur.')
+      feedback.style.color = '#ff7070'
+    }
+  } catch {
+    feedback.textContent = '✗ Erreur réseau.'
+    feedback.style.color = '#ff7070'
+  }
+  setTimeout(() => { feedback.textContent = ''; feedback.style.color = '' }, 5000)
+}
+
+async function deleteAllBots() {
+  if (!confirm('Supprimer TOUS les bots ainsi que toutes leurs données (connexions, notifications, matchs, votes FAQ, contacts) ? Action irréversible.')) return
+  const feedback = document.getElementById('other-actions-feedback')
+  feedback.textContent = 'Suppression des bots…'; feedback.style.color = 'var(--orange)'
+  try {
+    const res = await fetch('/api/admin/bots', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'delete_all' }) })
+    const data = await res.json()
+    if (res.ok) {
+      feedback.textContent = '✓ ' + (data.message || 'Bots supprimés.')
+      feedback.style.color = '#6ddc6d'
+      await Promise.all([loadUsers(), loadBotsStatus()])
     } else {
       feedback.textContent = '✗ ' + (data.error || 'Erreur.')
       feedback.style.color = '#ff7070'

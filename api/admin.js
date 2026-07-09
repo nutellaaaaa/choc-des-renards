@@ -22,6 +22,7 @@
 const { PrismaClient } = require('@prisma/client')
 const { requireAdmin } = require('./_auth')
 const cheerio = require('cheerio')
+const argon2 = require('argon2')
 
 if (!global._prisma) global._prisma = new PrismaClient()
 const prisma = global._prisma
@@ -190,6 +191,8 @@ module.exports = async function handler(req, res) {
       return handleMatch(req, res)
     case 'scheduling':
       return handleScheduling(req, res)
+    case 'bots':
+      return handleBots(req, res)
     default:
       return res.status(400).json({ error: 'resource invalide ou manquant.' })
   }
@@ -2790,4 +2793,474 @@ async function computePhase2Round(req, res, answers, roundOverride) {
     await flushLogs(phase, logEntries).catch(() => {})
     return res.status(500).json({ ok: false, error: 'Erreur serveur.', logs: logEntries })
   }
+}
+
+/* ============================================================
+ * BOTS — création / suppression / simulation de joueurs de test
+ * ============================================================
+ *
+ * Principe général : pas de worker en arrière-plan (fonctions serverless).
+ * Toutes les actions des bots sont matérialisées à l'avance sous forme de
+ * BotTask (échéance réaliste, dueAt), et une seule "tick" — déclenchée à
+ * chaque connexion admin (voir loadAllAdminDataWithProgress côté front) —
+ * traite en une fois toutes les tâches arrivées à échéance. Les timestamps
+ * enregistrés (LoginEvent.createdAt, Notification.readAt, Match.createdAt...)
+ * restent ceux calculés pour dueAt, pas l'instant réel du tick, pour que
+ * l'historique ait l'air naturel même traité en différé.
+ */
+
+const BOT_CONTACT_NATURES = [
+  'Poser une question',
+  'Signaler un bug sur le site',
+  'Proposer une fonctionnalité sur le site',
+  'Autre',
+]
+
+// Notes facultatives qu'un joueur pourrait laisser sur son match — un bot n'en
+// met une que de temps en temps (comme un vrai joueur), et jamais si le match
+// a déjà une note (ex: liée à un malus posé par l'admin, qu'on ne veut pas écraser).
+const BOT_MATCH_NOTES = [
+  'Match très serré, beaucoup de longs échanges.',
+  "Bon match, merci à mon adversaire !",
+  'Petit retard au début, sinon tout s\'est bien passé.',
+  'Terrain un peu glissant aujourd\'hui.',
+  'Revanche la prochaine fois 😄',
+  'Match sympa, bonne ambiance.',
+]
+
+function randomExpMinutes(meanMinutes, maxMinutes) {
+  const v = -Math.log(1 - Math.random()) * meanMinutes
+  return Math.min(maxMinutes, Math.max(1, Math.round(v)))
+}
+
+// Simule un match au format de la charte : 3 sets gagnants de 11 points secs
+// (sans point d'écart), premier à 3 sets manches gagné. Le niveau (catégorie)
+// de chaque joueur influence probabilistiquement le score de chaque set.
+function generateBotMatchSets(catBot, catOpp) {
+  const sBot = CATEGORY_RANK[catBot] ?? 0
+  const sOpp = CATEGORY_RANK[catOpp] ?? 0
+  const diff = sBot - sOpp
+  const botWinSetProb = 1 / (1 + Math.pow(10, -diff / 2))
+
+  let botSetWins = 0, oppSetWins = 0, setNumber = 1
+  const sets = []
+  while (botSetWins < 3 && oppSetWins < 3 && setNumber <= 5) {
+    const botWinsSet = Math.random() < botWinSetProb
+    const gap = Math.min(6, Math.abs(diff))
+    const loserScore = Math.max(0, Math.min(10, Math.round(Math.random() * (10 - gap * 0.8))))
+    sets.push({
+      setNumber,
+      botScore: botWinsSet ? 11 : loserScore,
+      oppScore: botWinsSet ? loserScore : 11,
+    })
+    if (botWinsSet) botSetWins++; else oppSetWins++
+    setNumber++
+  }
+  return sets
+}
+
+async function handleBots(req, res) {
+  const payload = requireAdmin(req, res)
+  if (!payload) return
+
+  if (req.method === 'GET') {
+    try {
+      const [count, pendingTasks] = await Promise.all([
+        prisma.user.count({ where: { isBot: true } }),
+        prisma.botTask.count({}),
+      ])
+      return res.status(200).json({ count, pendingTasks })
+    } catch (err) {
+      console.error('[admin/bots GET]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' })
+  const { action } = req.body || {}
+
+  if (action === 'create') return createBots(req, res)
+  if (action === 'delete_all') return deleteAllBots(req, res)
+  if (action === 'tick') return tickBots(req, res)
+
+  return res.status(400).json({ error: 'Action invalide.' })
+}
+
+async function createBots(req, res) {
+  let { count } = req.body || {}
+  count = parseInt(count, 10)
+  if (isNaN(count) || count < 1 || count > 100) {
+    return res.status(400).json({ error: 'Le nombre de bots doit être entre 1 et 100.' })
+  }
+
+  try {
+    const existingBots = await prisma.user.findMany({ where: { isBot: true }, select: { username: true } })
+    let maxN = 0
+    for (const b of existingBots) {
+      const m = b.username.match(/^bot_(\d+)$/)
+      if (m) maxN = Math.max(maxN, parseInt(m[1], 10))
+    }
+
+    // Mot de passe par défaut identique pour tous les bots ("petitbot") — hashé
+    // une seule fois pour éviter de recalculer un Argon2 coûteux N fois.
+    const passwordHash = await argon2.hash('petitbot', {
+      type: argon2.argon2id, memoryCost: 65536, timeCost: 3, parallelism: 1,
+    })
+
+    let created = 0
+    for (let i = 1; i <= count; i++) {
+      const n = maxN + i
+      const category = VALID_CATEGORIES[Math.floor(Math.random() * VALID_CATEGORIES.length)]
+      const user = await prisma.user.create({
+        data: {
+          username: `bot_${n}`,
+          passwordHash,
+          firstName: 'Bot',
+          lastName: String(n),
+          phone: '0600000000',
+          category,
+          role: 'USER',
+          accepted: true,
+          banned: false,
+          active: true,
+          isBot: true,
+        },
+      })
+      created++
+      // Programme la première connexion du bot dans un futur réaliste.
+      await prisma.botTask.create({
+        data: {
+          botId: user.id,
+          kind: 'login',
+          dueAt: new Date(Date.now() + randomExpMinutes(90, 60 * 24) * 60000),
+        },
+      })
+    }
+
+    return res.status(201).json({ ok: true, createdCount: created, message: `${created} bot(s) créé(s).` })
+  } catch (err) {
+    console.error('[bots create]', err)
+    return res.status(500).json({ error: 'Erreur serveur.' })
+  }
+}
+
+async function deleteAllBots(req, res) {
+  try {
+    const bots = await prisma.user.findMany({ where: { isBot: true }, select: { id: true } })
+    const botIds = bots.map(b => b.id)
+    if (botIds.length === 0) {
+      return res.status(200).json({ ok: true, deletedCount: 0, message: 'Aucun bot à supprimer.' })
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Détacher les matchs de vrais joueurs des rencontres spéciales impliquant
+      // un bot, pour ne pas perdre leurs données (score, photos) à la suppression.
+      const specials = await tx.specialMatch.findMany({
+        where: { OR: [{ player1Id: { in: botIds } }, { player2Id: { in: botIds } }] },
+        select: { id: true },
+      })
+      const specialIds = specials.map(s => s.id)
+      if (specialIds.length > 0) {
+        await tx.match.updateMany({
+          where: { specialMatchId: { in: specialIds }, userId: { notIn: botIds } },
+          data: { specialMatchId: null },
+        })
+        await tx.specialMatch.deleteMany({ where: { id: { in: specialIds } } })
+      }
+
+      // Les matchs planifiés impliquant un bot n'ont plus de sens sans leur
+      // adversaire fictif — on les supprime (l'éventuel adversaire réel sera
+      // notifié naturellement de la disparition du match la prochaine fois
+      // qu'il consultera ses matchs planifiés).
+      await tx.plannedMatch.deleteMany({
+        where: { OR: [{ player1Id: { in: botIds } }, { player2Id: { in: botIds } }] },
+      })
+
+      // Supprime les bots — cascade Prisma sur Match/MatchSet/MatchPhoto/
+      // PouleMember/Phase2GroupMember/Notification/LoginEvent/ContactMessage/
+      // FaqVote/BotTask. FaqView passe à userId=null (comme pour un compte
+      // réel supprimé, conserve le compteur de vues honnête).
+      await tx.user.deleteMany({ where: { id: { in: botIds } } })
+
+      // Nettoyage cosmétique des poules/groupes devenus vides.
+      const emptyPoules = await tx.poule.findMany({ where: { members: { none: {} } }, select: { id: true } })
+      if (emptyPoules.length > 0) await tx.poule.deleteMany({ where: { id: { in: emptyPoules.map(p => p.id) } } })
+      const emptyGroups = await tx.phase2Group.findMany({ where: { members: { none: {} } }, select: { id: true } })
+      if (emptyGroups.length > 0) await tx.phase2Group.deleteMany({ where: { id: { in: emptyGroups.map(g => g.id) } } })
+    })
+
+    return res.status(200).json({
+      ok: true, deletedCount: botIds.length,
+      message: `${botIds.length} bot(s) et toutes leurs données associées ont été supprimés.`,
+    })
+  } catch (err) {
+    console.error('[bots delete_all]', err)
+    return res.status(500).json({ error: 'Erreur serveur lors de la suppression des bots.' })
+  }
+}
+
+async function tickBots(req, res) {
+  try {
+    const now = new Date()
+    let actionsDone = 0
+
+    // Traite les tâches dues, en plusieurs passes (une tâche traitée peut en
+    // programmer une autre déjà due, ex: lecture immédiate au login).
+    for (let pass = 0; pass < 5; pass++) {
+      const dueTasks = await prisma.botTask.findMany({
+        where: { dueAt: { lte: now } },
+        orderBy: { dueAt: 'asc' },
+        take: 300,
+      })
+      if (dueTasks.length === 0) break
+      for (const task of dueTasks) {
+        await processBotTask(task)
+        actionsDone++
+      }
+    }
+
+    await scheduleUnreadNotificationsForBots()
+
+    return res.status(200).json({ ok: true, actionsDone })
+  } catch (err) {
+    console.error('[bots tick]', err)
+    return res.status(500).json({ error: 'Erreur serveur lors du tick des bots.' })
+  }
+}
+
+async function processBotTask(task) {
+  try {
+    switch (task.kind) {
+      case 'login':             await botDoLogin(task); break
+      case 'logout':            await botDoLogout(task); break
+      case 'read_notification': await botReadNotification(task); break
+      case 'submit_score':      await botSubmitScore(task); break
+      case 'faq_action':        await botFaqAction(task); break
+      case 'contact_message':   await botContactMessage(task); break
+    }
+  } catch (err) {
+    console.error('[bot task]', task.kind, task.id, err)
+  } finally {
+    await prisma.botTask.delete({ where: { id: task.id } }).catch(() => {})
+  }
+}
+
+async function botDoLogin(task) {
+  const bot = await prisma.user.findUnique({ where: { id: task.botId } })
+  if (!bot || !bot.isBot) return
+
+  const loginEvent = await prisma.loginEvent.create({
+    data: {
+      userId: bot.id,
+      ip: null,
+      userAgent: 'CDR-bot/1.0 (simulation)',
+      success: true,
+      message: 'Connexion simulée (bot de test)',
+      createdAt: task.dueAt,
+    },
+  })
+
+  // Session réaliste : 3 à 35 minutes.
+  const sessionMinutes = 3 + Math.floor(Math.random() * 32)
+  const logoutAt = new Date(task.dueAt.getTime() + sessionMinutes * 60000)
+  await prisma.botTask.create({
+    data: { botId: bot.id, kind: 'logout', dueAt: logoutAt, payload: { loginEventId: loginEvent.id } },
+  })
+
+  // Pendant la session : consultation FAQ (60%) et/ou message de contact (12%).
+  if (Math.random() < 0.6) {
+    const faqAt = new Date(task.dueAt.getTime() + Math.random() * sessionMinutes * 60000)
+    await prisma.botTask.create({ data: { botId: bot.id, kind: 'faq_action', dueAt: faqAt } })
+  }
+  if (Math.random() < 0.12) {
+    const contactAt = new Date(task.dueAt.getTime() + Math.random() * sessionMinutes * 60000)
+    await prisma.botTask.create({ data: { botId: bot.id, kind: 'contact_message', dueAt: contactAt } })
+  }
+
+  // Prochaine connexion : tous les 1 à 6 jours, comme un joueur régulier.
+  const nextLoginAt = new Date(logoutAt.getTime() + randomExpMinutes(60 * 24 * 1.5, 60 * 24 * 6) * 60000)
+  await prisma.botTask.create({ data: { botId: bot.id, kind: 'login', dueAt: nextLoginAt } })
+}
+
+async function botDoLogout(task) {
+  const loginEventId = task.payload?.loginEventId
+  if (!loginEventId) return
+  const reason = Math.random() < 0.85 ? 'manual' : 'inactivity'
+  await prisma.loginEvent.updateMany({
+    where: { id: loginEventId, logoutAt: null },
+    data: { logoutAt: task.dueAt, logoutReason: reason },
+  })
+}
+
+async function botReadNotification(task) {
+  const notificationId = task.payload?.notificationId
+  if (!notificationId) return
+  const notif = await prisma.notification.findUnique({ where: { id: notificationId } })
+  if (!notif || notif.read) return
+
+  await prisma.notification.update({ where: { id: notificationId }, data: { read: true, readAt: task.dueAt } })
+
+  if (notif.type === 'next_match' && notif.plannedMatchId) {
+    await scheduleBotSubmitScore(notif.plannedMatchId, task.botId, task.dueAt)
+  }
+}
+
+// Programme la saisie de score d'un bot pour un match planifié, calibrée sur
+// la deadline réelle du match : ~90% de chances de rentrer le score à temps,
+// ~5% en retard (mais quand même saisi), ~5% oublié définitivement (le
+// forfait automatique existant s'en charge alors, sans intervention du bot).
+async function scheduleBotSubmitScore(plannedMatchId, botId, readAt) {
+  const pm = await prisma.plannedMatch.findUnique({ where: { id: plannedMatchId } })
+  if (!pm || pm.forfeited) return
+
+  const existing = await prisma.botTask.findFirst({
+    where: { botId, kind: 'submit_score', payload: { path: ['plannedMatchId'], equals: plannedMatchId } },
+  })
+  if (existing) return
+
+  let dueAt
+  const deadline = pm.deadlineAt
+  if (deadline && deadline.getTime() > readAt.getTime()) {
+    const windowMs = deadline.getTime() - readAt.getTime()
+    const roll = Math.random()
+    if (roll < 0.9) {
+      const safetyMs = Math.min(10 * 60000, windowMs * 0.05)
+      const frac = (Math.random() + Math.random()) / 2 // légèrement centré
+      dueAt = new Date(readAt.getTime() + frac * (windowMs - safetyMs))
+    } else if (roll < 0.95) {
+      dueAt = new Date(deadline.getTime() + randomExpMinutes(240, 3 * 1440) * 60000)
+    } else {
+      return // oublie définitivement — forfait auto
+    }
+  } else {
+    dueAt = new Date(readAt.getTime() + randomExpMinutes(180, 2880) * 60000)
+  }
+
+  await prisma.botTask.create({ data: { botId, kind: 'submit_score', dueAt, payload: { plannedMatchId } } })
+}
+
+async function botSubmitScore(task) {
+  const plannedMatchId = task.payload?.plannedMatchId
+  if (!plannedMatchId) return
+
+  const pm = await prisma.plannedMatch.findUnique({
+    where: { id: plannedMatchId },
+    include: { player1: true, player2: true },
+  })
+  if (!pm || pm.forfeited) return // déjà forfaité ou converti entre-temps
+
+  const bot = await prisma.user.findUnique({ where: { id: task.botId } })
+  if (!bot) return
+
+  const botIsPlayer1 = pm.player1Id === bot.id
+  const opponent = botIsPlayer1 ? pm.player2 : pm.player1
+  if (!opponent) return
+
+  const rawSets = generateBotMatchSets(bot.category, opponent.category)
+  const player1Sets = rawSets.map(s => ({
+    setNumber: s.setNumber,
+    playerScore: botIsPlayer1 ? s.botScore : s.oppScore,
+    opponentScore: botIsPlayer1 ? s.oppScore : s.botScore,
+  }))
+
+  const matchDateObj = pm.scheduledDate || task.dueAt
+  const roundInt = pm.phase === 'PHASE2' ? pm.roundNumber : null
+  // Note facultative : ~25% de chance qu'un bot en laisse une, seulement si
+  // le match planifié n'en a pas déjà une (ex: note liée à un malus admin,
+  // qu'on ne veut jamais écraser).
+  const noteStr = pm.note || (Math.random() < 0.25
+    ? BOT_MATCH_NOTES[Math.floor(Math.random() * BOT_MATCH_NOTES.length)]
+    : null)
+
+  await prisma.$transaction([
+    prisma.match.create({
+      data: {
+        userId: pm.player1Id, phase: pm.phase, roundNumber: roundInt,
+        matchDate: matchDateObj, createdAt: task.dueAt,
+        opponentFirstName: pm.player2.firstName, opponentLastName: pm.player2.lastName,
+        note: noteStr, published: false,
+        sets: { create: player1Sets },
+      },
+    }),
+    prisma.match.create({
+      data: {
+        userId: pm.player2Id, phase: pm.phase, roundNumber: roundInt,
+        matchDate: matchDateObj, createdAt: task.dueAt,
+        opponentFirstName: pm.player1.firstName, opponentLastName: pm.player1.lastName,
+        note: noteStr, published: false,
+        sets: { create: player1Sets.map(s => ({ setNumber: s.setNumber, playerScore: s.opponentScore, opponentScore: s.playerScore })) },
+      },
+    }),
+    prisma.plannedMatch.delete({ where: { id: pm.id } }),
+  ])
+}
+
+async function botFaqAction(task) {
+  const topics = await prisma.faqTopic.findMany({ select: { id: true } })
+  if (topics.length === 0) return
+  const topic = topics[Math.floor(Math.random() * topics.length)]
+
+  const alreadyViewed = await prisma.faqView.findFirst({ where: { topicId: topic.id, userId: task.botId } })
+  await prisma.faqView.create({ data: { topicId: topic.id, userId: task.botId, createdAt: task.dueAt } })
+  if (!alreadyViewed) {
+    await prisma.faqTopic.update({ where: { id: topic.id }, data: { viewCount: { increment: 1 } } })
+  }
+
+  if (Math.random() < 0.4) {
+    const existingVote = await prisma.faqVote.findUnique({
+      where: { topicId_userId: { topicId: topic.id, userId: task.botId } },
+    })
+    if (!existingVote) {
+      const useful = Math.random() < 0.8
+      await prisma.$transaction([
+        prisma.faqVote.create({ data: { topicId: topic.id, userId: task.botId, useful, createdAt: task.dueAt } }),
+        prisma.faqTopic.update({
+          where: { id: topic.id },
+          data: useful ? { usefulCount: { increment: 1 } } : { notUsefulCount: { increment: 1 } },
+        }),
+      ])
+    }
+  }
+}
+
+async function botContactMessage(task) {
+  const bot = await prisma.user.findUnique({ where: { id: task.botId } })
+  if (!bot) return
+  const nature = BOT_CONTACT_NATURES[Math.floor(Math.random() * BOT_CONTACT_NATURES.length)]
+  await prisma.contactMessage.create({
+    data: {
+      userId: bot.id,
+      nature,
+      subject: `[Test bot] ${nature}`,
+      message: `Message généré automatiquement par ${bot.firstName} ${bot.lastName} (bot de test) pour vérifier le fonctionnement du formulaire de contact.`,
+      createdAt: task.dueAt,
+    },
+  })
+}
+
+// Programme la lecture des notifications non lues des bots qui n'en ont pas
+// déjà une de programmée (évite les doublons d'une tick à l'autre).
+async function scheduleUnreadNotificationsForBots() {
+  const unread = await prisma.notification.findMany({
+    where: { read: false, user: { isBot: true } },
+    select: { id: true, userId: true, createdAt: true },
+  })
+  if (unread.length === 0) return
+
+  const pendingReadTasks = await prisma.botTask.findMany({
+    where: { kind: 'read_notification' },
+    select: { payload: true },
+  })
+  const alreadyScheduled = new Set(
+    pendingReadTasks.map(t => t.payload?.notificationId).filter(Boolean)
+  )
+
+  const toCreate = []
+  for (const n of unread) {
+    if (alreadyScheduled.has(n.id)) continue
+    const delayMinutes = randomExpMinutes(180, 4 * 1440) // moyenne 3h, plafond 4 jours
+    const dueAt = new Date(n.createdAt.getTime() + delayMinutes * 60000)
+    toCreate.push({ botId: n.userId, kind: 'read_notification', dueAt, payload: { notificationId: n.id } })
+  }
+  if (toCreate.length > 0) await prisma.botTask.createMany({ data: toCreate })
 }

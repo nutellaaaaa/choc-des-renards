@@ -41,6 +41,7 @@ model User {
   banned       Boolean  @default(false)
   active       Boolean  @default(true)
   forceLogout  Boolean  @default(false)
+  isBot        Boolean  @default(false)
   createdAt    DateTime @default(now())
 
   matches        Match[]
@@ -55,6 +56,7 @@ model User {
   faqViews       FaqView[]
   faqVotes       FaqVote[]
   contactMessages ContactMessage[]
+  botTasks       BotTask[]
 }
 
 model LoginEvent {
@@ -326,4 +328,23 @@ model ContactMessage {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ═══════════════════ BOTS DE TEST ═══════════════════
+
+// File d'actions programmées pour un bot (voir api/admin.js → handleBots).
+// Chaque tâche a une échéance réaliste (dueAt) ; elle n'est exécutée que lors
+// du prochain "tick" (déclenché à la connexion d'un admin), mais son horodatage
+// enregistré (readAt, createdAt de la LoginEvent/Match/etc.) reste celui de
+// dueAt afin que l'historique ait l'air naturel même si le traitement réel a
+// lieu plus tard.
+model BotTask {
+  id        Int      @id @default(autoincrement())
+  botId     Int
+  kind      String   // 'login' | 'logout' | 'read_notification' | 'submit_score' | 'faq_action' | 'contact_message'
+  dueAt     DateTime
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  bot User @relation(fields: [botId], references: [id], onDelete: Cascade)
 }

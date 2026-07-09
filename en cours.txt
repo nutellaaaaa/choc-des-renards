@@ -1,33 +1,21 @@
 ---------- Fonctionnalités en cours d'implémentation ----------
 - Dans le classement, on n'a pas de classement général, c'est Poules / Rondes suisses. Le bon onglet doit être cliqué par défaut selon la phase en cours. Si je suis à la Phase 1, le classement par défaut qui apparait lorsque je vais dans "classement" est Poules. Inversement si je suis à la Phase 2. Pour la phase 0, un message apparaît "La saison [année actuelle]-[année actuelle +1] n'a pas encore débutée. 
 - Détourer l'icône de l'onglet du site (et agrandir)
-- Mettre un filtrage de joueurs dans la liste des notifications (le même que pour la liste des connexions)
 - Historique de progression d'un joueur : un petit graphe (points/victoires dans le temps) sur la modale joueur — tu as déjà tout en base (matches, createdAt), juste à agréger.
  --> .html de prévisualisation généré
-- Automate d'aide à la  planification de matchs auto
+- Ecrire une nouvelle notif
+- Ajouter à la FAQ une expliquation du fonctionnement de l'automate de planification des matchs auto
+
 - Création de bots pour tester les fonctionnalités du site
-- Charger automatiquement tout le site (notifs, utilisateurs, etc) sans avoir à cliquer sur chacun des onglets correspondants (chargement à faire pendant la barre de chargement qui était jusque là factice)
-
-
-Je souhaiterai automatiser la planification des matchs sur mon site. 
-Premièrement, supposons qu'on est en Phase 1 et que les Poules ont été crées. 
-Le principe est que tout le monde doit affronter tout le monde pour la Phase 1. 
-Dans l'onglet admin "Matchs planifiés" doit appraitre des nouveaux boutons : 
-"Supprimer les matchs planifiés" qui supprime les matchs planifiés (tous), en demandant confirmation. 
-"Paramètres de planification auto" qui demande d'indiquer la durée par défaut entre deux matchs (cette valeure est de deux semaines par défaut mais peut être modifiée) ;
-Un calendrier doit apparaître, colorié avec "première phase de matchs", "deuxième phase de matchs", etc 
-L'admin peut faire un glisser déposer s'il souhaite réorganiser ces matchs ;
-L'admin peut choisir la période sur laquelle ont lieu ces matchs (par défaut, du premier septembre au premier janvier). Ces information permettent d'afficher le calendrier sur un intervalle de temps réduit, et de fixer quand à lieu le premier match. Une erreur devra être renvoyée si les paramètres fournit par l'admin ne permettent pas de finir la phase avant la date de fin limite ;
-L'admin peut définir des périodes de non-jeu (vacances scolaires par exemple). Les matchs situés sur cette prériode et après devront donc être décalés de la durée de cette pause de non-jeu. 
-Deuxièmement, supposons qu'on est en Phase 2 et que les groupes ont été crées. 
-Le système fonctionne comme une ronde suisse. 
-À chaque ronde, le joueur avec le plus de points affronte le deuxième, etc. 
-À chaque ronde, les joueurs ayant perdus un match sont éliminés du tournoi, jusqu'à ce qu'il n'en reste qu'un. 
-Les matchs se planifient automatiquement lorsque la ronde est changée. 
-Les paramètres sont les mêmes que pour la phase 1, sauf pour la période par défaut qui sera du premier Février au premier Juin. 
-Je souhaite avoir un bouton dans ce menu "Informer les X joueurs de leur prochain match", qui informe tous les joueurs de la date de leur prochain match (mais pas de la date de leur match prévu après celui-ci). Une confirmation est demandée avant de l'envoi de la notification. Si l'admin modifie un match planifié entre temps, il faut que le message qui ait été envoyé soit modifié également pour ne pas que l'utilisateur ait une information qui diffère de ce qui est prévu par l'admin. 
-Lorsque les joueurs sont informés de leur prochain match par l'envoi d'une notification, ce match peut alors apparaitre dans les scores à rentrer. La date limite de remplissage de score sera le dernier Samedi avant la fin de la période de match (2 semaines par défaut) à minuit. Si un joueur n'a toujours par rempli de score le Vendredi soir à minuit, une notification automatique lui est envoyée pour le prévenir qu'il ne lui reste que 24 heures pour le faire. 
---> Session en cours a.fillon2008
+Fonctionnalité de création de bots : Dans "actions et autre", on a la possibilité de créer N bots (l'admin chsoisit le nombre). On aura également la possibilité de "supprimer les bots créés". 
+Ces bots doivent agir comme des utilisateurs normaux afin d'aider l'admin à tester les fonctionnalités de son site.
+Voici les comportements que ces bots doivent adopter : 
+Quand un bot reçoit une notification, il l'a lit et en prend connaissance dans un temps aléatoire, cohérent avec celui d'un humain 
+Quand un bot est convoqué à un match, il joue fictivement le match et rempli le score dans un temps également aléatoire, en respectant les contraintes de temps donnés par l'admin la plupart du temps, parfois le bot "oublie" de renseigner les scores dans le délai, comme un vrai joueur pourrait faire. 
+Les joueurs fictifs peuvent consulter les FAQ et déposer des likes ou des dislikes. 
+Les joueurs fictifs peuvent déposer des formulaires de contact (dans un cadre de test de la fonctionnalité).
+Les joueurs fictifs peuvent se connecter et se déconnecter fictivement.
+Toutes les données relatives à ces bots seront supprimées en même temps qu'eux (historique de connexions, historique des notifications, etc) car ce sont des données fictives qui auront servi au test du site, donc inutiles.  
 
 
 
@@ -117,3 +105,10 @@ Voici un petit récapitulatif des statuts des matchs si jamais ce n'était pas t
 - Lors de la planification auto d'un match, un malus automatique est attribué au joueur ayant un écart de classement de P/R, P/N, D/N 
 
 - Lorsque deux joueurs ont été convoqué à un match, ils ont un nouveau menu "score du match" dans lequel l'un d'eux doit remplir le score du match avant la date limite. Après cela, le match apparaît automatiquement dans la liste des matchs à publier par l'admin. 
+- Automate d'aide à la  planification de matchs auto
+- Charger automatiquement tout le site (notifs, utilisateurs, etc) sans avoir à cliquer sur chacun des onglets correspondants (chargement à faire pendant la barre de chargement qui était jusque là factice)
+- Changer la couleur de l'oeil à la connexion qui affiche le mot de passe en blanc pour qu'on le voie mieux
+- Mettre un filtrage de joueurs dans la liste des notifications (le même que pour la liste des connexions) pour pouvoir lister les notifications reçues par un joueur en particulier
+
+---------- Fonctionnement de l'automate ----------
+(a.fillon657)
