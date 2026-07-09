@@ -1390,6 +1390,11 @@
           <button class="btn-sm btn-deactivate" onclick="otherAction('deactivate_all_players','Passer tous les joueurs en inactif ?')">Désactiver tous</button>
         </div>
         <div class="other-action-card">
+          <h4>📊 Réinitialiser les stats FAQ</h4>
+          <p>Supprime tous les likes/dislikes, tout l'historique de consultation et remet le nombre de vues à zéro pour tous les sujets de la FAQ. Le contenu (questions/réponses) n'est pas affecté.</p>
+          <button class="btn-sm btn-danger" onclick="otherAction('reset_faq_stats','⚠️ Supprimer TOUTES les données de visibilité de la FAQ (vues, avis, historique de consultation) pour tous les sujets ? Action irréversible.')">Réinitialiser les stats FAQ</button>
+        </div>
+        <div class="other-action-card">
           <h4>🔄 Mettre à jour les données des joueurs</h4>
           <p>Récupère les classements officiels du club sur MYFFBAD et met à jour la catégorie des joueurs (classement Simple).</p>
           <button class="btn-sm btn-edit" onclick="runMyffbadUpdate()">Mettre à jour (MYFFBAD)</button>
@@ -3860,6 +3865,21 @@ async function loadAllAdminDataWithProgress() {
   const text    = document.getElementById('admin-loading-text')
   if (overlay) { overlay.style.display = 'flex'; overlay.classList.remove('fade-out') }
 
+  // Le tick des bots de test (qui écrit leurs connexions, votes FAQ, etc. en
+  // base) doit être terminé AVANT de charger le reste des données admin.
+  // Auparavant ce tick tournait en parallèle (via Promise.all) avec
+  // loadHistory() et les autres chargements : comme rien ne garantit l'ordre
+  // de résolution des requêtes, loadHistory() pouvait se terminer après le
+  // tick mais avec des données lues avant l'écriture des connexions des
+  // bots, et écraser l'affichage à jour avec une version obsolète — les
+  // connexions des bots n'apparaissaient alors jamais dans l'historique tant
+  // que la page n'était pas rechargée une seconde fois. En attendant le tick
+  // en premier, toutes les données chargées ensuite sont garanties à jour.
+  if (text) text.textContent = 'Simulation des bots de test…'
+  try {
+    await fetch('/api/admin/bots', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'tick' }) })
+  } catch (e) { console.error('[admin-preload] tick bots', e) }
+
   const tasks = [
     { label: 'Utilisateurs…',              fn: loadUsers },
     { label: 'Historique des connexions…', fn: loadHistory },
@@ -3873,7 +3893,7 @@ async function loadAllAdminDataWithProgress() {
     { label: 'FAQ…',                       fn: loadFaqAdmin },
     { label: 'Prises de contact…',         fn: loadContactAdmin },
     { label: 'Demandes en attente…',       fn: loadRefused },
-    { label: 'Simulation des bots de test…', fn: tickBotsAndRefresh },
+    { label: 'Statut des bots…',           fn: loadBotsStatus },
   ]
 
   let done = 0
@@ -5965,24 +5985,10 @@ async function otherAction(action, confirmMsg) {
 }
 
 /* ── Bots de test ── */
-// Déclenché à chaque connexion admin (préchargement) : traite toutes les
-// actions de bots arrivées à échéance, puis rafraîchit les onglets que ces
-// actions peuvent avoir modifiés.
-async function tickBotsAndRefresh() {
-  try {
-    const res = await fetch('/api/admin/bots', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'tick' }) })
-    if (res.ok) {
-      const { actionsDone } = await res.json()
-      if (actionsDone > 0) {
-        await Promise.all([
-          loadUsers(), loadHistory(), loadNotificationsList(),
-          loadPendingMatches(), loadPlannedMatches(), loadContactAdmin(), loadFaqAdmin(),
-        ])
-      }
-    }
-  } catch (e) { console.error('[bots tick]', e) }
-  await loadBotsStatus()
-}
+// Le tick automatique des bots (déclenché à chaque connexion admin) se fait
+// désormais en amont, dans loadAllAdminDataWithProgress(), avant le
+// chargement du reste des données admin — voir le commentaire à cet endroit
+// pour le détail du bug de course que cela corrige.
 
 async function fastForwardBots() {
   const input = document.getElementById('bots-ff-hours-input')

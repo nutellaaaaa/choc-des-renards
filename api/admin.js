@@ -866,7 +866,7 @@ async function handleAction(req, res) {
   const globalActions = [
     'suspend_site', 'unsuspend_site', 'force_logout_all',
     'reset_all_matches', 'reset_all_notifications', 'deactivate_all_players',
-    'scrape_myffbad', 'apply_myffbad_changes',
+    'scrape_myffbad', 'apply_myffbad_changes', 'reset_faq_stats',
   ]
 
   if (globalActions.includes(action)) {
@@ -930,6 +930,22 @@ async function handleAction(req, res) {
             data: { active: false },
           })
           return res.status(200).json({ ok: true, message: 'Tous les joueurs ont été mis en inactif.' })
+        }
+
+        // Purge complète des données de "visibilité" de la FAQ : votes
+        // (like/dislike), historique de consultation (FaqView) et remise à
+        // zéro des compteurs dénormalisés sur FaqTopic. Ne touche pas au
+        // contenu de la FAQ (sujets/questions/réponses).
+        case 'reset_faq_stats': {
+          await prisma.faqVote.deleteMany({})
+          await prisma.faqView.deleteMany({})
+          await prisma.faqTopic.updateMany({
+            data: { viewCount: 0, usefulCount: 0, notUsefulCount: 0 },
+          })
+          return res.status(200).json({
+            ok: true,
+            message: 'Les votes, vues et historique de consultation de la FAQ ont été réinitialisés pour tous les sujets.',
+          })
         }
 
         case 'scrape_myffbad': {
@@ -2977,10 +2993,64 @@ async function deleteAllBots(req, res) {
         where: { OR: [{ player1Id: { in: botIds } }, { player2Id: { in: botIds } }] },
       })
 
+      // Corriger les compteurs FAQ AVANT de supprimer les bots. usefulCount/
+      // notUsefulCount/viewCount sur FaqTopic sont des compteurs dénormalisés
+      // incrémentés à chaque vote/vue ; la cascade Prisma supprime bien les
+      // FaqVote des bots à la suppression des users, mais ne décrémente pas
+      // ces compteurs, qui restaient donc gonflés indéfiniment (bug : "like/
+      // dislike faussés"). On calcule ici la contribution des bots et on la
+      // retire des compteurs, puis on purge leur historique de consultation
+      // (FaqView) au lieu de le laisser orphelin (userId=null) — sinon
+      // l'historique de consultation admin continuait d'afficher des visites
+      // de comptes qui n'existent plus.
+      const botVotes = await tx.faqVote.findMany({
+        where: { userId: { in: botIds } },
+        select: { topicId: true, useful: true },
+      })
+      const voteDelta = {}
+      for (const v of botVotes) {
+        if (!voteDelta[v.topicId]) voteDelta[v.topicId] = { useful: 0, notUseful: 0 }
+        if (v.useful) voteDelta[v.topicId].useful++
+        else voteDelta[v.topicId].notUseful++
+      }
+      for (const [topicId, d] of Object.entries(voteDelta)) {
+        await tx.faqTopic.update({
+          where: { id: parseInt(topicId, 10) },
+          data: {
+            usefulCount: { decrement: d.useful },
+            notUsefulCount: { decrement: d.notUseful },
+          },
+        })
+      }
+
+      const botViews = await tx.faqView.findMany({
+        where: { userId: { in: botIds } },
+        select: { topicId: true, userId: true },
+      })
+      // viewCount n'est incrémenté qu'une fois par (topic, utilisateur) —
+      // donc on ne décrémente qu'une fois par bot ayant consulté le sujet,
+      // même s'il a généré plusieurs lignes FaqView pour ce sujet.
+      const distinctViewersPerTopic = {}
+      for (const fv of botViews) {
+        if (!distinctViewersPerTopic[fv.topicId]) distinctViewersPerTopic[fv.topicId] = new Set()
+        distinctViewersPerTopic[fv.topicId].add(fv.userId)
+      }
+      for (const [topicId, viewerSet] of Object.entries(distinctViewersPerTopic)) {
+        await tx.faqTopic.update({
+          where: { id: parseInt(topicId, 10) },
+          data: { viewCount: { decrement: viewerSet.size } },
+        })
+      }
+      await tx.faqView.deleteMany({ where: { userId: { in: botIds } } })
+
+      // Filet de sécurité : si des compteurs étaient déjà faussés par des
+      // suppressions de bots antérieures à ce correctif, on évite au moins
+      // de les faire passer sous zéro.
+      await tx.$executeRaw`UPDATE "FaqTopic" SET "viewCount" = GREATEST("viewCount", 0), "usefulCount" = GREATEST("usefulCount", 0), "notUsefulCount" = GREATEST("notUsefulCount", 0)`
+
       // Supprime les bots — cascade Prisma sur Match/MatchSet/MatchPhoto/
       // PouleMember/Phase2GroupMember/Notification/LoginEvent/ContactMessage/
-      // FaqVote/BotTask. FaqView passe à userId=null (comme pour un compte
-      // réel supprimé, conserve le compteur de vues honnête).
+      // FaqVote/BotTask.
       await tx.user.deleteMany({ where: { id: { in: botIds } } })
 
       // Nettoyage cosmétique des poules/groupes devenus vides.
