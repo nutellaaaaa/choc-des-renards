@@ -10,8 +10,6 @@
 - Sous-titre "Choc des renards" du logo de bondy à mettre en blanc
 - Retirer le contour du bouton autour de "cliquer pour commencer" qui clignote
 - trois petits points qui sortent de l'écran 
-- site pas chargé au lancement côté utilisateur
-
 
 ---------- Fonctionnalités supplémentaires -----------
  - Envoyer des messages aux participants sur WhatsApp pour les matchs 

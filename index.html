@@ -30,7 +30,7 @@
      pour tous ses descendants position:fixed (dont le tiroir mobile), ce qui les
      piégeait dans la hauteur de la barre de nav au lieu de couvrir tout l'écran. */
   nav::before { content: ''; position: absolute; inset: 0; z-index: -1; backdrop-filter: blur(12px); pointer-events: none; }
-  .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+  .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; flex-shrink: 0; }
   .nav-logo img { height: 88px; width: auto; object-fit: contain; }
 
   /* LOGO NAV ANIMÉ (fidèle à l'animation d'intro : renard qui frappe le volant) */
@@ -124,12 +124,13 @@
   }
   .nav-logo-label { font-family: var(--font-display); font-size: 1.4rem; letter-spacing: 0.06em; color: var(--white); }
   .nav-logo-label em { color: var(--orange); font-style: normal; }
-  .nav-links { display: flex; gap: 4px; }
-  .nav-btn { background: none; border: none; cursor: pointer; font-family: var(--font-heading); font-size: 1rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray); padding: 0.5rem 1rem; border-radius: 6px; transition: all 0.2s; position: relative; }
+  .nav-links { display: flex; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+  .nav-links::-webkit-scrollbar { display: none; }
+  .nav-btn { background: none; border: none; cursor: pointer; font-family: var(--font-heading); font-size: 1rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray); padding: 0.5rem 1rem; border-radius: 6px; transition: all 0.2s; position: relative; flex-shrink: 0; }
   .nav-btn:hover { color: var(--white); }
   .nav-btn.active { color: var(--orange); }
   .nav-btn.active::after { content: ''; position: absolute; bottom: 0; left: 1rem; right: 1rem; height: 2px; background: var(--orange); border-radius: 2px; }
-  .nav-user-info { display: none; align-items: center; gap: 0.75rem; }
+  .nav-user-info { display: none; align-items: center; gap: 0.75rem; flex-shrink: 0; }
   .nav-user-greeting { font-family: var(--font-heading); font-size: 0.92rem; font-weight: 600; letter-spacing: 0.06em; color: var(--gray-light); }
   .nav-user-greeting strong { color: var(--white); }
   .nav-logout-btn { background: none; border: 1px solid var(--dark4); cursor: pointer; font-family: var(--font-heading); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray); padding: 0.4rem 0.9rem; border-radius: 6px; transition: all 0.2s; }
@@ -245,6 +246,17 @@
   .player-stat-card { background: var(--dark3); border: 1px solid var(--dark4); border-radius: 8px; padding: 0.7rem 1.1rem; text-align: center; flex: 1; min-width: 70px; }
   .player-stat-card .val { font-family: var(--font-display); font-size: 1.5rem; color: var(--orange); }
   .player-stat-card .lbl { font-family: var(--font-heading); font-size: 0.68rem; letter-spacing: 0.1em; color: var(--gray); text-transform: uppercase; }
+
+  /* Onglet Performances */
+  .perf-search { display: block; width: 100%; max-width: 420px; background: var(--dark2); border: 1px solid var(--dark4); border-radius: 8px; padding: 0.7rem 1.1rem; color: var(--gray-light); font-family: var(--font-body); font-size: 0.9rem; margin: 1.5rem 0; transition: border-color 0.2s; }
+  .perf-search::placeholder { color: var(--gray); }
+  .perf-search:focus { outline: none; border-color: var(--orange); }
+  .my-perf-card { background: var(--dark2); border: 1px solid var(--dark4); border-top: 3px solid var(--orange); border-radius: 12px; padding: 1.5rem; cursor: pointer; transition: border-color 0.2s, transform 0.15s; margin-bottom: 0.5rem; }
+  .my-perf-card:hover { border-color: var(--orange); transform: translateY(-2px); }
+  .my-perf-card-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+  .my-perf-eyebrow { font-family: var(--font-heading); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--orange); margin-bottom: 0.2rem; }
+  .my-perf-name { font-family: var(--font-display); font-size: 1.5rem; color: var(--white); letter-spacing: 0.03em; }
+  .my-perf-stats { display: flex; gap: 1rem; flex-wrap: wrap; }
   .matches-list { display: flex; flex-direction: column; gap: 0.75rem; }
   .match-card { background: var(--dark3); border: 1px solid var(--dark4); border-radius: 10px; padding: 1rem 1.25rem; }
   .match-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem; }
@@ -987,6 +999,18 @@
     .admin-table td { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.9rem; padding: 0.45rem 0; border-bottom: 1px dashed var(--dark4); text-align: right; white-space: normal; max-width: none; }
     .admin-table td:last-child { border-bottom: none; }
     .admin-table td::before { font-family: var(--font-heading); font-size: 0.66rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--gray); text-align: left; flex-shrink: 0; padding-top: 2px; }
+
+    /* Menu "⋯" (actions utilisateurs) : en absolu ancré au bouton, il pouvait sortir de
+       l'écran selon la position du bouton dans la carte. En mobile, on l'affiche plutôt
+       comme un panneau centré et fixe, toujours entièrement visible. */
+    .actions-menu {
+      position: fixed; left: 50%; right: auto; top: 50%;
+      transform: translate(-50%, -50%);
+      width: min(280px, calc(100vw - 2rem));
+      max-height: calc(100vh - 2rem);
+      overflow-y: auto;
+      z-index: 250;
+    }
 
     /* Colonnes "Actions" (toujours en dernière position) : boutons en pleine largeur, sans étiquette */
     #tbl-users td:last-child, #tbl-pending td:last-child, #tbl-notifications td:last-child, #tbl-contact td:last-child {
@@ -2435,6 +2459,7 @@ function showPage(id, btn) {
   if (btn) btn.classList.add('active')
   window.scrollTo(0, 0)
   if (id === 'classement') loadClassement()
+  if (id === 'performances') loadPerformances()
   if (id === 'souvenirs') loadGallery()
   if (id === 'mes-notifs') loadMesNotifs()
   if (id === 'faq') loadFaq()
@@ -3424,6 +3449,93 @@ function switchClassTab(id, btn) {
   if (el) el.classList.add('active')
   if (btn) btn.classList.add('active')
   bindPlayerRows()
+}
+
+/* ══════════════ PERFORMANCES ══════════════ */
+let perfPlayers = []
+
+async function loadPerformances() {
+  const container = document.getElementById('performances-content')
+  const myCard = document.getElementById('my-perf-card')
+  container.innerHTML = '<div class="admin-empty">Chargement…</div>'
+  try {
+    const res = await fetch('/api/matches', { headers: authHeaders() })
+    if (!res.ok) { container.innerHTML = '<div class="admin-empty">Impossible de charger les performances.</div>'; return }
+    const { phase, players } = await res.json()
+    perfPlayers = players || []
+    classementPlayers = perfPlayers // réutilise la modale de détail joueur (showPlayerDetail / bindPlayerRows)
+
+    if (phase === 'PHASE0') {
+      myCard.style.display = 'none'
+      container.innerHTML = `<div class="admin-empty">La saison ${seasonLabel()} n'a pas encore débutée.</div>`
+      return
+    }
+
+    // Carte "Votre profil"
+    const me = currentUser ? perfPlayers.find(p => p.id === currentUser.id) : null
+    if (me) {
+      myCard.style.display = 'block'
+      document.getElementById('my-perf-name').textContent = capName(me.firstName) + ' ' + capName(me.lastName)
+      const diff = me.setDiff
+      document.getElementById('my-perf-stats').innerHTML = `
+        <div class="player-stat-card"><div class="val">${me.played}</div><div class="lbl">Matchs</div></div>
+        <div class="player-stat-card"><div class="val">${me.wins}</div><div class="lbl">Victoires</div></div>
+        <div class="player-stat-card"><div class="val">${me.losses}</div><div class="lbl">Défaites</div></div>
+        <div class="player-stat-card"><div class="val">${diff}</div><div class="lbl">Sets ±</div></div>
+        <div class="player-stat-card"><div class="val">${me.points}</div><div class="lbl">Points</div></div>`
+    } else {
+      myCard.style.display = 'none'
+    }
+
+    document.getElementById('perf-search').value = ''
+    renderPerformancesList(perfPlayers)
+  } catch (e) {
+    console.error('[loadPerformances]', e)
+    container.innerHTML = '<div class="admin-empty">Erreur de chargement.</div>'
+  }
+}
+
+function renderPerformancesList(list) {
+  const container = document.getElementById('performances-content')
+  if (!list || list.length === 0) {
+    container.innerHTML = '<div class="admin-empty">Aucun joueur trouvé.</div>'
+    return
+  }
+  const sorted = sortPlayersForDisplay(list)
+  container.innerHTML = renderRankingTable(sorted)
+  bindPlayerRows()
+}
+
+// Même ordre que le classement (victoires DESC, matchs joués ASC, points DESC)
+function sortPlayersForDisplay(list) {
+  return [...list].sort((a, b) => {
+    if (b.wins !== a.wins) return b.wins - a.wins
+    if (a.played !== b.played) return a.played - b.played
+    return b.points - a.points
+  })
+}
+
+function normalizeSearch(str) {
+  return (str || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
+function filterPerformances() {
+  const q = normalizeSearch(document.getElementById('perf-search').value.trim())
+  if (!q) { renderPerformancesList(perfPlayers); return }
+  const filtered = perfPlayers.filter(p =>
+    normalizeSearch(p.username).includes(q) ||
+    normalizeSearch(p.firstName).includes(q) ||
+    normalizeSearch(p.lastName).includes(q) ||
+    normalizeSearch(p.firstName + ' ' + p.lastName).includes(q)
+  )
+  renderPerformancesList(filtered)
+}
+
+function openMyPerformance(e) {
+  if (e) e.stopPropagation()
+  if (!currentUser) return
+  const me = perfPlayers.find(p => p.id === currentUser.id)
+  if (me) showPlayerDetail(me)
 }
 
 /* ══════════════ FAQ (public) ══════════════ */
