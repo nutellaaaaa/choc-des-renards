@@ -9,13 +9,12 @@
 ---------- Bugs en cours de réparation ----------
 - Sous-titre "Choc des renards" du logo de bondy à mettre en blanc
 - Retirer le contour du bouton autour de "cliquer pour commencer" qui clignote
-- trois petits points qui sortent de l'écran 
 
 ---------- Fonctionnalités supplémentaires -----------
  - Envoyer des messages aux participants sur WhatsApp pour les matchs 
  - Transformer le site en une appli mobile
 
- - Badge/streak : "3 victoires d'affilée", "meilleure progression du mois" — ludique, pas cher à calculer côté back.
+ - Badge/streak : "3 victoires d'affilée", "meilleure progression du mois" 
 
 ---------- Done ----------
 - Retirer nb phases et nb mois sur l'accueil
