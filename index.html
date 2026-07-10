@@ -441,7 +441,6 @@
   /* Renfort explicite : garantit que la zone cliquable couvre bien tout l'écran, quoi qu'il arrive */
   #intro-gate { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; }
   .intro-click-label { position: relative; font-family: var(--font-heading); letter-spacing: 0.15em; text-transform: uppercase; color: var(--gray-light); font-size: 0.95rem; padding: 1rem 2.2rem; border-radius: 999px; transition: color 0.3s ease; animation: introLabelPulse 2.4s ease-in-out infinite; }
-  .intro-click-label::after { content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; border: 1px solid rgba(255,109,0,0.4); border-radius: 999px; opacity: 0.5; animation: introRingPulse 2.4s ease-in-out infinite; pointer-events: none; }
   .intro-click-gate:hover .intro-click-label { color: var(--white); }
   @keyframes introLabelPulse { 0%,100% { text-shadow: 0 0 0 rgba(255,109,0,0); } 50% { text-shadow: 0 0 22px rgba(255,109,0,0.55); } }
   @keyframes introRingPulse { 0%,100% { transform: scale(1); opacity: 0.35; } 50% { transform: scale(1.08); opacity: 0.75; } }
@@ -2920,6 +2919,15 @@ function introFinish() {
     document.querySelectorAll('#intro-overlay .intro-stage').forEach(s => s.classList.remove('visible'))
     const video = document.getElementById('intro-video')
     video.pause(); try { video.currentTime = 0 } catch {}
+    // L'accueil a été préparé par showApp() bien avant, pendant que l'overlay noir de
+    // l'intro le masquait : sans ceci, l'utilisateur ne voit jamais les chiffres défiler
+    // ni le logo apparaître — tout se serait déjà joué "hors écran". On relance donc ces
+    // animations pile au moment où le site redevient visible.
+    if (currentUser && currentUser.role !== 'ADMIN') {
+      document.getElementById('page-accueil')?.classList.add('active')
+      document.querySelectorAll('.hero-logo, .hero-tagline, .hero-desc').forEach(el => el.classList.remove('visible'))
+      requestAnimationFrame(() => { animateHero(); loadHomeStats() })
+    }
   }, 500)
 }
 
