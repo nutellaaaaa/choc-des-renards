@@ -3,15 +3,14 @@
 - Historique de progression d'un joueur : un petit graphe (points/victoires dans le temps) sur la modale joueur — tu as déjà tout en base (matches, createdAt), juste à agréger.
  --> .html de prévisualisation généré
  --> Session en cours a.fillon657
-- Format mobile responsive a.fillon256
 - Ecrire une nouvelle notif
-
-
 
 
 ---------- Bugs en cours de réparation ----------
 - Sous-titre "Choc des renards" du logo de bondy à mettre en blanc
 - Retirer le contour du bouton autour de "cliquer pour commencer" qui clignote
+- trois petits points qui sortent de l'écran 
+- site pas chargé au lancement côté utilisateur
 
 
 ---------- Fonctionnalités supplémentaires -----------
@@ -75,6 +74,8 @@ Voici un petit récapitulatif des statuts des matchs si jamais ce n'était pas t
 - Dans les logs de connexions de la section "Connexions" auquelle a accès l'admin, ajoute l'heure de déconnexion à l'heure de connexion des joueurs. Si un joueur s'est déconnecté manuellement, l'heure de déconnexion est celle indiquée. Si le joueur a été déconnecté par inactivité, retires 15 minutes à l'heure pour avoir la vraie heure à laquelle il a arrêté d'utiliser le site. 
 - Avoir la possibilité d'envoyer une notification à plusieurs joueurs en même temps (petites cases à cocher + case "tout le monde")
 
+----- NEW -----
+
 - Dans "actions et autre", une fois le scrapping terminé, il faudrait que la console affiche un message "souhaitez-vous mettre à jour les n joueurs suivants (Y/N)" afin de demander confirmation à l'admin. Lorsque l'admin accepte, on pourrait mettre une petite barre de chargement fictive en mode "chargement des modifications en cours" pour faire quelque chose d'un peu stylé. 
 - Les admins ont un compte "admin" et un compte "utilisateur", il faudrait qu'il puisse passer de l'un à l'autre facilement. Par exemple, en haut de la page, un toggle switch compte admin / compte utilisateur. Les comptes communicants sont yanis <-> admin et alexandre <-> root. Fais en sorte qu'il n'y ait pas besoin de ressaisir les identifiants de connexion pour passer de l'un à l'autre. 
 - Côté front-end : Retirer le bouton "voir le classement" page d'accueil ; Retirer l'information page des classements si c'est mis à jour en temps réel par l'admin ou pas ; Remplacer "mis à jour en temps réel" ou "classement figé" par "Phase en cours : [nom de la phase]
@@ -100,6 +101,8 @@ Voici un petit récapitulatif des statuts des matchs si jamais ce n'était pas t
 - Mettre un filtrage de joueurs dans la liste des notifications (le même que pour la liste des connexions) pour pouvoir lister les notifications reçues par un joueur en particulier
 
 - Ajouter à la FAQ une expliquation du fonctionnement de l'automate de planification des matchs auto
+
+- - Format mobile responsive 
 
 
 
