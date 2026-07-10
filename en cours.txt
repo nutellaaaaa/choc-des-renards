@@ -1,21 +1,11 @@
 ---------- Fonctionnalités en cours d'implémentation ----------
-- Dans le classement, on n'a pas de classement général, c'est Poules / Rondes suisses. Le bon onglet doit être cliqué par défaut selon la phase en cours. Si je suis à la Phase 1, le classement par défaut qui apparait lorsque je vais dans "classement" est Poules. Inversement si je suis à la Phase 2. Pour la phase 0, un message apparaît "La saison [année actuelle]-[année actuelle +1] n'a pas encore débutée. 
 - Détourer l'icône de l'onglet du site (et agrandir)
 - Historique de progression d'un joueur : un petit graphe (points/victoires dans le temps) sur la modale joueur — tu as déjà tout en base (matches, createdAt), juste à agréger.
  --> .html de prévisualisation généré
+ --> Session en cours a.fillon657
+- Format mobile responsive a.fillon256
 - Ecrire une nouvelle notif
-- Ajouter à la FAQ une expliquation du fonctionnement de l'automate de planification des matchs auto
 
-- Création de bots pour tester les fonctionnalités du site
-Fonctionnalité de création de bots : Dans "actions et autre", on a la possibilité de créer N bots (l'admin chsoisit le nombre). On aura également la possibilité de "supprimer les bots créés". 
-Ces bots doivent agir comme des utilisateurs normaux afin d'aider l'admin à tester les fonctionnalités de son site.
-Voici les comportements que ces bots doivent adopter : 
-Quand un bot reçoit une notification, il l'a lit et en prend connaissance dans un temps aléatoire, cohérent avec celui d'un humain 
-Quand un bot est convoqué à un match, il joue fictivement le match et rempli le score dans un temps également aléatoire, en respectant les contraintes de temps donnés par l'admin la plupart du temps, parfois le bot "oublie" de renseigner les scores dans le délai, comme un vrai joueur pourrait faire. 
-Les joueurs fictifs peuvent consulter les FAQ et déposer des likes ou des dislikes. 
-Les joueurs fictifs peuvent déposer des formulaires de contact (dans un cadre de test de la fonctionnalité).
-Les joueurs fictifs peuvent se connecter et se déconnecter fictivement.
-Toutes les données relatives à ces bots seront supprimées en même temps qu'eux (historique de connexions, historique des notifications, etc) car ce sont des données fictives qui auront servi au test du site, donc inutiles.  
 
 
 
@@ -27,7 +17,6 @@ Toutes les données relatives à ces bots seront supprimées en même temps qu'e
 ---------- Fonctionnalités supplémentaires -----------
  - Envoyer des messages aux participants sur WhatsApp pour les matchs 
  - Transformer le site en une appli mobile
- - Revoir le format mobile (responsive)
 
  - Badge/streak : "3 victoires d'affilée", "meilleure progression du mois" — ludique, pas cher à calculer côté back.
 
@@ -110,5 +99,9 @@ Voici un petit récapitulatif des statuts des matchs si jamais ce n'était pas t
 - Changer la couleur de l'oeil à la connexion qui affiche le mot de passe en blanc pour qu'on le voie mieux
 - Mettre un filtrage de joueurs dans la liste des notifications (le même que pour la liste des connexions) pour pouvoir lister les notifications reçues par un joueur en particulier
 
----------- Fonctionnement de l'automate ----------
-(a.fillon657)
+- Ajouter à la FAQ une expliquation du fonctionnement de l'automate de planification des matchs auto
+
+
+
+
+
