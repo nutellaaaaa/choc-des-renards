@@ -343,20 +343,41 @@ async function restoreVersion(tx, versionId) {
         await tryCreate(`Sujet FAQ "${t.question}"`, () => tx.faqTopic.create({ data: topicFields }))
         for (const it of items || [])
           await tryCreate(`Item FAQ #${it.id}`, () => tx.faqItem.create({ data: it }))
-        for (const v of views || [])
-          await tryCreate(`Vue FAQ #${v.id}`, () => tx.faqView.create({ data: v }))
-        for (const v of votes || [])
-          await tryCreate(`Vote FAQ #${v.id}`, () => tx.faqVote.create({ data: v }))
+        if ((views || []).length > 0) {
+          try {
+            await tx.faqView.createMany({ data: views, skipDuplicates: true })
+          } catch (err) {
+            warnings.push(`Vues du sujet FAQ "${t.question}" : ${err.message}`)
+          }
+        }
+        if ((votes || []).length > 0) {
+          try {
+            await tx.faqVote.createMany({ data: votes, skipDuplicates: true })
+          } catch (err) {
+            warnings.push(`Votes du sujet FAQ "${t.question}" : ${err.message}`)
+          }
+        }
       }
       break
     }
 
     case 'FAQ_STATS': {
       const { votes, views, topicCounters } = payload
-      for (const v of votes)
-        await tryCreate(`Vote FAQ #${v.id}`, () => tx.faqVote.create({ data: v }))
-      for (const v of views)
-        await tryCreate(`Vue FAQ #${v.id}`, () => tx.faqView.create({ data: v }))
+      // createMany au lieu de N inserts séquentiels — critique pour les gros volumes (ex : 1600 vues)
+      if (views.length > 0) {
+        try {
+          await tx.faqView.createMany({ data: views, skipDuplicates: true })
+        } catch (err) {
+          warnings.push(`Restauration des vues FAQ : ${err.message}`)
+        }
+      }
+      if (votes.length > 0) {
+        try {
+          await tx.faqVote.createMany({ data: votes, skipDuplicates: true })
+        } catch (err) {
+          warnings.push(`Restauration des votes FAQ : ${err.message}`)
+        }
+      }
       for (const tc of topicCounters)
         await tryCreate(`Compteurs sujet FAQ #${tc.id}`, () => tx.faqTopic.update({
           where: { id: tc.id },
