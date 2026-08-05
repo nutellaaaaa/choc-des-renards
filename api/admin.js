@@ -1100,7 +1100,7 @@ async function handleAction(req, res) {
     try {
       const result = await prisma.$transaction(
  	 async (tx) => restoreVersion(tx, vid),
-  	{ timeout: 20000, maxWait: 10000 } // 20s de budget pour la transaction, 10s pour l'obtenir
+  	{ timeout: 60000, maxWait: 10000 } // 60s de budget pour la transaction, 10s pour l'obtenir
 	)
       return res.status(200).json({ ok: true, ...result })
     } catch (err) {
