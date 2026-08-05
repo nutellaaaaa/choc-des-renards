@@ -21,7 +21,7 @@
  */
 const { PrismaClient } = require('@prisma/client')
 const { requireAdmin } = require('./_auth')
-const { logDeletion, restoreVersion } = require('../lib/dataVersion')
+const { logDeletion, restoreVersion } = require('./lib/dataVersion')
 const cheerio = require('cheerio')
 const argon2 = require('argon2')
 
