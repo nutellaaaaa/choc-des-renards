@@ -21,6 +21,7 @@
  */
 const { PrismaClient } = require('@prisma/client')
 const { requireAdmin } = require('./_auth')
+const { logDeletion, restoreVersion } = require('../lib/dataVersion')
 const cheerio = require('cheerio')
 const argon2 = require('argon2')
 
@@ -353,8 +354,12 @@ async function handleFaq(req, res) {
     const tid = parseInt(topicId, 10)
     if (isNaN(tid)) return res.status(400).json({ error: 'topicId invalide.' })
     try {
-      await prisma.faqTopic.delete({ where: { id: tid } })
-      return res.status(200).json({ ok: true })
+      const version = await prisma.$transaction(async (tx) => {
+        const v = await logDeletion(tx, 'FAQ_TOPIC', [tid])
+        await tx.faqTopic.delete({ where: { id: tid } })
+        return v
+      })
+      return res.status(200).json({ ok: true, dataVersion: version })
     } catch (err) {
       console.error('[admin/faq delete]', err)
       return res.status(500).json({ error: 'Erreur serveur ou sujet introuvable.' })
@@ -536,8 +541,12 @@ async function handleNotifications(req, res) {
     const nid = parseInt(notificationId, 10)
     if (isNaN(nid)) return res.status(400).json({ error: 'notificationId invalide.' })
     try {
-      await prisma.notification.delete({ where: { id: nid } })
-      return res.status(200).json({ ok: true })
+      const version = await prisma.$transaction(async (tx) => {
+        const v = await logDeletion(tx, 'NOTIFICATION', [nid])
+        await tx.notification.delete({ where: { id: nid } })
+        return v
+      })
+      return res.status(200).json({ ok: true, dataVersion: version })
     } catch (err) {
       console.error('[admin/notifications delete]', err)
       return res.status(500).json({ error: 'Erreur serveur ou notification introuvable.' })
@@ -689,9 +698,14 @@ async function handlePoules(req, res) {
     const pid = parseInt(pouleId, 10)
     if (isNaN(pid)) return res.status(400).json({ error: 'pouleId invalide.' })
     try {
-      await prisma.poule.delete({ where: { id: pid } })
-      return res.status(200).json({ ok: true })
+      const version = await prisma.$transaction(async (tx) => {
+        const v = await logDeletion(tx, 'POULE', [pid])
+        await tx.poule.delete({ where: { id: pid } })
+        return v
+      })
+      return res.status(200).json({ ok: true, dataVersion: version })
     } catch (err) {
+      console.error('[delete_poule]', err)
       return res.status(500).json({ error: 'Erreur serveur.' })
     }
   }
@@ -785,9 +799,14 @@ async function handlePoules(req, res) {
     const gid = parseInt(groupId, 10)
     if (isNaN(gid)) return res.status(400).json({ error: 'groupId invalide.' })
     try {
-      await prisma.phase2Group.delete({ where: { id: gid } })
-      return res.status(200).json({ ok: true })
+      const version = await prisma.$transaction(async (tx) => {
+        const v = await logDeletion(tx, 'PHASE2_GROUP', [gid])
+        await tx.phase2Group.delete({ where: { id: gid } })
+        return v
+      })
+      return res.status(200).json({ ok: true, dataVersion: version })
     } catch (err) {
+      console.error('[delete_group]', err)
       return res.status(500).json({ error: 'Erreur serveur.' })
     }
   }
@@ -903,24 +922,31 @@ async function handleAction(req, res) {
         }
 
         case 'reset_all_matches': {
-          await prisma.matchSet.deleteMany({})
-          await prisma.match.deleteMany({})
-          await prisma.pouleMember.deleteMany({})
-          await prisma.poule.deleteMany({})
-          await prisma.phase2GroupMember.deleteMany({})
-          await prisma.phase2Group.deleteMany({})
-          await prisma.specialMatch.deleteMany({})
-          await prisma.plannedMatch.deleteMany({})
-          await prisma.tournamentState.upsert({
-            where: { id: 1 },
-            update: { rankingSnapshot: null, currentPhase: 'PHASE0', currentRound: null },
-            create: { id: 1, currentPhase: 'PHASE0' },
+          await prisma.$transaction(async (tx) => {
+            await logDeletion(tx, 'RESET_TOURNOI')
+            await tx.matchSet.deleteMany({})
+            await tx.match.deleteMany({})
+            await tx.pouleMember.deleteMany({})
+            await tx.poule.deleteMany({})
+            await tx.phase2GroupMember.deleteMany({})
+            await tx.phase2Group.deleteMany({})
+            await tx.specialMatch.deleteMany({})
+            await tx.plannedMatch.deleteMany({})
+            await tx.tournamentState.upsert({
+              where: { id: 1 },
+              update: { rankingSnapshot: null, currentPhase: 'PHASE0', currentRound: null },
+              create: { id: 1, currentPhase: 'PHASE0' },
+            })
           })
           return res.status(200).json({ ok: true, message: 'Tous les matchs, scores, poules et groupes ont été supprimés. Tournoi réinitialisé.' })
         }
 
         case 'reset_all_notifications': {
-          await prisma.notification.deleteMany({})
+          await prisma.$transaction(async (tx) => {
+            const all = await tx.notification.findMany({ select: { id: true } })
+            await logDeletion(tx, 'NOTIFICATION', all.map(n => n.id), `Suppression de toutes les notifications (${all.length})`)
+            await tx.notification.deleteMany({})
+          })
           return res.status(200).json({ ok: true, message: 'Toutes les notifications ont été supprimées.' })
         }
 
@@ -937,10 +963,13 @@ async function handleAction(req, res) {
         // zéro des compteurs dénormalisés sur FaqTopic. Ne touche pas au
         // contenu de la FAQ (sujets/questions/réponses).
         case 'reset_faq_stats': {
-          await prisma.faqVote.deleteMany({})
-          await prisma.faqView.deleteMany({})
-          await prisma.faqTopic.updateMany({
-            data: { viewCount: 0, usefulCount: 0, notUsefulCount: 0 },
+          await prisma.$transaction(async (tx) => {
+            await logDeletion(tx, 'FAQ_STATS')
+            await tx.faqVote.deleteMany({})
+            await tx.faqView.deleteMany({})
+            await tx.faqTopic.updateMany({
+              data: { viewCount: 0, usefulCount: 0, notUsefulCount: 0 },
+            })
           })
           return res.status(200).json({
             ok: true,
@@ -1047,6 +1076,36 @@ async function handleAction(req, res) {
     }
   }
 
+  // Liste des versions restaurables (non expirées, non déjà restaurées), pour
+  // l'onglet "Actions et autres". Pas de payload complet renvoyé (potentiellement
+  // volumineux) : uniquement les métadonnées d'affichage.
+  if (action === 'list_versions') {
+    try {
+      const versions = await prisma.dataVersion.findMany({
+        where: { expiresAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, label: true, entityType: true, createdAt: true, expiresAt: true, restoredAt: true },
+      })
+      return res.status(200).json({ ok: true, versions })
+    } catch (err) {
+      console.error('[list_versions]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  if (action === 'restore_version') {
+    const { versionId } = req.body
+    const vid = parseInt(versionId, 10)
+    if (isNaN(vid)) return res.status(400).json({ error: 'versionId invalide.' })
+    try {
+      const result = await prisma.$transaction(async (tx) => restoreVersion(tx, vid))
+      return res.status(200).json({ ok: true, ...result })
+    } catch (err) {
+      console.error('[restore_version]', err)
+      return res.status(400).json({ error: err.message || 'Erreur lors de la restauration.' })
+    }
+  }
+
   if (!userId) return res.status(400).json({ error: 'userId requis pour cette action.' })
 
   const id = parseInt(userId, 10)
@@ -1067,14 +1126,17 @@ async function handleAction(req, res) {
       }
 
       case 'refuse': {
-        await prisma.refusedRegistration.create({
-          data: {
-            firstName: user.firstName,
-            lastName:  user.lastName,
-            phone:     user.phone,
-          },
+        await prisma.$transaction(async (tx) => {
+          await tx.refusedRegistration.create({
+            data: {
+              firstName: user.firstName,
+              lastName:  user.lastName,
+              phone:     user.phone,
+            },
+          })
+          await logDeletion(tx, 'USER', [id], `Refus d'inscription : ${user.firstName} ${user.lastName}`)
+          await tx.user.delete({ where: { id } })
         })
-        await prisma.user.delete({ where: { id } })
         return res.status(200).json({ ok: true, message: 'Demande refusée, compte supprimé.' })
       }
 
@@ -1090,7 +1152,10 @@ async function handleAction(req, res) {
 
       case 'delete_banned': {
         if (!user.banned) return res.status(400).json({ error: 'Cet utilisateur n\'est pas banni.' })
-        await prisma.user.delete({ where: { id } })
+        await prisma.$transaction(async (tx) => {
+          await logDeletion(tx, 'USER', [id])
+          await tx.user.delete({ where: { id } })
+        })
         return res.status(200).json({ ok: true, message: 'Utilisateur banni supprimé définitivement.' })
       }
 
@@ -1507,9 +1572,14 @@ async function handleMatch(req, res) {
     const mid = parseInt(req.body.matchId, 10)
     if (isNaN(mid)) return res.status(400).json({ error: 'matchId invalide.' })
     try {
-      await prisma.match.delete({ where: { id: mid } })
-      return res.status(200).json({ ok: true, message: 'Match supprimé.' })
+      const version = await prisma.$transaction(async (tx) => {
+        const v = await logDeletion(tx, 'MATCH', [mid])
+        await tx.match.delete({ where: { id: mid } })
+        return v
+      })
+      return res.status(200).json({ ok: true, message: 'Match supprimé.', dataVersion: version })
     } catch (err) {
+      console.error('[admin/match delete]', err)
       return res.status(500).json({ error: 'Erreur serveur ou match introuvable.' })
     }
   }
@@ -1668,9 +1738,14 @@ async function handleMatch(req, res) {
     const pmid = parseInt(req.body.plannedMatchId, 10)
     if (isNaN(pmid)) return res.status(400).json({ error: 'plannedMatchId invalide.' })
     try {
-      await prisma.plannedMatch.delete({ where: { id: pmid } })
-      return res.status(200).json({ ok: true })
+      const version = await prisma.$transaction(async (tx) => {
+        const v = await logDeletion(tx, 'PLANNED_MATCH', [pmid])
+        await tx.plannedMatch.delete({ where: { id: pmid } })
+        return v
+      })
+      return res.status(200).json({ ok: true, dataVersion: version })
     } catch (err) {
+      console.error('[planned_delete]', err)
       return res.status(500).json({ error: 'Erreur serveur ou match introuvable.' })
     }
   }
@@ -1773,9 +1848,14 @@ async function handleMatch(req, res) {
     const pid = parseInt(req.body.photoId, 10)
     if (isNaN(pid)) return res.status(400).json({ error: 'photoId invalide.' })
     try {
-      await prisma.matchPhoto.delete({ where: { id: pid } })
-      return res.status(200).json({ ok: true })
+      const version = await prisma.$transaction(async (tx) => {
+        const v = await logDeletion(tx, 'PHOTO', [pid])
+        await tx.matchPhoto.delete({ where: { id: pid } })
+        return v
+      })
+      return res.status(200).json({ ok: true, dataVersion: version })
     } catch (err) {
+      console.error('[delete_photo]', err)
       return res.status(500).json({ error: 'Erreur serveur ou photo introuvable.' })
     }
   }
@@ -1990,19 +2070,28 @@ async function handleScheduling(req, res) {
     const bid = parseInt(req.body.blackoutId, 10)
     if (isNaN(bid)) return res.status(400).json({ error: 'blackoutId invalide.' })
     try {
-      await prisma.blackoutPeriod.delete({ where: { id: bid } })
-      return res.status(200).json({ ok: true })
+      const version = await prisma.$transaction(async (tx) => {
+        const v = await logDeletion(tx, 'BLACKOUT', [bid])
+        await tx.blackoutPeriod.delete({ where: { id: bid } })
+        return v
+      })
+      return res.status(200).json({ ok: true, dataVersion: version })
     } catch (err) {
+      console.error('[delete_blackout]', err)
       return res.status(500).json({ error: 'Erreur serveur ou période introuvable.' })
     }
   }
 
   if (action === 'reset_phase1') {
     try {
-      await prisma.plannedMatch.deleteMany({ where: { phase: 'PHASE1' } })
-      await prisma.schedulingSettings.updateMany({ where: { phase: 'PHASE1' }, data: { locked: false } })
-      await prisma.schedulingLog.create({
-        data: { phase: 'PHASE1', type: 'action', message: 'Matchs planifiés Phase 1 supprimés — paramètres déverrouillés.' },
+      await prisma.$transaction(async (tx) => {
+        const toDelete = await tx.plannedMatch.findMany({ where: { phase: 'PHASE1' }, select: { id: true } })
+        await logDeletion(tx, 'PLANNED_MATCH', toDelete.map(m => m.id), `Suppression de ${toDelete.length} match(s) planifié(s) Phase 1 (reset)`)
+        await tx.plannedMatch.deleteMany({ where: { phase: 'PHASE1' } })
+        await tx.schedulingSettings.updateMany({ where: { phase: 'PHASE1' }, data: { locked: false } })
+        await tx.schedulingLog.create({
+          data: { phase: 'PHASE1', type: 'action', message: 'Matchs planifiés Phase 1 supprimés — paramètres déverrouillés.' },
+        })
       })
       return res.status(200).json({ ok: true })
     } catch (err) {
@@ -2013,10 +2102,14 @@ async function handleScheduling(req, res) {
 
   if (action === 'reset_phase2') {
     try {
-      await prisma.plannedMatch.deleteMany({ where: { phase: 'PHASE2' } })
-      await prisma.schedulingSettings.updateMany({ where: { phase: 'PHASE2' }, data: { locked: false } })
-      await prisma.schedulingLog.create({
-        data: { phase: 'PHASE2', type: 'action', message: 'Matchs planifiés Phase 2 supprimés — paramètres déverrouillés.' },
+      await prisma.$transaction(async (tx) => {
+        const toDelete = await tx.plannedMatch.findMany({ where: { phase: 'PHASE2' }, select: { id: true } })
+        await logDeletion(tx, 'PLANNED_MATCH', toDelete.map(m => m.id), `Suppression de ${toDelete.length} match(s) planifié(s) Phase 2 (reset)`)
+        await tx.plannedMatch.deleteMany({ where: { phase: 'PHASE2' } })
+        await tx.schedulingSettings.updateMany({ where: { phase: 'PHASE2' }, data: { locked: false } })
+        await tx.schedulingLog.create({
+          data: { phase: 'PHASE2', type: 'action', message: 'Matchs planifiés Phase 2 supprimés — paramètres déverrouillés.' },
+        })
       })
       return res.status(200).json({ ok: true })
     } catch (err) {
@@ -2501,7 +2594,10 @@ async function handleConsoleCommand(req, res) {
       if (isNaN(id)) { await say('erreur', 'Usage : annuler <id>'); return res.status(200).json({ ok: true }) }
       const pm = await prisma.plannedMatch.findUnique({ where: { id }, include: { player1: { select: { firstName: true, lastName: true } }, player2: { select: { firstName: true, lastName: true } } } })
       if (!pm) { await say('erreur', `Match planifié #${id} introuvable.`); return res.status(200).json({ ok: true }) }
-      await prisma.plannedMatch.delete({ where: { id } })
+      await prisma.$transaction(async (tx) => {
+        await logDeletion(tx, 'PLANNED_MATCH', [id])
+        await tx.plannedMatch.delete({ where: { id } })
+      })
       await say('action', `Match #${id} (${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}) supprimé.`)
       return res.status(200).json({ ok: true })
     }

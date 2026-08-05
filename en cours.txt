@@ -1,5 +1,15 @@
 ---------- Fonctionnalités en cours d'implémentation ----------
-- Détourer l'icône de l'onglet du site (et agrandir)
+- Création de snapshot de la base de donnée
+--> Session en cours sur a.fillon256
+- L'admin choisit, pour chacun des article faq, s'il rend visible publiquement celle-ci ou pas. Ainsi, il peut publier un article ultérieurement ou ne jamais le publier et le conserver à titre informatif pour lui-même. 
+- J'ai vu de marqué sur le site "session 2025-2026", assure-toi que la date soit toujours la bonne en fonction de l'année. 
+- Rajoute les malus auto aux couple N/DC, D/NC, P/NC. 
+- Dans actions et autres, l'admin peut modifier la liste des malus (en décocher ou en ajouter). Si un malus est supprimé, les potentiels matchs prévus qui utilisaient ce malus doivent être modifiés pour utiliser un autre malus. Un log apparait alors dans la console de l'automate d'aide à la planification pour prévenir du changement. 
+- Remplace les rappels automatiquement envoyés pour remplir les matchs par une commande admin
+- Dans l'historique des notifications envoyées aux joueurs, l'admin peut cliquer sur l'une d'elles pour en afficher le contenu
+- Dans actions et autres, l'admin peut cocher/décocher les onglets qu'il veut rendre disponible au public (par exemple, il peut retirer l'onglet performances qui n'est pas essentiel et le proposer plus tard dans la saison)
+- L'admin a un onglet Alertes admin qui répertorie des logs de : 1.les joueurs ayant oublié de rentrer leur score 2.les tentatives de connexions non-fructueuses au site avec le pseudo admin (date+ip) 3.si un joueur a créé un compte avec le même pseudo qu'un autre
+- Ajoute une heure de déconnexion aux bots
 
 
 ---------- Bugs en cours de réparation ----------

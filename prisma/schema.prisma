@@ -330,6 +330,18 @@ model ContactMessage {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+// ═══════════════════ VERSIONS / CORBEILLE ═══════════════════
+
+model DataVersion {
+  id          Int      @id @default(autoincrement())
+  label       String
+  entityType  String
+  payload     Json
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+  restoredAt  DateTime?
+}
+
 // ═══════════════════ BOTS DE TEST ═══════════════════
 
 // File d'actions programmées pour un bot (voir api/admin.js → handleBots).

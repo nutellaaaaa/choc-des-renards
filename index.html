@@ -1340,7 +1340,7 @@
       <button class="admin-tab" onclick="adminTab('notifications-list',this)">Notifications <span class="badge" id="badge-notifs" hidden>–</span></button>
       <button class="admin-tab" onclick="adminTab('faq',this)">FAQ <span class="badge badge-info" id="badge-faq">–</span></button>
       <button class="admin-tab" onclick="adminTab('contact',this)">Contacts <span class="badge" id="badge-contact" hidden>–</span></button>
-      <button class="admin-tab" onclick="adminTab('other-actions',this)">Actions autres</button>
+      <button class="admin-tab" onclick="adminTab('other-actions',this)">Actions autres <span class="badge" id="badge-versions" hidden>–</span></button>
     </div>
 
     <!-- Utilisateurs -->
@@ -1652,12 +1652,12 @@
         </div>
         <div class="other-action-card">
           <h4>🗑 Réinitialiser le tournoi</h4>
-          <p>Supprime TOUS les matchs, scores, poules, groupes et rencontres spéciales. Action irréversible.</p>
-          <button class="btn-sm btn-danger" onclick="otherAction('reset_all_matches','⚠️ ATTENTION : supprimer TOUS les matchs, poules et groupes ? Action IRRÉVERSIBLE.')">Réinitialiser le tournoi</button>
+          <p>Supprime TOUS les matchs, scores, poules, groupes et rencontres spéciales. Restaurable pendant 30 jours ci-dessous.</p>
+          <button class="btn-sm btn-danger" onclick="otherAction('reset_all_matches','⚠️ ATTENTION : supprimer TOUS les matchs, poules et groupes ? Restaurable 30 jours depuis la section « Suppressions récentes » ci-dessous.')">Réinitialiser le tournoi</button>
         </div>
         <div class="other-action-card">
           <h4>🔕 Effacer les notifications</h4>
-          <p>Supprime toutes les notifications de tous les joueurs.</p>
+          <p>Supprime toutes les notifications de tous les joueurs. Restaurable pendant 30 jours ci-dessous.</p>
           <button class="btn-sm btn-danger" onclick="otherAction('reset_all_notifications','Supprimer toutes les notifications ?')">Effacer les notifications</button>
         </div>
         <div class="other-action-card">
@@ -1692,7 +1692,20 @@
         </div>
       </div>
       <div id="other-actions-feedback" class="modal-success" style="margin-top:1rem"></div>
+
+      <h3 style="font-family:var(--font-heading);font-size:1.2rem;font-weight:700;letter-spacing:0.06em;margin:2.5rem 0 1rem">Suppressions récentes (restaurables 30 jours)</h3>
+      <p style="font-size:0.88rem;color:var(--gray);margin-bottom:1rem">
+        Chaque suppression importante (poules, joueurs, notifications, matchs, réinitialisation…) est conservée ici pendant 30 jours avant d'être purgée définitivement. Vous pouvez annuler une suppression en la restaurant.
+      </p>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Action</th><th>Date</th><th>Expire</th><th>Statut</th><th>Actions</th></tr></thead>
+          <tbody id="tbl-data-versions"></tbody>
+        </table>
+        <div id="data-versions-empty" class="admin-empty" style="display:none">Aucune suppression récente à restaurer.</div>
+      </div>
     </div>
+
 
     <!-- CONSOLE MYFFBAD -->
     <div id="myffbad-console-bg" class="admin-modal-bg">
@@ -4307,6 +4320,7 @@ function adminTab(name, btn) {
   if (name === 'pending') loadRefused()
   if (name === 'faq') loadFaqAdmin()
   if (name === 'contact') loadContactAdmin()
+  if (name === 'other-actions') loadDataVersions()
 }
 
 function pubSubTab(name, btn) {
@@ -6465,6 +6479,71 @@ async function otherAction(action, confirmMsg) {
     feedback.style.color = '#ff7070'
   }
   setTimeout(() => { feedback.textContent = ''; feedback.style.color = '' }, 5000)
+}
+
+/* ── Suppressions récentes / corbeille (DataVersion) ── */
+async function loadDataVersions() {
+  try {
+    const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'list_versions' }) })
+    if (!res.ok) return
+    const { versions } = await res.json()
+    renderDataVersions(versions)
+  } catch(e) { console.error('[loadDataVersions]', e) }
+}
+
+function daysLeft(expiresAtIso) {
+  const ms = new Date(expiresAtIso).getTime() - Date.now()
+  return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)))
+}
+
+function renderDataVersions(versions) {
+  const tbl = document.getElementById('tbl-data-versions')
+  const restorableCount = (versions || []).filter(v => !v.restoredAt).length
+  setBadge('badge-versions', restorableCount)
+  if (!versions || versions.length === 0) {
+    tbl.innerHTML = ''
+    document.getElementById('data-versions-empty').style.display = 'block'
+    return
+  }
+  document.getElementById('data-versions-empty').style.display = 'none'
+  tbl.innerHTML = versions.map(v => `<tr>
+    <td>${esc(v.label)}</td>
+    <td style="color:var(--gray);font-size:0.82rem;white-space:nowrap">${fmtDate(v.createdAt)}</td>
+    <td style="font-size:0.82rem;white-space:nowrap">${daysLeft(v.expiresAt)} jour(s)</td>
+    <td>${v.restoredAt ? '<span class="badge badge-info">Déjà restaurée</span>' : '<span style="color:var(--gray)">—</span>'}</td>
+    <td>${v.restoredAt
+        ? ''
+        : `<button class="btn-sm btn-accept" onclick="restoreDataVersion(${v.id})">Restaurer</button>`}</td>
+  </tr>`).join('')
+}
+
+async function restoreDataVersion(versionId) {
+  if (!confirm('Restaurer cette version ? Les données supprimées seront réinsérées dans la base.')) return
+  const feedback = document.getElementById('other-actions-feedback')
+  feedback.textContent = 'Restauration…'; feedback.style.color = 'var(--orange)'
+  try {
+    const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'restore_version', versionId }) })
+    const data = await res.json()
+    if (res.ok) {
+      if (data.warnings && data.warnings.length > 0) {
+        feedback.innerHTML = `✓ Restauré avec ${data.warnings.length} avertissement(s) :<br>` +
+          data.warnings.map(w => esc(w)).join('<br>') +
+          '<br><small>(Ces éléments n\'ont pas pu être restaurés — probablement car une donnée liée a changé depuis.)</small>'
+        feedback.style.color = '#e0c060'
+      } else {
+        feedback.textContent = '✓ Restauration réussie.'
+        feedback.style.color = '#6ddc6d'
+      }
+      await Promise.all([loadDataVersions(), loadUsers(), loadHistory()])
+    } else {
+      feedback.textContent = '✗ ' + (data.error || 'Erreur.')
+      feedback.style.color = '#ff7070'
+    }
+  } catch {
+    feedback.textContent = '✗ Erreur réseau.'
+    feedback.style.color = '#ff7070'
+  }
+  setTimeout(() => { feedback.textContent = ''; feedback.style.color = '' }, 8000)
 }
 
 /* ── Bots de test ── */
