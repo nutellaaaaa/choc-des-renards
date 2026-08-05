@@ -1098,7 +1098,10 @@ async function handleAction(req, res) {
     const vid = parseInt(versionId, 10)
     if (isNaN(vid)) return res.status(400).json({ error: 'versionId invalide.' })
     try {
-      const result = await prisma.$transaction(async (tx) => restoreVersion(tx, vid))
+      const result = await prisma.$transaction(
+ 	 async (tx) => restoreVersion(tx, vid),
+  	{ timeout: 20000, maxWait: 10000 } // 20s de budget pour la transaction, 10s pour l'obtenir
+	)
       return res.status(200).json({ ok: true, ...result })
     } catch (err) {
       console.error('[restore_version]', err)
