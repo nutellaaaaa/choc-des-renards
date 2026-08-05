@@ -1324,8 +1324,7 @@
     <div class="admin-loading-track"><div id="admin-loading-bar" class="admin-loading-bar"></div></div>
   </div>
   <div class="admin-wrap">
-    <h1 class="admin-title">Panneau <span>Admin</span></h1>
-    <p class="admin-subtitle">Gestion des utilisateurs &amp; du tournoi — Choc des Renards</p>
+    <h1 class="admin-title">Lordy's  <span>Kingdom</span></h1>
     <div id="admin-tabs-anchor"></div>
     <div class="admin-tabs" id="admin-tabs">
       <button class="admin-tab active" onclick="adminTab('users',this)">Utilisateurs <span class="badge badge-info" id="badge-users">–</span></button>
@@ -1917,7 +1916,7 @@
 <!-- MODAL SAISIR SCORE MATCH PLANIFIÉ -->
 <div id="planned-score-modal" class="admin-modal-bg">
   <div class="admin-modal" style="max-width:520px">
-    <h3>Renseigner le <span>Score</span></h3>
+    <h3>Score du <span>match</span></h3>
     <input type="hidden" id="planned-score-id">
     <div id="planned-score-players" style="background:var(--dark3);border:1px solid var(--dark4);border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.95rem;color:var(--gray-light)"></div>
     <div class="form-group">
@@ -2193,7 +2192,7 @@
 <div id="page-reglement" class="page">
   <div class="section">
     <h1 class="section-title">Char<span>te</span></h1>
-    <p class="section-subtitle">Charte officielle du Choc des Renards &mdash; Club de Bondy</p>
+    <p class="section-subtitle">Charte officielle du Choc des Renards</p>
     <div class="reglement-tools">
       <div class="reglement-tools-text"><strong>Version PDF disponible</strong><br>Téléchargez la charte complète du Choc des Renards au format PDF.</div>
       <a class="pdf-btn" href="reglement-choc-des-renards.pdf" target="_blank" rel="noopener">Télécharger le PDF</a>
@@ -2351,7 +2350,7 @@
 <div id="page-souvenirs" class="page">
   <div class="section">
     <h1 class="section-title">Souve<span>nirs</span></h1>
-    <p class="section-subtitle">Tous les souvenirs du Choc des Renards</p>
+    <p class="section-subtitle">Le choc en photos</p>
     <div class="gallery-tabs">
       <button class="gallery-tab active" onclick="switchGalleryTab('grid',this)">🖼 Grille</button>
       <button class="gallery-tab" onclick="switchGalleryTab('matches',this)">🏸 Par match</button>
@@ -2369,7 +2368,7 @@
 <div id="page-mes-notifs" class="page">
   <div class="section">
     <h1 class="section-title">Messa<span>ges</span></h1>
-    <p class="section-subtitle">Historique des notifications dont vous avez pris connaissance</p>
+    <p class="section-subtitle">Historique de vos notifications</p>
     <div id="mes-notifs-list"><div class="admin-empty">Chargement…</div></div>
   </div>
 </div>
@@ -2569,12 +2568,36 @@ function closePrivacyPreauth() {
   if (navAccueilBtn) navAccueilBtn.classList.add('active')
   // L'auth-overlay n'a jamais été touché : il est toujours là, intact, au premier plan.
 }
-function toggleArticle(el) {
-  const wasOpen = el.classList.contains('open')
-  const body = el.querySelector('.article-body')
-  el.classList.toggle('open')
-  if (body) body.style.maxHeight = wasOpen ? '' : (body.scrollHeight + 'px')
+function closeArticle(article) {
+  article.classList.remove('open');
+  const body = article.querySelector('.article-body');
+  if (body) body.style.maxHeight = '';
 }
+
+function toggleArticle(el) {
+  const isOpen = el.classList.contains('open');
+
+  // Ferme tous les articles
+  document.querySelectorAll('.article.open').forEach(closeArticle);
+
+  // Si l'article cliqué était fermé, on l'ouvre
+  if (!isOpen) {
+    el.classList.add('open');
+    const body = el.querySelector('.article-body');
+    if (body) body.style.maxHeight = body.scrollHeight + 'px';
+  }
+}
+
+// Ferme tous les articles quand la page est affichée
+// (y compris après un retour navigateur avec le cache bfcache)
+window.addEventListener('pageshow', () => {
+  document.querySelectorAll('.article.open').forEach(closeArticle);
+});
+
+// Ferme tous les articles lorsque l'utilisateur quitte la page
+window.addEventListener('pagehide', () => {
+  document.querySelectorAll('.article.open').forEach(closeArticle);
+});
 
 /* ══════════════ AUTH ══════════════ */
 let currentUser = null
@@ -3452,10 +3475,10 @@ async function loadClassement() {
     if (hasPoules) {
       html += `<div id="class-poules" class="phase-content${defaultTab === 'poules' ? ' active' : ''}">`
       for (const p of poules) {
-        html += `<div class="poule-title">🏓 ${esc(p.name)}</div>`
+        html += `<div class="poule-title">${esc(p.name)}</div>`
         html += renderRankingTable(p.members || [])
       }
-      html += `<p style="font-size:0.78rem;color:var(--gray);margin-top:1rem;text-align:right">Cliquez sur un joueur pour voir le détail de ses matchs.</p>`
+      html += `<p style="font-size:0.78rem;color:var(--gray);margin-top:1rem;text-align:right"></p>`
       html += `</div>`
     }
 
