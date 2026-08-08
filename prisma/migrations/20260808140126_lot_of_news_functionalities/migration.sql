@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "AdminAlert" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMP(3);

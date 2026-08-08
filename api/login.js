@@ -224,6 +224,17 @@ module.exports = async function handler(req, res) {
             html: `<h2>Tentative de connexion ADMIN</h2><p><strong>Résultat :</strong> mauvais mot de passe</p><p><strong>IP :</strong> ${(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim()}</p>`,
           })
         } catch (mailErr) { console.error('[EMAIL ADMIN]', mailErr) }
+        // Alerte admin persistante
+        try {
+          const failIp = ((req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'inconnue')).split(',')[0].trim()
+          await prisma.adminAlert.create({
+            data: {
+              type: 'login_failed_admin',
+              message: `Tentative de connexion échouée sur le compte « ${user.username} » — IP : ${failIp}`,
+              meta: { username: user.username, ip: failIp, at: new Date().toISOString() },
+            },
+          })
+        } catch {}
       }
       await logLogin(user.id, req, false, 'Mot de passe incorrect')
       return res.status(401).json({ error: 'Identifiants incorrects.' })

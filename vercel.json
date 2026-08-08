@@ -10,6 +10,7 @@
     { "source": "/api/admin/match",         "destination": "/api/admin?resource=match" },
     { "source": "/api/admin/scheduling",    "destination": "/api/admin?resource=scheduling" },
     { "source": "/api/admin/bots",          "destination": "/api/admin?resource=bots" },
+    { "source": "/api/admin/alerts",        "destination": "/api/admin?resource=alerts" },
 
     { "source": "/api/contact",             "destination": "/api/public?resource=contact" },
     { "source": "/api/faq",                 "destination": "/api/public?resource=faq" },

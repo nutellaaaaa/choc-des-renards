@@ -1340,6 +1340,7 @@
       <button class="admin-tab" onclick="adminTab('faq',this)">FAQ <span class="badge badge-info" id="badge-faq">–</span></button>
       <button class="admin-tab" onclick="adminTab('contact',this)">Contacts <span class="badge" id="badge-contact" hidden>–</span></button>
       <button class="admin-tab" onclick="adminTab('other-actions',this)">Actions autres <span class="badge" hidden>–</span></button>
+      <button class="admin-tab" onclick="adminTab('alerts',this)">🔴 Alertes <span class="badge" id="badge-alerts" hidden>–</span></button>
     </div>
 
     <!-- Utilisateurs -->
@@ -1670,6 +1671,28 @@
           <button class="btn-sm btn-danger" onclick="otherAction('reset_faq_stats','⚠️ Supprimer TOUTES les données de visibilité de la FAQ (vues, avis, historique de consultation) pour tous les sujets ? Action irréversible.')">Réinitialiser les stats FAQ</button>
         </div>
         <div class="other-action-card">
+          <h4>🔔 Rappels automatiques de score</h4>
+          <p>Lorsqu'ils sont activés, les joueurs reçoivent une notification 48h avant la deadline d'un match si le score n'a pas encore été saisi. Vous pouvez aussi envoyer les rappels manuellement.</p>
+          <div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:0.6rem">
+            <button class="btn-sm btn-edit" id="btn-toggle-auto-reminders" onclick="toggleAutoReminders()">…</button>
+            <button class="btn-sm btn-accept" onclick="sendRemindersManual()">Envoyer maintenant</button>
+          </div>
+        </div>
+        <div class="other-action-card" style="grid-column:1/-1">
+          <h4>👁 Onglets visibles par les joueurs</h4>
+          <p>Cochez les onglets que vous souhaitez rendre visibles dans l'interface joueur. Les onglets décochés restent accessibles pour vous en tant qu'admin.</p>
+          <div id="tabs-visibility-list" style="display:flex;flex-wrap:wrap;gap:0.7rem;margin-top:0.8rem"></div>
+          <button class="btn-sm btn-accept" style="margin-top:0.9rem" onclick="saveHiddenTabs()">Enregistrer</button>
+        </div>
+        <div class="other-action-card" style="grid-column:1/-1">
+          <h4>⚡ Liste des malus</h4>
+          <p>Gérez la liste des malus utilisés lors de la planification des matchs. Si vous supprimez un malus, les matchs planifiés qui l'utilisaient seront automatiquement réassignés (un log apparaîtra dans la console de planification).</p>
+          <div id="malus-config-list" style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.8rem"></div>
+          <button class="btn-sm btn-add" style="margin-top:0.7rem" onclick="addMalusItem()">+ Ajouter un malus</button>
+          <button class="btn-sm btn-accept" style="margin-top:0.7rem;margin-left:0.5rem" onclick="saveMalusConfig()">Enregistrer</button>
+          <button class="btn-sm btn-edit" style="margin-top:0.7rem;margin-left:0.5rem" onclick="resetMalusConfig()">Réinitialiser par défaut</button>
+        </div>
+        <div class="other-action-card">
           <h4>🔄 Mettre à jour les données des joueurs</h4>
           <p>Récupère les classements officiels du club sur MYFFBAD et met à jour la catégorie des joueurs (classement Simple).</p>
           <button class="btn-sm btn-edit" onclick="runMyffbadUpdate()">Mettre à jour (MYFFBAD)</button>
@@ -1706,6 +1729,22 @@
     </div>
 
 
+    <!-- ALERTES ADMIN -->
+    <div id="admin-alerts" class="admin-section" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:0.75rem">
+        <h3 style="font-family:var(--font-heading);font-size:1.2rem;font-weight:700;letter-spacing:0.06em;margin:0">🔴 Alertes admin</h3>
+        <button class="btn-sm btn-edit" onclick="markAllAlertsRead()">Tout marquer comme lu</button>
+      </div>
+      <div id="alerts-filter" style="display:flex;gap:0.6rem;margin-bottom:1rem;flex-wrap:wrap">
+        <button class="btn-sm btn-edit alert-filter-btn active" data-filter="all" onclick="filterAlerts('all',this)">Tout</button>
+        <button class="btn-sm btn-edit alert-filter-btn" data-filter="score_missing" onclick="filterAlerts('score_missing',this)">⏱ Score oublié</button>
+        <button class="btn-sm btn-edit alert-filter-btn" data-filter="login_failed_admin" onclick="filterAlerts('login_failed_admin',this)">🔐 Connexion échouée</button>
+        <button class="btn-sm btn-edit alert-filter-btn" data-filter="duplicate_username" onclick="filterAlerts('duplicate_username',this)">👤 Pseudo dupliqué</button>
+      </div>
+      <div id="alerts-list"></div>
+      <div id="alerts-empty" class="admin-empty" style="display:none">Aucune alerte pour l'instant.</div>
+    </div>
+
     <!-- CONSOLE MYFFBAD -->
     <div id="myffbad-console-bg" class="admin-modal-bg">
       <div class="myffbad-console">
@@ -1717,6 +1756,25 @@
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- MODALE DÉTAIL NOTIFICATION -->
+<div id="notif-detail-modal" class="admin-modal-bg" style="display:none" onclick="if(event.target===this)closeNotifDetail()">
+  <div class="admin-modal" style="max-width:480px">
+    <h3 style="font-size:1rem;margin-bottom:1rem">📩 Contenu de la notification</h3>
+    <div style="margin-bottom:0.6rem;font-size:0.82rem;color:var(--gray)">
+      Destinataire : <strong id="notif-detail-user" style="color:var(--gray-light)"></strong>
+      &nbsp;·&nbsp; <span id="notif-detail-type" style="color:var(--orange)"></span>
+      &nbsp;·&nbsp; <span id="notif-detail-date"></span>
+    </div>
+    <div style="background:var(--dark2);border:1px solid var(--dark4);border-radius:8px;padding:1rem;margin-bottom:0.5rem">
+      <div id="notif-detail-title" style="font-family:var(--font-heading);font-size:0.95rem;font-weight:700;color:var(--white);margin-bottom:0.5rem"></div>
+      <div id="notif-detail-body" style="font-size:0.9rem;color:var(--gray-light);white-space:pre-wrap;line-height:1.5"></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+      <button class="btn-modal-cancel" onclick="closeNotifDetail()">Fermer</button>
+    </div>
   </div>
 </div>
 
@@ -3384,6 +3442,10 @@ const INACTIVITY_MS = 15 * 60 * 1000
 const WARN_BEFORE_MS = 60 * 1000
 const INACTIVITY_EXEMPT_USERNAMES = ['admin', 'yanis']
 let inactivityTimer = null, warnTimer = null, warnCountdown = null
+// Déconnexion auto mobile : si la page est masquée plus de MOBILE_BG_TIMEOUT_MS (15 min),
+// on déconnecte à la reprise — car les événements mouse/touch ne se déclenchent pas en arrière-plan.
+const MOBILE_BG_TIMEOUT_MS = 15 * 60 * 1000
+let mobileBgTimer = null, mobileBgHiddenAt = null
 
 function isInactivityExempt() {
   const username = (currentUser?.username || '').toLowerCase()
@@ -3406,11 +3468,36 @@ function startInactivityTimer() {
   if (isInactivityExempt()) return // pas besoin d'écouter l'activité, jamais déconnecté
   ;['mousemove','keydown','click','scroll','touchstart'].forEach(e => document.addEventListener(e, resetInactivityTimer, {passive:true}))
   resetInactivityTimer()
+  // Déconnexion auto sur mobile (page en arrière-plan)
+  document.addEventListener('visibilitychange', handleMobileVisibility)
 }
 function stopInactivityTimer() {
   clearTimeout(inactivityTimer); clearTimeout(warnTimer); clearInterval(warnCountdown)
+  clearTimeout(mobileBgTimer); mobileBgHiddenAt = null
   document.getElementById('inactivity-toast').style.display = 'none'
   ;['mousemove','keydown','click','scroll','touchstart'].forEach(e => document.removeEventListener(e, resetInactivityTimer))
+  document.removeEventListener('visibilitychange', handleMobileVisibility)
+}
+function handleMobileVisibility() {
+  if (isInactivityExempt()) return
+  if (document.hidden) {
+    mobileBgHiddenAt = Date.now()
+    mobileBgTimer = setTimeout(() => {
+      // L'utilisateur n'est pas revenu après MOBILE_BG_TIMEOUT_MS → déconnecter dès le retour
+      mobileBgHiddenAt = -1 // marquer comme expiré
+    }, MOBILE_BG_TIMEOUT_MS)
+  } else {
+    // Retour en premier plan
+    clearTimeout(mobileBgTimer)
+    if (mobileBgHiddenAt === -1 || (mobileBgHiddenAt && Date.now() - mobileBgHiddenAt >= MOBILE_BG_TIMEOUT_MS)) {
+      // Timeout dépassé en arrière-plan → déconnecter
+      mobileBgHiddenAt = null
+      logout('inactivity')
+    } else {
+      mobileBgHiddenAt = null
+      resetInactivityTimer() // réinitialiser le timer normal au retour
+    }
+  }
 }
 
 /* ══════════════ CLASSEMENT ══════════════ */
@@ -4343,7 +4430,8 @@ function adminTab(name, btn) {
   if (name === 'pending') loadRefused()
   if (name === 'faq') loadFaqAdmin()
   if (name === 'contact') loadContactAdmin()
-  if (name === 'other-actions') loadDataVersions()
+  if (name === 'other-actions') { loadDataVersions(); loadOtherActionsConfig() }
+  if (name === 'alerts') loadAlerts()
 }
 
 function pubSubTab(name, btn) {
@@ -4414,6 +4502,8 @@ async function loadAllAdminDataWithProgress() {
     { label: 'Prises de contact…',         fn: loadContactAdmin },
     { label: 'Demandes en attente…',       fn: loadRefused },
     { label: 'Statut des bots…',           fn: loadBotsStatus },
+    { label: 'Configuration actions…',     fn: loadOtherActionsConfig },
+    { label: 'Alertes admin…',             fn: loadAlerts },
   ]
 
   let done = 0
@@ -5563,14 +5653,31 @@ function renderNotifications(notifications) {
   if (notifications.length === 0) { tbl.innerHTML = ''; document.getElementById('notifs-empty').style.display = 'block'; return }
   document.getElementById('notifs-empty').style.display = 'none'
   tbl.innerHTML = notifications.map(n => `
-    <tr>
+    <tr style="cursor:pointer" onclick="showNotifDetail(${n.id})" title="Cliquer pour voir le contenu">
       <td><strong style="color:var(--white)">${esc(n.user?.username||'—')}</strong><br><span style="font-size:0.78rem;color:var(--gray)">${esc(n.user?.firstName||'')} ${esc(n.user?.lastName||'')}</span></td>
-      <td><span class="status-badge ${n.type === 'special_match' ? 'status-wait' : 'status-ok'}">${n.type === 'special_match' ? 'Rencontre' : 'Message'}</span></td>
+      <td><span class="status-badge ${n.type === 'special_match' ? 'status-wait' : 'status-ok'}">${n.type === 'special_match' ? 'Rencontre' : n.type === 'deadline_reminder' ? 'Rappel' : 'Message'}</span></td>
       <td style="color:var(--gray-light)">${esc(n.title)}</td>
       <td style="color:var(--gray);font-size:0.82rem">${fmtDate(n.createdAt)}</td>
       <td>${n.read ? `<span class="log-success">✓ ${fmtDate(n.readAt)}</span>` : '<span class="log-fail">En attente</span>'}</td>
-      <td><button class="btn-sm btn-danger" onclick="deleteNotif(${n.id})">Supprimer</button></td>
+      <td onclick="event.stopPropagation()"><button class="btn-sm btn-danger" onclick="deleteNotif(${n.id})">Supprimer</button></td>
     </tr>`).join('')
+}
+let _notifDetailData = []
+function showNotifDetail(id) {
+  const n = notificationsAllList.find(n => n.id === id)
+  if (!n) return
+  const modal = document.getElementById('notif-detail-modal')
+  if (!modal) return
+  document.getElementById('notif-detail-title').textContent = n.title || '(sans titre)'
+  document.getElementById('notif-detail-type').textContent = n.type || ''
+  document.getElementById('notif-detail-body').textContent = n.message || '(aucun contenu)'
+  document.getElementById('notif-detail-date').textContent = n.createdAt ? new Date(n.createdAt).toLocaleString('fr-FR') : ''
+  document.getElementById('notif-detail-user').textContent = n.user ? `${n.user.firstName} ${n.user.lastName} (@${n.user.username})` : '—'
+  modal.style.display = 'flex'
+}
+function closeNotifDetail() {
+  const modal = document.getElementById('notif-detail-modal')
+  if (modal) modal.style.display = 'none'
 }
 async function deleteNotif(id) {
   if (!confirm('Supprimer cette notification ?')) return
@@ -5600,26 +5707,7 @@ async function loadFaqAdmin() {
       return
     }
     empty.style.display = 'none'
-    list.innerHTML = faqAdminTopics.map(t => `
-      <div class="faq-admin-row" draggable="true" data-id="${t.id}"
-           ondragstart="faqDragStart(event, ${t.id})" ondragover="faqDragOver(event)"
-           ondrop="faqDrop(event, ${t.id})" ondragend="faqDragEnd(event)">
-        <span class="faq-drag-handle">⠿</span>
-        <div class="faq-admin-row-main">
-          <div class="faq-admin-row-title">${esc(t.question)}</div>
-          <div class="faq-admin-row-stats">
-            <span title="Consultations">👁 ${t.viewCount}</span>
-            <span title="Utile" style="color:#6ddc6d">👍 ${t.usefulCount}</span>
-            <span title="Pas utile" style="color:#ff7070">👎 ${t.notUsefulCount}</span>
-          </div>
-        </div>
-        <div class="faq-admin-row-actions">
-          <button class="btn-sm btn-edit" onclick="viewFaqHistory(${t.id})">Historique</button>
-          <button class="btn-sm btn-edit" onclick="openFaqEditModal(${t.id})">Modifier</button>
-          <button class="btn-sm btn-danger" onclick="deleteFaqTopic(${t.id})">Supprimer</button>
-        </div>
-      </div>
-    `).join('')
+    renderFaqAdminList()
   } catch (e) {
     console.error('[loadFaqAdmin]', e)
   }
@@ -5660,16 +5748,19 @@ function faqDragEnd(ev) {
   document.querySelectorAll('.faq-admin-row.drag-over').forEach(r => r.classList.remove('drag-over'))
   faqDragSourceId = null
 }
-function loadFaqAdminRenderOnly() {
-  // Ré-affiche la liste actuelle sans re-fetch (utilisé juste après un drop)
+function renderFaqAdminList() {
   const list = document.getElementById('faq-admin-list')
+  if (!list) return
   list.innerHTML = faqAdminTopics.map(t => `
     <div class="faq-admin-row" draggable="true" data-id="${t.id}"
          ondragstart="faqDragStart(event, ${t.id})" ondragover="faqDragOver(event)"
          ondrop="faqDrop(event, ${t.id})" ondragend="faqDragEnd(event)">
       <span class="faq-drag-handle">⠿</span>
       <div class="faq-admin-row-main">
-        <div class="faq-admin-row-title">${esc(t.question)}</div>
+        <div class="faq-admin-row-title">
+          ${esc(t.question)}
+          <span style="margin-left:0.55rem;font-size:0.75rem;font-weight:600;padding:0.18rem 0.55rem;border-radius:20px;${t.published ? 'background:#1a3a1a;color:#6ddc6d;border:1px solid #2d6a2d' : 'background:#2a2a1a;color:#bbb;border:1px solid #444'}">${t.published ? '✓ Publié' : '⬤ Brouillon'}</span>
+        </div>
         <div class="faq-admin-row-stats">
           <span title="Consultations">👁 ${t.viewCount}</span>
           <span title="Utile" style="color:#6ddc6d">👍 ${t.usefulCount}</span>
@@ -5677,12 +5768,16 @@ function loadFaqAdminRenderOnly() {
         </div>
       </div>
       <div class="faq-admin-row-actions">
+        <button class="btn-sm ${t.published ? 'btn-edit' : 'btn-add'}" onclick="toggleFaqPublish(${t.id})" style="min-width:90px">${t.published ? 'Dépublier' : 'Publier'}</button>
         <button class="btn-sm btn-edit" onclick="viewFaqHistory(${t.id})">Historique</button>
         <button class="btn-sm btn-edit" onclick="openFaqEditModal(${t.id})">Modifier</button>
         <button class="btn-sm btn-danger" onclick="deleteFaqTopic(${t.id})">Supprimer</button>
       </div>
     </div>
   `).join('')
+}
+function loadFaqAdminRenderOnly() {
+  renderFaqAdminList()
 }
 
 /* ── Création / édition ── */
@@ -5799,6 +5894,16 @@ async function saveFaqTopic() {
   } catch (e) {
     errorEl.textContent = 'Erreur réseau.'
   }
+}
+
+async function toggleFaqPublish(topicId) {
+  try {
+    const r = await apiFetch('/api/admin/faq', { method: 'POST', body: JSON.stringify({ action: 'toggle_publish', topicId }) })
+    if (!r.ok) return
+    const topic = faqAdminTopics.find(t => t.id === topicId)
+    if (topic) { topic.published = r.published }
+    renderFaqAdminList()
+  } catch (e) { console.error('[toggleFaqPublish]', e) }
 }
 
 async function deleteFaqTopic(topicId) {
@@ -6504,7 +6609,230 @@ async function otherAction(action, confirmMsg) {
   setTimeout(() => { feedback.textContent = ''; feedback.style.color = '' }, 5000)
 }
 
+async function otherAction(action, confirmMsg) {
+  if (!confirm(confirmMsg)) return
+  const feedback = document.getElementById('other-actions-feedback')
+  feedback.textContent = 'Traitement…'; feedback.style.color = 'var(--orange)'
+  try {
+    const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action }) })
+    const data = await res.json()
+    if (res.ok) {
+      feedback.textContent = '✓ ' + (data.message || 'Opération effectuée.')
+      feedback.style.color = '#6ddc6d'
+      await loadUsers()
+    } else {
+      feedback.textContent = '✗ ' + (data.error || 'Erreur.')
+      feedback.style.color = '#ff7070'
+    }
+  } catch {
+    feedback.textContent = '✗ Erreur réseau.'
+    feedback.style.color = '#ff7070'
+  }
+  setTimeout(() => { feedback.textContent = ''; feedback.style.color = '' }, 5000)
+}
+
+/* ── Rappels automatiques ── */
+let _autoRemindersEnabled = true
+async function toggleAutoReminders() {
+  try {
+    const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'toggle_auto_reminders' }) })
+    const data = await res.json()
+    if (res.ok) {
+      _autoRemindersEnabled = data.autoRemindersEnabled
+      updateAutoReminderBtn()
+      showFeedback('other-actions-feedback', '✓ ' + data.message, true)
+    } else { showFeedback('other-actions-feedback', '✗ ' + data.error, false) }
+  } catch { showFeedback('other-actions-feedback', '✗ Erreur réseau.', false) }
+}
+function updateAutoReminderBtn() {
+  const btn = document.getElementById('btn-toggle-auto-reminders')
+  if (!btn) return
+  if (_autoRemindersEnabled) {
+    btn.textContent = '🔔 Désactiver les rappels auto'
+    btn.className = 'btn-sm btn-deactivate'
+  } else {
+    btn.textContent = '🔔 Activer les rappels auto'
+    btn.className = 'btn-sm btn-accept'
+  }
+}
+async function sendRemindersManual() {
+  if (!confirm('Envoyer les rappels de score manuellement maintenant ?')) return
+  try {
+    const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'send_reminders_manual' }) })
+    const data = await res.json()
+    if (res.ok) showFeedback('other-actions-feedback', '✓ ' + data.message, true)
+    else showFeedback('other-actions-feedback', '✗ ' + data.error, false)
+  } catch { showFeedback('other-actions-feedback', '✗ Erreur réseau.', false) }
+}
+function showFeedback(id, msg, ok) {
+  const el = document.getElementById(id)
+  if (!el) return
+  el.textContent = msg; el.style.color = ok ? '#6ddc6d' : '#ff7070'
+  setTimeout(() => { el.textContent = ''; el.style.color = '' }, 5000)
+}
+
+/* ── Onglets visibles ── */
+const PLAYER_TABS = [
+  { key: 'ranking', label: 'Classement' },
+  { key: 'matches', label: 'Mes matchs' },
+  { key: 'planned', label: 'Mes matchs planifiés' },
+  { key: 'specials', label: 'Rencontres en cours' },
+  { key: 'performances', label: 'Performances' },
+  { key: 'gallery', label: 'Galerie photos' },
+  { key: 'faq', label: 'FAQ' },
+  { key: 'contact', label: 'Contact' },
+]
+let _hiddenTabs = []
+function renderTabsVisibility() {
+  const container = document.getElementById('tabs-visibility-list')
+  if (!container) return
+  container.innerHTML = PLAYER_TABS.map(t => `
+    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;background:var(--dark3);border:1px solid var(--dark4);border-radius:8px;padding:0.5rem 0.9rem;${!_hiddenTabs.includes(t.key) ? 'border-color:var(--orange)' : ''}">
+      <input type="checkbox" value="${t.key}" ${!_hiddenTabs.includes(t.key) ? 'checked' : ''} style="accent-color:var(--orange)">
+      <span style="font-family:var(--font-heading);font-size:0.88rem;font-weight:600;color:${!_hiddenTabs.includes(t.key) ? 'var(--orange)' : 'var(--gray)'}">${t.label}</span>
+    </label>
+  `).join('')
+}
+async function saveHiddenTabs() {
+  const checkboxes = document.querySelectorAll('#tabs-visibility-list input[type=checkbox]')
+  const hiddenTabs = [...checkboxes].filter(c => !c.checked).map(c => c.value)
+  try {
+    const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'update_hidden_tabs', hiddenTabs }) })
+    const data = await res.json()
+    if (res.ok) { _hiddenTabs = hiddenTabs; renderTabsVisibility(); showFeedback('other-actions-feedback', '✓ ' + data.message, true) }
+    else showFeedback('other-actions-feedback', '✗ ' + data.error, false)
+  } catch { showFeedback('other-actions-feedback', '✗ Erreur réseau.', false) }
+}
+
+/* ── Gestion des malus ── */
+let _malusList = []
+function renderMalusConfig() {
+  const container = document.getElementById('malus-config-list')
+  if (!container) return
+  container.innerHTML = _malusList.map((m, i) => `
+    <div style="display:flex;gap:0.5rem;align-items:center">
+      <input type="text" value="${esc(m)}" data-malus-idx="${i}" style="flex:1;background:var(--dark2);border:1px solid var(--dark4);border-radius:6px;color:var(--white);padding:0.4rem 0.75rem;font-family:var(--font-body);font-size:0.88rem" oninput="_malusList[${i}]=this.value">
+      <button class="btn-sm btn-danger" onclick="removeMalusItem(${i})" title="Supprimer ce malus">✕</button>
+    </div>
+  `).join('')
+}
+function addMalusItem() {
+  _malusList.push('')
+  renderMalusConfig()
+  // Focus le dernier input
+  const inputs = document.querySelectorAll('#malus-config-list input[type=text]')
+  if (inputs.length) inputs[inputs.length - 1].focus()
+}
+function removeMalusItem(idx) {
+  _malusList.splice(idx, 1)
+  renderMalusConfig()
+}
+async function saveMalusConfig() {
+  // Relire les valeurs actuelles des inputs (en cas d'édition directe)
+  const inputs = document.querySelectorAll('#malus-config-list input[type=text]')
+  const malusList = [...inputs].map(i => i.value.trim()).filter(v => v.length > 0)
+  if (malusList.length === 0) return alert('La liste de malus ne peut pas être vide.')
+  if (!confirm(`Enregistrer la liste de malus (${malusList.length} entrée(s)) ?`)) return
+  try {
+    const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'update_malus_config', malusList }) })
+    const data = await res.json()
+    if (res.ok) { _malusList = malusList; renderMalusConfig(); showFeedback('other-actions-feedback', '✓ ' + data.message, true) }
+    else showFeedback('other-actions-feedback', '✗ ' + data.error, false)
+  } catch { showFeedback('other-actions-feedback', '✗ Erreur réseau.', false) }
+}
+async function resetMalusConfig() {
+  if (!confirm('Réinitialiser la liste des malus par défaut ?')) return
+  try {
+    const res = await fetch('/api/admin/match', { headers: authHeaders() })
+    if (!res.ok) return
+    const data = await res.json()
+    // loadMalusList retourne DEFAULT_MALUS_LIST si malusConfig est vide — on envoie une liste vide pour forcer le reset
+    const saveRes = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'update_malus_config', malusList: data.defaultMalusList || [] }) })
+    const saveData = await saveRes.json()
+    if (saveRes.ok) {
+      _malusList = saveData.malusList || []
+      renderMalusConfig()
+      showFeedback('other-actions-feedback', '✓ Liste de malus réinitialisée.', true)
+    }
+  } catch { showFeedback('other-actions-feedback', '✗ Erreur réseau.', false) }
+}
+
+/* ── Alertes admin ── */
+let _allAlerts = [], _alertFilter = 'all'
+async function loadAlerts() {
+  try {
+    const res = await fetch('/api/admin/alerts', { headers: authHeaders() })
+    if (!res.ok) return
+    const { alerts } = await res.json()
+    _allAlerts = alerts || []
+    renderAlerts()
+    const unread = _allAlerts.filter(a => !a.read && a.type !== 'score_missing').length +
+                   _allAlerts.filter(a => a.type === 'score_missing').length
+    const badge = document.getElementById('badge-alerts')
+    if (badge) { badge.textContent = unread; badge.hidden = unread === 0 }
+  } catch(e) { console.error('[loadAlerts]', e) }
+}
+function filterAlerts(filter, btn) {
+  _alertFilter = filter
+  document.querySelectorAll('.alert-filter-btn').forEach(b => b.classList.remove('active'))
+  if (btn) btn.classList.add('active')
+  renderAlerts()
+}
+function renderAlerts() {
+  const container = document.getElementById('alerts-list')
+  const empty = document.getElementById('alerts-empty')
+  if (!container) return
+  const filtered = _alertFilter === 'all' ? _allAlerts : _allAlerts.filter(a => a.type === _alertFilter)
+  if (filtered.length === 0) { container.innerHTML = ''; empty.style.display = ''; return }
+  empty.style.display = 'none'
+  const typeLabel = { score_missing:'⏱ Score oublié', login_failed_admin:'🔐 Connexion échouée', duplicate_username:'👤 Pseudo dupliqué' }
+  const typeColor = { score_missing:'#f5a623', login_failed_admin:'#ff7070', duplicate_username:'#b983ff' }
+  container.innerHTML = filtered.map(a => `
+    <div style="display:flex;align-items:flex-start;gap:0.9rem;background:var(--dark3);border:1px solid ${a.read ? 'var(--dark4)' : typeColor[a.type] || 'var(--orange)'};border-radius:10px;padding:0.85rem 1.1rem;margin-bottom:0.55rem;opacity:${a.read ? '0.6' : '1'}">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.3rem">
+          <span style="font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:20px;background:${typeColor[a.type] || 'var(--orange)'}22;color:${typeColor[a.type] || 'var(--orange)'};">${typeLabel[a.type] || a.type}</span>
+          <span style="font-size:0.78rem;color:var(--gray)">${a.createdAt ? new Date(a.createdAt).toLocaleString('fr-FR') : ''}</span>
+          ${!a.read && a.id ? `<button class="btn-sm" style="padding:0.1rem 0.5rem;font-size:0.72rem" onclick="markAlertRead(${a.id})">Lu</button>` : ''}
+        </div>
+        <div style="font-size:0.88rem;color:var(--gray-light)">${esc(a.message)}</div>
+      </div>
+    </div>
+  `).join('')
+}
+async function markAlertRead(id) {
+  try {
+    await fetch('/api/admin/alerts', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'mark_read', alertId:id }) })
+    const a = _allAlerts.find(a => a.id === id); if (a) a.read = true
+    renderAlerts()
+  } catch(e) { console.error('[markAlertRead]', e) }
+}
+async function markAllAlertsRead() {
+  try {
+    await fetch('/api/admin/alerts', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'mark_all_read' }) })
+    _allAlerts.forEach(a => { if (a.id) a.read = true })
+    renderAlerts()
+  } catch(e) { console.error('[markAllAlertsRead]', e) }
+}
+
 /* ── Suppressions récentes / corbeille (DataVersion) ── */
+async function loadOtherActionsConfig() {
+  try {
+    const res = await fetch('/api/admin/match', { headers: authHeaders() })
+    if (!res.ok) return
+    const data = await res.json()
+    // Malus
+    _malusList = data.malusList || []
+    renderMalusConfig()
+    // Onglets
+    _hiddenTabs = data.hiddenTabs || []
+    renderTabsVisibility()
+    // Rappels auto
+    _autoRemindersEnabled = data.autoRemindersEnabled ?? true
+    updateAutoReminderBtn()
+  } catch(e) { console.error('[loadOtherActionsConfig]', e) }
+}
+
 async function loadDataVersions() {
   try {
     const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'list_versions' }) })

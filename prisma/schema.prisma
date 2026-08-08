@@ -83,11 +83,17 @@ model RefusedRegistration {
 }
 
 model TournamentState {
-  id              Int     @id @default(autoincrement())
-  currentPhase    Phase   @default(PHASE0)
-  currentRound    Int?
-  rankingSnapshot String?
-  siteSuspended   Boolean @default(false)
+  id                   Int     @id @default(autoincrement())
+  currentPhase         Phase   @default(PHASE0)
+  currentRound         Int?
+  rankingSnapshot      String?
+  siteSuspended        Boolean @default(false)
+  // Rappels automatiques de remplissage de score (cron-deadline-reminders)
+  autoRemindersEnabled Boolean @default(true)
+  // Onglets masqués côté joueur (JSON array de noms d'onglets, ex: ["performances"])
+  hiddenTabs           String  @default("[]")
+  // Configuration des malus (JSON array de strings). Vide = utiliser MALUS_LIST hardcodé.
+  malusConfig          String  @default("[]")
 }
 
 model Poule {
@@ -273,6 +279,7 @@ model FaqTopic {
   viewCount      Int      @default(0)
   usefulCount    Int      @default(0)
   notUsefulCount Int      @default(0)
+  published      Boolean  @default(false) // visible publiquement côté joueur
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -340,6 +347,18 @@ model DataVersion {
   createdAt   DateTime @default(now())
   expiresAt   DateTime
   restoredAt  DateTime?
+}
+
+// ═══════════════════ ALERTES ADMIN ═══════════════════
+
+// Logs d'anomalies : score oublié, connexion admin échouée, pseudo dupliqué.
+model AdminAlert {
+  id        Int      @id @default(autoincrement())
+  type      String   // 'score_missing' | 'login_failed_admin' | 'duplicate_username'
+  message   String
+  meta      Json?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
 }
 
 // ═══════════════════ BOTS DE TEST ═══════════════════

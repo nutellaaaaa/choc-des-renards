@@ -60,6 +60,16 @@ module.exports = async function handler(req, res) {
         // Suffixer avec un nombre aléatoire
         username = alt + Math.floor(Math.random() * 900 + 100)
       }
+      // Alerte admin : un nouveau joueur a le même prénom qu'un existant
+      try {
+        await prisma.adminAlert.create({
+          data: {
+            type: 'duplicate_username',
+            message: `Nouvelle inscription avec un pseudo dupliqué : « ${firstName} ${lastName} » → pseudo attribué « ${username} » (conflit avec « ${existing.username} »).`,
+            meta: { firstName, lastName, assignedUsername: username, conflictWith: existing.username },
+          },
+        })
+      } catch {}
     }
 
     if (['admin', 'root'].includes(username.toLowerCase())) username = username + '_user'

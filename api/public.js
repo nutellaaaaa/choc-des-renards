@@ -97,6 +97,7 @@ async function handleFaq(req, res) {
   if (req.method === 'GET') {
     try {
       const topics = await prisma.faqTopic.findMany({
+        where: { published: true },
         orderBy: { order: 'asc' },
         include: {
           items: { orderBy: { order: 'asc' } },

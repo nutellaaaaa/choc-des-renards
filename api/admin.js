@@ -35,7 +35,7 @@ const MYFFBAD_BASE = 'https://myffbad.fr/recherche/joueur?league=12&committee=67
 // Format d'un hash Argon2 encodé (ex: $argon2id$v=19$m=65536,t=3,p=1$<salt>$<hash>)
 const ARGON2_HASH_REGEX = /^\$argon2(id|i|d)\$v=\d+\$m=\d+,t=\d+,p=\d+\$[A-Za-z0-9+/]+\$[A-Za-z0-9+/]+$/
 
-const MALUS_LIST = [
+const DEFAULT_MALUS_LIST = [
   'Interdiction de smasher ou de tendre droit',
   'Porter un cache-œil',
   'Interdiction de taper le volant au-dessus de la bande',
@@ -53,30 +53,53 @@ const MALUS_LIST = [
   'Le joueur le moins classé marque le point',
   'Zone restrictive changeant à chaque set : rivière, box, couloir du fond, box puis rivière',
 ]
+// Alias rétrocompatible (utilisé dans les endroits qui lisent MALUS_LIST statiquement)
+let MALUS_LIST = [...DEFAULT_MALUS_LIST]
+
+/** Charge la liste des malus depuis la DB (malusConfig). Retourne DEFAULT_MALUS_LIST si vide. */
+async function loadMalusList() {
+  try {
+    const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
+    if (state?.malusConfig) {
+      const cfg = JSON.parse(state.malusConfig)
+      if (Array.isArray(cfg) && cfg.length > 0) return cfg
+    }
+  } catch {}
+  return DEFAULT_MALUS_LIST
+}
 
 // Rang de classement, du plus faible au plus fort (FFBad) — utilisé pour le malus automatique
 const CATEGORY_RANK = { NC: 0, P: 1, D: 2, R: 3, N: 4 }
 // Écarts de classement qui déclenchent un malus automatique pour compenser l'écart
-const AUTO_MALUS_PAIRS = [['P', 'R'], ['P', 'N'], ['D', 'N']]
+// N/DC → N vs NC ; D/NC ; P/NC ajoutés en plus de P/R, P/N, D/N
+const AUTO_MALUS_PAIRS = [['P', 'R'], ['P', 'N'], ['D', 'N'], ['N', 'NC'], ['D', 'NC'], ['P', 'NC']]
 
-function pickRandomMalus() {
-  return MALUS_LIST[Math.floor(Math.random() * MALUS_LIST.length)]
+function pickRandomMalus(list) {
+  const src = list || MALUS_LIST
+  return src[Math.floor(Math.random() * src.length)]
 }
 
 /**
  * Calcule un malus automatique si l'écart de classement entre les deux joueurs
- * correspond à un des écarts significatifs (P/R, P/N, D/N). Le malus est attribué
+ * correspond à un des écarts significatifs. Le malus est attribué
  * au joueur le mieux classé pour compenser l'écart. Retourne null si aucun écart
  * qualifiant n'est trouvé.
  */
-function computeAutoMalus(cat1, cat2) {
+function computeAutoMalus(cat1, cat2, list) {
   const c1 = cat1 || 'NC', c2 = cat2 || 'NC'
   const qualifies = AUTO_MALUS_PAIRS.some(([a, b]) => (c1 === a && c2 === b) || (c1 === b && c2 === a))
   if (!qualifies) return null
   const r1 = CATEGORY_RANK[c1] ?? 0
   const r2 = CATEGORY_RANK[c2] ?? 0
   const target = r1 >= r2 ? 1 : 2 // 1 = player1, 2 = player2 — au mieux classé
-  return { malus: pickRandomMalus(), malusTarget: target }
+  return { malus: pickRandomMalus(list), malusTarget: target }
+}
+
+/** Crée une alerte admin en base (non bloquant). */
+async function createAdminAlert(type, message, meta) {
+  try {
+    await prisma.adminAlert.create({ data: { type, message, meta: meta || null } })
+  } catch (e) { console.error('[adminAlert]', e) }
 }
 
 // Met en forme "jean-pierre" / "JEAN" / "jEan" → "Jean-Pierre" (gère espaces et tirets)
@@ -194,6 +217,8 @@ module.exports = async function handler(req, res) {
       return handleScheduling(req, res)
     case 'bots':
       return handleBots(req, res)
+    case 'alerts':
+      return handleAlerts(req, res)
     default:
       return res.status(400).json({ error: 'resource invalide ou manquant.' })
   }
@@ -363,6 +388,24 @@ async function handleFaq(req, res) {
     } catch (err) {
       console.error('[admin/faq delete]', err)
       return res.status(500).json({ error: 'Erreur serveur ou sujet introuvable.' })
+    }
+  }
+
+  if (action === 'toggle_publish') {
+    const { topicId } = req.body
+    const tid = parseInt(topicId, 10)
+    if (isNaN(tid)) return res.status(400).json({ error: 'topicId invalide.' })
+    try {
+      const existing = await prisma.faqTopic.findUnique({ where: { id: tid } })
+      if (!existing) return res.status(404).json({ error: 'Sujet introuvable.' })
+      const updated = await prisma.faqTopic.update({
+        where: { id: tid },
+        data: { published: !existing.published },
+      })
+      return res.status(200).json({ ok: true, published: updated.published })
+    } catch (err) {
+      console.error('[admin/faq toggle_publish]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
     }
   }
 
@@ -886,6 +929,8 @@ async function handleAction(req, res) {
     'suspend_site', 'unsuspend_site', 'force_logout_all',
     'reset_all_matches', 'reset_all_notifications', 'deactivate_all_players',
     'scrape_myffbad', 'apply_myffbad_changes', 'reset_faq_stats',
+    'toggle_auto_reminders', 'send_reminders_manual',
+    'update_hidden_tabs', 'update_malus_config',
   ]
 
   if (globalActions.includes(action)) {
@@ -1067,6 +1112,127 @@ async function handleAction(req, res) {
             appliedCount: applied.length,
             applied,
             message: `${applied.length} classement(s) mis à jour.`,
+          })
+        }
+
+        case 'toggle_auto_reminders': {
+          const state = await prisma.tournamentState.upsert({
+            where: { id: 1 },
+            update: {},
+            create: { id: 1, currentPhase: 'PHASE0' },
+          })
+          const next = !state.autoRemindersEnabled
+          await prisma.tournamentState.update({ where: { id: 1 }, data: { autoRemindersEnabled: next } })
+          return res.status(200).json({
+            ok: true,
+            autoRemindersEnabled: next,
+            message: next ? 'Rappels automatiques activés.' : 'Rappels automatiques désactivés.',
+          })
+        }
+
+        case 'send_reminders_manual': {
+          // Même logique que le cron-deadline-reminders, déclenchée manuellement
+          const now = new Date()
+          const deadline48h = new Date(now.getTime() + 48 * 60 * 60 * 1000)
+          const upcoming = await prisma.plannedMatch.findMany({
+            where: {
+              forfeited: false,
+              notifiedAt: { not: null }, // déjà notifié du match
+              deadlineAt: { gte: now, lte: deadline48h },
+            },
+            include: {
+              player1: { select: { id: true, firstName: true, lastName: true, username: true } },
+              player2: { select: { id: true, firstName: true, lastName: true, username: true } },
+            },
+          })
+          let sent = 0
+          for (const pm of upcoming) {
+            for (const { player, opponent } of [
+              { player: pm.player1, opponent: pm.player2 },
+              { player: pm.player2, opponent: pm.player1 },
+            ]) {
+              if (ADMIN_USERNAMES.includes(player.username.toLowerCase())) continue
+              const alreadySent = await prisma.notification.findFirst({
+                where: {
+                  userId: player.id,
+                  plannedMatchId: pm.id,
+                  type: 'next_match',
+                  createdAt: { gte: new Date(now.getTime() - 12 * 60 * 60 * 1000) },
+                },
+              })
+              if (alreadySent) continue
+              await prisma.notification.create({
+                data: {
+                  userId: player.id,
+                  type: 'next_match',
+                  title: '⏰ Rappel : score à saisir',
+                  message: `Votre match contre ${opponent.firstName} ${opponent.lastName} approche de sa deadline. Pensez à saisir votre score !`,
+                  opponentName: `${opponent.firstName} ${opponent.lastName}`,
+                  plannedMatchId: pm.id,
+                },
+              })
+              sent++
+            }
+          }
+          return res.status(200).json({
+            ok: true,
+            sent,
+            message: `${sent} rappel(s) envoyé(s) manuellement.`,
+          })
+        }
+
+        case 'update_hidden_tabs': {
+          const { hiddenTabs } = req.body || {}
+          if (!Array.isArray(hiddenTabs)) return res.status(400).json({ error: 'hiddenTabs (array) requis.' })
+          await prisma.tournamentState.upsert({
+            where: { id: 1 },
+            update: { hiddenTabs: JSON.stringify(hiddenTabs) },
+            create: { id: 1, currentPhase: 'PHASE0', hiddenTabs: JSON.stringify(hiddenTabs) },
+          })
+          return res.status(200).json({ ok: true, hiddenTabs, message: 'Onglets mis à jour.' })
+        }
+
+        case 'update_malus_config': {
+          const { malusList: newList } = req.body || {}
+          if (!Array.isArray(newList)) return res.status(400).json({ error: 'malusList (array) requis.' })
+          const cleaned = newList.map(s => String(s).trim()).filter(s => s.length > 0)
+          if (cleaned.length === 0) return res.status(400).json({ error: 'La liste de malus ne peut pas être vide.' })
+
+          // Trouver les malus supprimés et réassigner les matchs planifiés qui les utilisaient
+          const currentList = await loadMalusList()
+          const removed = currentList.filter(m => !cleaned.includes(m))
+
+          let reassigned = 0
+          if (removed.length > 0) {
+            const affectedMatches = await prisma.plannedMatch.findMany({
+              where: { malus: { in: removed } },
+              include: { player1: { select: { firstName: true, lastName: true } }, player2: { select: { firstName: true, lastName: true } } },
+            })
+            for (const pm of affectedMatches) {
+              const newMalus = cleaned[Math.floor(Math.random() * cleaned.length)]
+              await prisma.plannedMatch.update({ where: { id: pm.id }, data: { malus: newMalus } })
+              await prisma.schedulingLog.create({
+                data: {
+                  phase: pm.phase,
+                  type: 'avertissement',
+                  message: `Malus modifié automatiquement pour le match #${pm.id} (${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}) : l'ancien malus a été supprimé de la liste. Nouveau malus attribué : « ${newMalus} ».`,
+                },
+              })
+              reassigned++
+            }
+          }
+
+          await prisma.tournamentState.upsert({
+            where: { id: 1 },
+            update: { malusConfig: JSON.stringify(cleaned) },
+            create: { id: 1, currentPhase: 'PHASE0', malusConfig: JSON.stringify(cleaned) },
+          })
+
+          return res.status(200).json({
+            ok: true,
+            malusList: cleaned,
+            reassigned,
+            message: `Liste de malus mise à jour (${cleaned.length} entrée(s))${reassigned > 0 ? `. ${reassigned} match(s) planifié(s) réassigné(s) — voir la console de planification.` : '.'}`,
           })
         }
       }
@@ -1283,7 +1449,14 @@ async function handleMatch(req, res) {
           },
         }),
       ])
-      return res.status(200).json({ pending, published, activeUsers, openSpecials, planned, malusList: MALUS_LIST })
+      const dynamicMalusList = await loadMalusList()
+      const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
+      return res.status(200).json({
+        pending, published, activeUsers, openSpecials, planned,
+        malusList: dynamicMalusList,
+        autoRemindersEnabled: state?.autoRemindersEnabled ?? true,
+        hiddenTabs: JSON.parse(state?.hiddenTabs || '[]'),
+      })
     } catch (err) {
       console.error('[admin/match GET]', err)
       return res.status(500).json({ error: 'Erreur serveur.' })
@@ -1667,9 +1840,10 @@ async function handleMatch(req, res) {
       let finalMalus = malus || null
       let finalMalusTarget = malusTarget ? parseInt(malusTarget, 10) : null
 
+      const malusList = await loadMalusList()
       if (finalMalus === '__RANDOM__') {
         // Malus "Aléatoire" choisi par l'admin : on tire un malus concret dès l'enregistrement
-        finalMalus = pickRandomMalus()
+        finalMalus = pickRandomMalus(malusList)
         if (!finalMalusTarget) finalMalusTarget = Math.random() < 0.5 ? 1 : 2
       } else if (!finalMalus) {
         // Aucun malus fourni : vérifier si l'écart de classement déclenche un malus automatique
@@ -1677,7 +1851,7 @@ async function handleMatch(req, res) {
           prisma.user.findUnique({ where: { id: p1id }, select: { category: true } }),
           prisma.user.findUnique({ where: { id: p2id }, select: { category: true } }),
         ])
-        const auto = computeAutoMalus(p1?.category, p2?.category)
+        const auto = computeAutoMalus(p1?.category, p2?.category, malusList)
         if (auto) { finalMalus = auto.malus; finalMalusTarget = auto.malusTarget }
       }
 
@@ -1712,7 +1886,8 @@ async function handleMatch(req, res) {
       let finalMalus = malus || null
       let finalMalusTarget = malusTarget ? parseInt(malusTarget, 10) : null
       if (finalMalus === '__RANDOM__') {
-        finalMalus = pickRandomMalus()
+        const malusList = await loadMalusList()
+        finalMalus = pickRandomMalus(malusList)
         if (!finalMalusTarget) finalMalusTarget = Math.random() < 0.5 ? 1 : 2
       }
       const pm = await prisma.plannedMatch.update({
@@ -2153,7 +2328,10 @@ async function computePhase1(req, res, answers) {
   const log = (type, message) => logEntries.push({ phase, type, message })
 
   try {
-    const settings = await prisma.schedulingSettings.findUnique({ where: { phase } })
+    const [settings, dynamicMalusList] = await Promise.all([
+      prisma.schedulingSettings.findUnique({ where: { phase } }),
+      loadMalusList(),
+    ])
     if (!settings) {
       log('erreur', 'Aucun paramètre de planification configuré pour la Phase 1. Configurez la période et le cycle avant de calculer.')
       await flushLogs(phase, logEntries)
@@ -2266,7 +2444,7 @@ async function computePhase1(req, res, answers) {
         const deadlineAt = addHours(addDays(scheduledDate, settings.cycleLengthDays), -settings.deadlineHoursBeforeCycleEnd)
         for (const [a, b] of roundPairs) {
           const p1 = byId.get(a), p2 = byId.get(b)
-          const auto = computeAutoMalus(p1.category, p2.category)
+          const auto = computeAutoMalus(p1.category, p2.category, dynamicMalusList)
           toCreate.push({
             player1Id: a, player2Id: b, phase, scheduledDate, deadlineAt,
             malus: auto?.malus || null, malusTarget: auto?.malusTarget || null,
@@ -2703,9 +2881,10 @@ async function computePhase2Round(req, res, answers, roundOverride) {
   const log = (type, message) => logEntries.push({ phase, type, message })
 
   try {
-    const [settings, state] = await Promise.all([
+    const [settings, state, dynamicMalusListP2] = await Promise.all([
       prisma.schedulingSettings.findUnique({ where: { phase } }),
       prisma.tournamentState.upsert({ where: { id: 1 }, update: {}, create: { id: 1, currentPhase: 'PHASE0', currentRound: null } }),
+      loadMalusList(),
     ])
     if (!settings) {
       log('erreur', 'Aucun paramètre de planification configuré pour la Phase 2.')
@@ -2878,7 +3057,7 @@ async function computePhase2Round(req, res, answers, roundOverride) {
 
     const toCreate = toCreatePairs.map(p => {
       const p1 = usersInfo.get(p.player1Id), p2 = usersInfo.get(p.player2Id)
-      const auto = computeAutoMalus(p1.category, p2.category)
+      const auto = computeAutoMalus(p1.category, p2.category, dynamicMalusListP2)
       if (auto) log('info', `Malus automatique appliqué : ${p1.firstName} ${p1.lastName} vs ${p2.firstName} ${p2.lastName} (écart de classement ${p1.category}/${p2.category}).`)
       return { player1Id: p.player1Id, player2Id: p.player2Id, phase, roundNumber: round, scheduledDate, deadlineAt, malus: auto?.malus || null, malusTarget: auto?.malusTarget || null }
     })
@@ -2972,6 +3151,98 @@ function generateBotMatchSets(catBot, catOpp) {
     setNumber++
   }
   return sets
+}
+
+/* ============================================================
+ * ALERTES ADMIN — logs d'anomalies
+ * ============================================================ */
+async function handleAlerts(req, res) {
+  const payload = requireAdmin(req, res)
+  if (!payload) return
+
+  if (req.method === 'GET') {
+    try {
+      // Générer les alertes "score manquant" à la volée (matchs deadline dépassée sans score)
+      const now = new Date()
+      const overdueMatches = await prisma.plannedMatch.findMany({
+        where: {
+          forfeited: false,
+          deadlineAt: { lt: now },
+          notifiedAt: { not: null },
+        },
+        include: {
+          player1: { select: { id: true, firstName: true, lastName: true, username: true } },
+          player2: { select: { id: true, firstName: true, lastName: true, username: true } },
+        },
+        orderBy: { deadlineAt: 'desc' },
+        take: 50,
+      })
+
+      // Vérifier lesquels n'ont pas de match soumis
+      const scoreMissingAlerts = []
+      for (const pm of overdueMatches) {
+        const hasScore = await prisma.match.findFirst({
+          where: {
+            specialMatchId: null,
+            OR: [
+              { userId: pm.player1Id, opponentFirstName: pm.player2.firstName },
+              { userId: pm.player2Id, opponentFirstName: pm.player1.firstName },
+            ],
+            matchDate: { gte: pm.scheduledDate || new Date(0), lte: pm.deadlineAt },
+          },
+        })
+        if (!hasScore) {
+          scoreMissingAlerts.push({
+            type: 'score_missing',
+            message: `Match #${pm.id} : ${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName} — deadline dépassée le ${pm.deadlineAt.toLocaleDateString('fr-FR')} sans score saisi.`,
+            meta: {
+              plannedMatchId: pm.id,
+              player1: { id: pm.player1Id, name: `${pm.player1.firstName} ${pm.player1.lastName}` },
+              player2: { id: pm.player2Id, name: `${pm.player2.firstName} ${pm.player2.lastName}` },
+              deadlineAt: pm.deadlineAt,
+            },
+            createdAt: pm.deadlineAt,
+          })
+        }
+      }
+
+      // Récupérer les alertes persistantes (login échoué, pseudo dupliqué)
+      const stored = await prisma.adminAlert.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      })
+
+      return res.status(200).json({ alerts: [...scoreMissingAlerts, ...stored] })
+    } catch (err) {
+      console.error('[admin/alerts GET]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  if (req.method === 'POST') {
+    const { action, alertId } = req.body || {}
+    if (action === 'mark_read') {
+      const aid = parseInt(alertId, 10)
+      if (isNaN(aid)) return res.status(400).json({ error: 'alertId invalide.' })
+      try {
+        await prisma.adminAlert.update({ where: { id: aid }, data: { read: true } })
+        return res.status(200).json({ ok: true })
+      } catch (err) {
+        return res.status(500).json({ error: 'Erreur serveur.' })
+      }
+    }
+    if (action === 'mark_all_read') {
+      try {
+        await prisma.adminAlert.updateMany({ where: { type: { not: 'score_missing' } }, data: { read: true } })
+        return res.status(200).json({ ok: true })
+      } catch (err) {
+        return res.status(500).json({ error: 'Erreur serveur.' })
+      }
+    }
+    return res.status(400).json({ error: 'Action invalide.' })
+  }
+
+  return res.status(405).json({ error: 'Méthode non autorisée.' })
 }
 
 async function handleBots(req, res) {
@@ -3281,6 +3552,8 @@ async function botDoLogout(task) {
   const loginEventId = task.payload?.loginEventId
   if (!loginEventId) return
   const reason = Math.random() < 0.85 ? 'manual' : 'inactivity'
+  // On utilise task.dueAt comme heure de déconnexion fictive (cohérente avec la session planifiée),
+  // ce qui donne une heure réaliste dans l'historique (ex: connexion 14h03 → déconnexion 14h27).
   await prisma.loginEvent.updateMany({
     where: { id: loginEventId, logoutAt: null },
     data: { logoutAt: task.dueAt, logoutReason: reason },
