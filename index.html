@@ -124,12 +124,11 @@
   }
   .nav-logo-label { font-family: var(--font-display); font-size: 1.4rem; letter-spacing: 0.06em; color: var(--white); }
   .nav-logo-label em { color: var(--orange); font-style: normal; }
-  .nav-links { display: flex; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
-  .nav-links::-webkit-scrollbar { display: none; }
-  .nav-btn { background: none; border: none; cursor: pointer; font-family: var(--font-heading); font-size: 1rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray); padding: 0.5rem 1rem; border-radius: 6px; transition: all 0.2s; position: relative; flex-shrink: 0; }
-  .nav-btn:hover { color: var(--white); }
-  .nav-btn.active { color: var(--orange); }
-  .nav-btn.active::after { content: ''; position: absolute; bottom: 0; left: 1rem; right: 1rem; height: 2px; background: var(--orange); border-radius: 2px; }
+  /* .nav-btn reste la classe "logique" utilisée par showPage()/applyHiddenTabs()
+     pour savoir quel item est actif ou doit être masqué — son habillage visuel
+     réel est maintenant fourni par .dock-item (voir plus bas), ces règles de
+     base ne servent donc plus qu'au comportement, pas au rendu. */
+  .nav-btn { background: none; border: none; cursor: pointer; }
   .nav-user-info { display: none; align-items: center; gap: 0.75rem; flex-shrink: 0; }
   .nav-user-greeting { font-family: var(--font-heading); font-size: 0.92rem; font-weight: 600; letter-spacing: 0.06em; color: var(--gray-light); }
   .nav-user-greeting strong { color: var(--white); }
@@ -894,120 +893,23 @@
      RESPONSIVE / MOBILE
      ═══════════════════════════════════════════════════════════ */
 
-  /* Hamburger button — masqué par défaut (desktop) */
-  .nav-burger { display: none; flex-direction: column; justify-content: center; gap: 5px; width: 42px; height: 42px; background: none; border: none; cursor: pointer; padding: 0; z-index: 210; flex-shrink: 0; }
-  .nav-burger span { display: block; width: 100%; height: 2px; background: var(--white); border-radius: 2px; transition: transform 0.25s ease, opacity 0.25s ease; }
-  .nav-burger[aria-expanded="true"] span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-  .nav-burger[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
-  .nav-burger[aria-expanded="true"] span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
-  .nav-mobile-backdrop { display: none; position: fixed; inset: 0; z-index: 90; background: rgba(0,0,0,0.55); opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
-  .nav-mobile-backdrop.open { opacity: 1; pointer-events: auto; }
-  /* Sur desktop, ce wrapper est transparent au layout : nav-links et nav-user-info
-     se comportent exactement comme avant (enfants directs flex de <nav>). */
-  .nav-mobile-panel { display: contents; }
-
+  /* La barre du haut ne contient plus que le logo + le compte : la navigation
+     entre pages est désormais assurée par le dock flottant (voir plus bas). */
   @media (max-width: 900px) {
-    :root { --nav-h: 72px; }
-    nav { padding: 0 1.1rem; gap: 0.75rem; }
-    .nav-burger { display: flex; }
-    .nav-logo img, .nav-logo-anim { height: 52px; width: 52px; }
-    .nav-logo-label { font-size: 1.05rem; }
+    :root { --nav-h: 68px; }
+    nav { padding: 0 1rem; gap: 0.6rem; }
+    .nav-logo img, .nav-logo-anim { height: 48px; width: 48px; }
+    .nav-logo-label { font-size: 1rem; }
 
-    /* Un seul tiroir plein écran : la liste de pages, puis en bas la zone
-       compte, discrète, dans le même flux (plus de barre séparée qui recouvre). */
-    .nav-mobile-panel {
-      display: flex; flex-direction: column;
-      position: fixed; top: var(--nav-h); left: 0; right: 0; bottom: 0;
-      background: var(--dark2); border-top: 1px solid var(--dark4);
-      transform: translateX(100%); transition: transform 0.28s ease;
-      overflow-y: auto; -webkit-overflow-scrolling: touch;
-      z-index: 100;
-    }
-    #site-nav.nav-open .nav-mobile-panel { transform: translateX(0); }
-
-    .nav-links { flex-direction: column; align-items: stretch; gap: 0; padding: 0.5rem 1rem 0; }
-    .nav-links .nav-btn { text-align: left; width: 100%; padding: 0.95rem 0.5rem; font-size: 1.02rem; border-bottom: 1px solid var(--dark4); border-radius: 0; flex-shrink: 0; }
-    .nav-links .nav-btn.active::after { display: none; }
-    .nav-links .nav-btn.active { background: var(--orange-dim); border-radius: 6px; }
-
-    /* Onglets admin relocalisés dans le tiroir de nav (placeAdminTabs()) : même format
-       que les nav-btn ci-dessus, pour une navbar identique côté admin et côté joueur. */
-    #nav-mobile-panel > .admin-tabs { display: flex; flex-direction: column; align-items: stretch; gap: 0; flex-wrap: nowrap; margin: 0; padding: 0.5rem 1rem 0; }
-    #nav-mobile-panel > .admin-tabs .admin-tab { text-align: left; width: 100%; background: none; border: none; padding: 0.95rem 0.5rem; font-size: 1.02rem; font-weight: 600; border-bottom: 1px solid var(--dark4); border-radius: 0; }
-    #nav-mobile-panel > .admin-tabs .admin-tab.active { background: var(--orange-dim); color: var(--orange); border-radius: 6px; }
-
-    /* Zone compte : discrète, en petit, sans encadré ni ombre, en fin de tiroir */
-    .nav-user-info {
-      flex-shrink: 0; flex-direction: row; align-items: center; justify-content: space-between;
-      flex-wrap: wrap; gap: 0.4rem 0.75rem;
-      margin-top: 0.4rem; padding: 0.9rem 1rem calc(0.9rem + env(safe-area-inset-bottom));
-      border-top: 1px solid var(--dark4);
-    }
-    .nav-user-greeting { font-size: 0.78rem; color: var(--gray); order: 1; flex: 1 1 auto; }
-    .nav-user-greeting strong { color: var(--gray-light); font-weight: 600; }
-    .nav-switch-btn, .nav-logout-btn {
-      order: 2; width: auto; flex-shrink: 0;
-      background: none; border: none; padding: 0.3rem 0.1rem;
-      font-size: 0.72rem; letter-spacing: 0.05em; color: var(--gray);
-      text-decoration: underline; text-decoration-color: var(--dark4);
-    }
-    .nav-switch-btn:hover, .nav-logout-btn:hover { color: var(--orange); text-decoration-color: var(--orange); background: none; }
-
-    body.nav-locked { position: fixed; width: 100%; overflow: hidden; }
+    .nav-user-info { gap: 0.5rem; }
+    .nav-user-greeting { font-size: 0.76rem; }
+    .nav-switch-btn, .nav-logout-btn { padding: 0.35rem 0.6rem; font-size: 0.7rem; }
   }
 
-  @media (max-width: 900px) and (max-height: 480px) {
-    .nav-links .nav-btn { padding: 0.6rem 0.5rem; font-size: 0.92rem; }
-    #nav-mobile-panel > .admin-tabs .admin-tab { padding: 0.6rem 0.5rem; font-size: 0.92rem; }
-    .nav-user-info { padding: 0.5rem 1rem calc(0.5rem + env(safe-area-inset-bottom)); }
+  @media (max-width: 480px) {
+    .nav-logo-label { display: none; }
+    .nav-user-greeting span.player-level { display: none; }
   }
-
-  /* ═══════════════════════════════════════════════════════════
-     NAVBAR — MODE COMPACT FORCÉ (desktop trop étroit)
-     Sur certaines largeurs "ordinateur" (peu de place, beaucoup d'onglets,
-     nom d'utilisateur long…), la navbar peut ne pas tenir sur une seule
-     ligne. checkNavOverflow() (JS) détecte ce débordement réel et ajoute
-     la classe .nav-compact sur <html> : la navbar bascule alors sur le
-     même tiroir hamburger que le mode mobile, avec tout accessible et
-     scrollable, plutôt que de déborder hors de l'écran sans indication.
-     Les règles ci-dessous reprennent exactement celles du mode mobile. ═══ */
-  html.nav-compact { --nav-h: 72px; }
-  html.nav-compact nav { padding: 0 1.1rem; gap: 0.75rem; }
-  html.nav-compact .nav-burger { display: flex; }
-  html.nav-compact .nav-logo img, html.nav-compact .nav-logo-anim { height: 52px; width: 52px; }
-  html.nav-compact .nav-logo-label { font-size: 1.05rem; }
-  html.nav-compact .nav-mobile-panel {
-    display: flex; flex-direction: column;
-    position: fixed; top: var(--nav-h); left: 0; right: 0; bottom: 0;
-    background: var(--dark2); border-top: 1px solid var(--dark4);
-    transform: translateX(100%); transition: transform 0.28s ease;
-    overflow-y: auto; -webkit-overflow-scrolling: touch;
-    z-index: 100;
-  }
-  html.nav-compact #site-nav.nav-open .nav-mobile-panel { transform: translateX(0); }
-  html.nav-compact .nav-links { flex-direction: column; align-items: stretch; gap: 0; padding: 0.5rem 1rem 0; overflow-x: visible; }
-  html.nav-compact .nav-links .nav-btn { text-align: left; width: 100%; padding: 0.95rem 0.5rem; font-size: 1.02rem; border-bottom: 1px solid var(--dark4); border-radius: 0; flex-shrink: 0; }
-  html.nav-compact .nav-links .nav-btn.active::after { display: none; }
-  html.nav-compact .nav-links .nav-btn.active { background: var(--orange-dim); border-radius: 6px; }
-  html.nav-compact #nav-mobile-panel > .admin-tabs { display: flex; flex-direction: column; align-items: stretch; gap: 0; flex-wrap: nowrap; margin: 0; padding: 0.5rem 1rem 0; }
-  html.nav-compact #nav-mobile-panel > .admin-tabs .admin-tab { text-align: left; width: 100%; background: none; border: none; padding: 0.95rem 0.5rem; font-size: 1.02rem; font-weight: 600; border-bottom: 1px solid var(--dark4); border-radius: 0; }
-  html.nav-compact #nav-mobile-panel > .admin-tabs .admin-tab.active { background: var(--orange-dim); color: var(--orange); border-radius: 6px; }
-  html.nav-compact .nav-user-info {
-    flex-shrink: 0; flex-direction: row; align-items: center; justify-content: space-between;
-    flex-wrap: wrap; gap: 0.4rem 0.75rem;
-    margin-top: 0.4rem; padding: 0.9rem 1rem calc(0.9rem + env(safe-area-inset-bottom));
-    border-top: 1px solid var(--dark4);
-  }
-  html.nav-compact .nav-user-greeting { font-size: 0.78rem; color: var(--gray); order: 1; flex: 1 1 auto; }
-  html.nav-compact .nav-user-greeting strong { color: var(--gray-light); font-weight: 600; }
-  html.nav-compact .nav-switch-btn, html.nav-compact .nav-logout-btn {
-    order: 2; width: auto; flex-shrink: 0;
-    background: none; border: none; padding: 0.3rem 0.1rem;
-    font-size: 0.72rem; letter-spacing: 0.05em; color: var(--gray);
-    text-decoration: underline; text-decoration-color: var(--dark4);
-  }
-  html.nav-compact .nav-switch-btn:hover, html.nav-compact .nav-logout-btn:hover { color: var(--orange); text-decoration-color: var(--orange); background: none; }
-  html.nav-compact body.nav-locked { position: fixed; width: 100%; overflow: hidden; }
 
   @media (max-width: 768px) {
     .section { padding: 2.5rem 1.25rem; }
@@ -1155,6 +1057,98 @@
 
   @media (hover: none) and (pointer: coarse) {
     .nav-btn, .btn-sm, .btn-modal-save, .cta-btn, .pdf-btn, .admin-tab, .phase-tab { min-height: 40px; }
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     DOCK — navigation flottante "trajectoire de volant"
+     Desktop (>1100px) : rail vertical flottant à gauche, centré.
+     Mobile/tablette (≤1100px) : capsule flottante horizontale en bas,
+     défilable si le contenu déborde (comme .nav-links auparavant).
+     La barre du haut (#site-nav) ne garde que le logo + le compte ;
+     le dock devient l'unique moyen de changer de page.
+     ═══════════════════════════════════════════════════════════ */
+  /* Le sélecteur générique "nav {...}" (barre du haut) s'applique à TOUT élément
+     <nav>, y compris ce dock — right/height/justify-content/padding doivent donc
+     être explicitement réinitialisés ici pour ne pas hériter de la barre du haut. */
+  nav.dock {
+    position: fixed; left: 1.5rem; right: auto; top: 50%; bottom: auto; transform: translateY(-50%);
+    z-index: 150; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; gap: 0.3rem;
+    height: auto; width: auto;
+    background: rgba(21,21,21,0.72); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--dark4); border-radius: 20px; padding: 0.55rem;
+  }
+  .dock-brand {
+    width: 42px; height: 42px; border-radius: 13px; display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-weight: 400; font-size: 1.15rem; color: var(--orange);
+    border-bottom: 1px solid var(--dark4); margin-bottom: 0.3rem; padding-bottom: 0.55rem; flex-shrink: 0;
+  }
+  .dock-item {
+    position: relative; width: 42px; height: 42px; border-radius: 13px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: none; cursor: pointer; color: var(--gray);
+    transition: color 0.2s, background 0.2s; padding: 0;
+  }
+  .dock-item svg { width: 19px; height: 19px; stroke: currentColor; fill: none; stroke-width: 1.8; transition: transform 0.25s; }
+  .dock-item:hover { color: var(--gray-light); background: var(--dark4); }
+  .dock-item.active { color: var(--orange); background: none; }
+  .dock-item.active svg { transform: scale(1.08); }
+  .dock-item[style*="display: none"] { display: none !important; }
+
+  .dock-label {
+    position: absolute; left: calc(100% + 12px); top: 50%; transform: translateY(-50%) translateX(-6px);
+    font-family: var(--font-heading); font-size: 0.76rem; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase;
+    background: var(--dark3); border: 1px solid var(--dark4); color: var(--white);
+    padding: 0.4rem 0.75rem; border-radius: 8px; white-space: nowrap;
+    opacity: 0; pointer-events: none; transition: opacity 0.18s, transform 0.18s;
+  }
+  .dock-item:hover .dock-label { opacity: 1; transform: translateY(-50%) translateX(0); }
+
+  .dock-item::after {
+    content: ''; position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%);
+    width: 0; height: 2px; border-radius: 2px;
+    background-image: repeating-linear-gradient(90deg, var(--orange) 0 4px, transparent 4px 7px);
+    transition: width 0.3s ease;
+  }
+  .dock-item.active::after { width: 22px; }
+
+  .dock-item .dock-badge {
+    position: absolute; top: 1px; right: 1px; min-width: 15px; height: 15px; padding: 0 3px;
+    background: var(--orange); color: #000; border-radius: 8px;
+    font-family: var(--font-heading); font-size: 0.6rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; line-height: 1; border: none;
+  }
+
+  .shuttle {
+    position: fixed; z-index: 160; width: 20px; height: 20px; pointer-events: none;
+    left: 0; top: 0; opacity: 0; will-change: transform;
+  }
+  .shuttle svg { width: 100%; height: 100%; filter: drop-shadow(0 0 6px rgba(255,109,0,0.55)); }
+
+  .dock-item:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+
+  @media (max-width: 1100px), (max-height: 560px) {
+    nav.dock {
+      left: 50%; right: auto; top: auto; bottom: 0.9rem; transform: translateX(-50%);
+      flex-direction: row; border-radius: 24px; gap: 0.15rem; padding: 0.4rem;
+      width: auto; max-width: calc(100vw - 1.4rem); height: auto; max-height: none;
+      overflow-x: auto; overflow-y: visible; scroll-snap-type: x proximity;
+    }
+    .dock-brand { display: none; }
+    .dock-item { width: 42px; height: 42px; scroll-snap-align: center; }
+    .dock-label {
+      left: 50%; top: auto; bottom: calc(100% + 10px); transform: translateX(-50%) translateY(4px);
+    }
+    .dock-item:hover .dock-label { transform: translateX(-50%) translateY(0); }
+    .dock-item::after { bottom: 1px; }
+  }
+
+  @media (max-width: 480px) {
+    .dock-item { width: 38px; height: 38px; }
+    .dock-item svg { width: 17px; height: 17px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .shuttle, .dock-item, .dock-item::after, .dock-item svg, .dock-label { transition: none !important; animation: none !important; }
   }
 </style>
 </head>
@@ -1335,13 +1329,13 @@
       <button class="admin-tab" onclick="adminTab('planning',this)">Planification</button>
       <button class="admin-tab" onclick="adminTab('notify',this)">Notifier un joueur</button>
       <button class="admin-tab" onclick="adminTab('planned',this)">Matchs planifiés <span class="badge badge-info" id="badge-planned">–</span></button>
-      <button class="admin-tab" onclick="adminTab('whatsapp',this)">🟢 Communication WhatsApp <span class="badge" id="badge-whatsapp" hidden>–</span></button>
+      <button class="admin-tab" onclick="adminTab('whatsapp',this)">Communication WhatsApp <span class="badge" id="badge-whatsapp" hidden>–</span></button>
       <button class="admin-tab" onclick="adminTab('publication',this)">Publication matchs <span class="badge" id="badge-pending-matches" hidden>–</span></button>
       <button class="admin-tab" onclick="adminTab('notifications-list',this)">Notifications <span class="badge" id="badge-notifs" hidden>–</span></button>
       <button class="admin-tab" onclick="adminTab('faq',this)">FAQ <span class="badge badge-info" id="badge-faq">–</span></button>
       <button class="admin-tab" onclick="adminTab('contact',this)">Contacts <span class="badge" id="badge-contact" hidden>–</span></button>
       <button class="admin-tab" onclick="adminTab('other-actions',this)">Actions autres <span class="badge" hidden>–</span></button>
-      <button class="admin-tab" onclick="adminTab('alerts',this)">🔴 Alertes <span class="badge" id="badge-alerts" hidden>–</span></button>
+      <button class="admin-tab" onclick="adminTab('alerts',this)">Alertes <span class="badge" id="badge-alerts" hidden>–</span></button>
     </div>
 
     <!-- Utilisateurs -->
@@ -1567,7 +1561,7 @@
     <!-- Communication WhatsApp -->
     <div id="admin-whatsapp" class="admin-section">
       <div class="admin-section-header">
-        <h3>🟢 Communication WhatsApp</h3>
+        <h3>Communication WhatsApp</h3>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
           <button class="btn-sm btn-edit" onclick="openWhatsappTemplatesModal()">✎ Modifier les messages types</button>
           <button class="btn-sm btn-danger" onclick="deleteAllWhatsappMessages()">🗑 Tout supprimer</button>
@@ -1769,7 +1763,7 @@
     <!-- ALERTES ADMIN -->
     <div id="admin-alerts" class="admin-section">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:0.75rem">
-        <h3 style="font-family:var(--font-heading);font-size:1.2rem;font-weight:700;letter-spacing:0.06em;margin:0">🔴 Alertes admin</h3>
+        <h3 style="font-family:var(--font-heading);font-size:1.2rem;font-weight:700;letter-spacing:0.06em;margin:0">Alertes admin</h3>
         <button class="btn-sm btn-edit" onclick="markAllAlertsRead()">Tout marquer comme lu</button>
       </div>
       <div id="alerts-filter" style="display:flex;gap:0.6rem;margin-bottom:1rem;flex-wrap:wrap">
@@ -2270,29 +2264,68 @@
     </span>
     <span class="nav-logo-label">Le Choc des <em>Renards</em></span>
   </a>
-  <button class="nav-burger" id="nav-burger" aria-label="Ouvrir le menu" aria-expanded="false" onclick="toggleMobileNav()">
-    <span></span><span></span><span></span>
-  </button>
-  <div class="nav-mobile-panel" id="nav-mobile-panel">
-    <div class="nav-links" id="nav-links">
-      <button class="nav-btn active" onclick="showPage('accueil',this);closeMobileNav()">Accueil</button>
-      <button class="nav-btn" onclick="showPage('reglement',this);closeMobileNav()">Charte</button>
-      <button class="nav-btn" data-tab="faq" onclick="showPage('faq',this);closeMobileNav()">FAQ</button>
-      <button class="nav-btn" data-tab="contact" onclick="showPage('contact',this);closeMobileNav()">Contact</button>
-      <button class="nav-btn" data-tab="ranking" onclick="showPage('classement',this);closeMobileNav()">Classement</button>
-      <button class="nav-btn" data-tab="performances" onclick="showPage('performances',this);closeMobileNav()">Performances</button>
-      <button class="nav-btn" data-tab="gallery" onclick="showPage('souvenirs',this);closeMobileNav()">Souvenirs</button>
-      <button class="nav-btn" onclick="showPage('mes-notifs',this);closeMobileNav()">Messages</button>
-      <button class="nav-btn" data-tab="matches" onclick="showPage('score-match',this);closeMobileNav()">Score du match <span class="badge" id="badge-score-match" hidden>–</span></button>
-    </div>
-    <div class="nav-user-info" id="nav-user">
-      <span class="nav-user-greeting">Salut, <strong id="nav-user-name"></strong> <span id="nav-user-badge" class="player-level"></span></span>
-      <button class="nav-switch-btn" id="nav-switch-btn" onclick="switchAccount();closeMobileNav()" style="display:none"></button>
-      <button class="nav-logout-btn" onclick="logout();closeMobileNav()">Déconnexion</button>
-    </div>
+  <div class="nav-user-info" id="nav-user">
+    <span class="nav-user-greeting">Salut, <strong id="nav-user-name"></strong> <span id="nav-user-badge" class="player-level"></span></span>
+    <button class="nav-switch-btn" id="nav-switch-btn" onclick="switchAccount()" style="display:none"></button>
+    <button class="nav-logout-btn" onclick="logout()">Déconnexion</button>
   </div>
 </nav>
-<div class="nav-mobile-backdrop" id="nav-mobile-backdrop" onclick="closeMobileNav()"></div>
+
+<!-- ══════════ DOCK DE NAVIGATION ══════════ -->
+<nav class="dock" id="dock" aria-label="Navigation principale">
+  <div class="dock-brand" aria-hidden="true">R</div>
+
+  <button class="nav-btn dock-item active" onclick="showPage('accueil',this)" aria-label="Accueil">
+    <span class="dock-label">Accueil</span>
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+  </button>
+
+  <button class="nav-btn dock-item" data-tab="ranking" onclick="showPage('classement',this)" aria-label="Classement">
+    <span class="dock-label">Classement</span>
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"/><path d="M12 20V4"/><path d="M20 20v-6"/></svg>
+  </button>
+
+  <button class="nav-btn dock-item" data-tab="matches" onclick="showPage('score-match',this)" aria-label="Score du match">
+    <span class="dock-label">Score du match</span>
+    <span class="badge dock-badge" id="badge-score-match" hidden>–</span>
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="3"/><path d="M12 10c-1 3-1 3 3 6l4-4c-3-3-3-3-6-3"/><path d="M15 15l4 4"/></svg>
+  </button>
+
+  <button class="nav-btn dock-item" data-tab="performances" onclick="showPage('performances',this)" aria-label="Performances">
+    <span class="dock-label">Performances</span>
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 9-9"/><path d="M14 7h7v7"/></svg>
+  </button>
+
+  <button class="nav-btn dock-item" data-tab="gallery" onclick="showPage('souvenirs',this)" aria-label="Souvenirs">
+    <span class="dock-label">Souvenirs</span>
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M21 16l-5-4-4 3-3-2-6 5"/></svg>
+  </button>
+
+  <button class="nav-btn dock-item" onclick="showPage('reglement',this)" aria-label="Charte">
+    <span class="dock-label">Charte</span>
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h8l4 4v14H7z"/><path d="M14 3v5h5"/><path d="M9 13h7M9 17h7M9 9h3"/></svg>
+  </button>
+
+  <button class="nav-btn dock-item" data-tab="faq" onclick="showPage('faq',this)" aria-label="FAQ">
+    <span class="dock-label">FAQ</span>
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .5c0 1.5-2 1.8-2 3.3"/><circle cx="12" cy="17" r="0.4" fill="currentColor" stroke="none"/></svg>
+  </button>
+
+  <button class="nav-btn dock-item" onclick="showPage('mes-notifs',this)" aria-label="Messages">
+    <span class="dock-label">Messages</span>
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+  </button>
+
+  <button class="nav-btn dock-item" data-tab="contact" onclick="showPage('contact',this)" aria-label="Contact">
+    <span class="dock-label">Contact</span>
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+  </button>
+</nav>
+
+<!-- ══════════ VOLANT ANIMÉ (transition entre pages) ══════════ -->
+<div class="shuttle" id="shuttle" aria-hidden="true">
+  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="#FF6D00"/><path d="M12 7 L8 2 M12 7 L16 2 M12 7 L12 1" stroke="#FF9200" stroke-width="1.4" stroke-linecap="round"/></svg>
+</div>
 
 <!-- PAGE ACCUEIL -->
 <div id="page-accueil" class="page active">
@@ -5649,7 +5682,7 @@ function setNotifyChannel(channel) {
   const titleGroup = document.getElementById('notify-title').closest('.form-group')
   titleGroup.style.display = channel === 'whatsapp' ? 'none' : ''
   document.getElementById('notify-vars-hint').style.display = channel === 'whatsapp' ? 'block' : 'none'
-  document.getElementById('notify-submit-btn').textContent = channel === 'whatsapp' ? '🟢 Générer les boutons WhatsApp' : 'Envoyer la notification'
+  document.getElementById('notify-submit-btn').textContent = channel === 'whatsapp' ? 'Générer les boutons WhatsApp' : 'Envoyer la notification'
   if (channel === 'whatsapp' && !document.getElementById('notify-vars-list').dataset.loaded) {
     fetch('/api/admin/whatsapp', { headers: authHeaders() }).then(r => r.json()).then(d => {
       document.getElementById('notify-vars-list').textContent = (d.variables || []).map(v => `[${v}]`).join(' · ')
@@ -7338,88 +7371,18 @@ function animateHero() {
 }
 window.addEventListener('load', animateHero)
 
-/* ── Menu mobile (hamburger) ── */
-let _navScrollY = 0
-function toggleMobileNav() {
-  const nav = document.getElementById('site-nav')
-  const burger = document.getElementById('nav-burger')
-  const opening = !nav.classList.contains('nav-open')
-  nav.classList.toggle('nav-open', opening)
-  burger.setAttribute('aria-expanded', opening ? 'true' : 'false')
-  document.getElementById('nav-mobile-backdrop').classList.toggle('open', opening)
-  if (opening) {
-    _navScrollY = window.scrollY || document.documentElement.scrollTop || 0
-    document.body.style.top = (-_navScrollY) + 'px'
-    document.body.classList.add('nav-locked')
-  } else {
-    document.body.classList.remove('nav-locked')
-    document.body.style.top = ''
-    window.scrollTo(0, _navScrollY)
-  }
-}
-function closeMobileNav() {
-  const nav = document.getElementById('site-nav')
-  if (!nav.classList.contains('nav-open')) return
-  nav.classList.remove('nav-open')
-  document.getElementById('nav-burger').setAttribute('aria-expanded', 'false')
-  document.getElementById('nav-mobile-backdrop').classList.remove('open')
-  document.body.classList.remove('nav-locked')
-  document.body.style.top = ''
-  window.scrollTo(0, _navScrollY)
-}
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMobileNav() })
-window.addEventListener('resize', () => { if (window.innerWidth > 900) closeMobileNav() })
+/* ── Ex-menu mobile (hamburger) ── remplacé par le dock flottant : la navigation
+   entre pages ne passe plus par un tiroir, donc plus rien à ouvrir/fermer.
+   Fonctions gardées en no-op sûr au cas où un appel résiduel subsisterait
+   quelque part (ex: closeMobileNav() après switchAccount()/logout()). ── */
+function toggleMobileNav() {}
+function closeMobileNav() {}
 
-/* ── Panel admin : sur mobile, les onglets admin rejoignent le tiroir de nav ──
- * (même format de navbarre que côté joueur : un seul hamburger, un seul tiroir).
- * On déplace le vrai nœud DOM (pas de copie) pour ne jamais dupliquer les IDs
- * des badges (badge-users, badge-pending, etc.) et garder adminTab() valide. */
-/* ── Débordement réel de la navbar : bascule en mode compact (tiroir) dès que
-   le contenu ne tient plus sur une ligne, quelle que soit la largeur d'écran
-   (nom d'utilisateur long, admin + beaucoup d'onglets, zoom navigateur…),
-   au lieu de laisser un défilement invisible et inaccessible. ── */
-function checkNavOverflow() {
-  const nav = document.getElementById('site-nav')
-  const navLinks = document.getElementById('nav-links')
-  if (!nav || !navLinks) return
-  // En dessous de 900px, le vrai mode mobile (media query) gère déjà tout.
-  if (window.innerWidth <= 900) { document.documentElement.classList.remove('nav-compact'); return }
-  // On repart d'un état "normal" pour mesurer la largeur réellement nécessaire.
-  document.documentElement.classList.remove('nav-compact')
-  // Important : c'est .nav-links (pas <nav>) qu'il faut mesurer. Comme elle peut
-  // défiler horizontalement en interne (filet de sécurité), un débordement de son
-  // contenu ne fait JAMAIS grandir le scrollWidth de <nav> — il faut donc vérifier
-  // le débordement propre à .nav-links elle-même.
-  const overflowing = navLinks.scrollWidth > navLinks.clientWidth + 1
-  if (overflowing) document.documentElement.classList.add('nav-compact')
-  placeAdminTabs()
-}
-let _navOverflowTimer = null
-function scheduleNavOverflowCheck() {
-  clearTimeout(_navOverflowTimer)
-  _navOverflowTimer = setTimeout(checkNavOverflow, 100)
-}
-window.addEventListener('resize', scheduleNavOverflowCheck)
-window.addEventListener('load', checkNavOverflow)
-if (document.fonts && document.fonts.ready) document.fonts.ready.then(checkNavOverflow)
-
-function placeAdminTabs() {
-  const tabs = document.getElementById('admin-tabs')
-  const anchor = document.getElementById('admin-tabs-anchor')
-  const navLinks = document.getElementById('nav-links')
-  const mobilePanel = document.getElementById('nav-mobile-panel')
-  if (!tabs || !anchor || !navLinks || !mobilePanel) return
-  const isAdmin = currentUser && currentUser.role === 'ADMIN'
-  const isMobile = window.innerWidth <= 900 || document.documentElement.classList.contains('nav-compact')
-  if (isAdmin && isMobile) {
-    navLinks.style.display = 'none'
-    if (tabs.parentElement !== mobilePanel) mobilePanel.insertBefore(tabs, navLinks)
-  } else {
-    navLinks.style.display = ''
-    if (tabs.parentElement !== anchor.parentElement) anchor.insertAdjacentElement('afterend', tabs)
-  }
-}
-window.addEventListener('resize', placeAdminTabs)
+/* ── Onglets admin : restent affichés tels quels dans le panneau admin
+   (déjà responsive, ils passent à la ligne sur petit écran) — ils ne
+   rejoignent plus de tiroir de nav, celui-ci n'existant plus. ── */
+function checkNavOverflow() {}
+function placeAdminTabs() {}
 
 /* ── Logo animé de la nav (renard qui frappe le volant) : joué au chargement et au survol ── */
 ;(function () {
@@ -7448,6 +7411,49 @@ window.addEventListener('resize', placeAdminTabs)
 
   window.addEventListener('load', () => setTimeout(playLogoAnim, 300))
   el.addEventListener('mouseenter', playLogoAnim)
+})()
+
+/* ── Dock de navigation : le volant "vole" en arc de l'item actif vers l'item
+   cliqué, comme dans la maquette. showPage() (déjà existant) gère le
+   changement de page réel ; on se contente ici d'habiller la transition. ── */
+;(function () {
+  const dock = document.getElementById('dock')
+  const shuttle = document.getElementById('shuttle')
+  if (!dock || !shuttle) return
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  function centerOf(el) {
+    const r = el.getBoundingClientRect()
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+  }
+
+  function flyShuttleTo(fromEl, toEl) {
+    if (reduceMotion || !fromEl || !toEl || fromEl === toEl) return
+    const from = centerOf(fromEl)
+    const to = centerOf(toEl)
+    const midX = (from.x + to.x) / 2
+    const midY = Math.min(from.y, to.y) - 46
+
+    shuttle.style.opacity = '1'
+    const anim = shuttle.animate([
+      { transform: `translate(${from.x - 10}px, ${from.y - 10}px) scale(0.85)`, offset: 0 },
+      { transform: `translate(${midX - 10}px, ${midY - 10}px) scale(1.15) rotate(160deg)`, offset: 0.55 },
+      { transform: `translate(${to.x - 10}px, ${to.y - 8}px) scale(1.05) rotate(300deg)`, offset: 0.85 },
+      { transform: `translate(${to.x - 10}px, ${to.y - 10}px) scale(1) rotate(340deg)`, offset: 1 },
+    ], { duration: 480, easing: 'cubic-bezier(.22,.61,.36,1)' })
+    anim.onfinish = () => { shuttle.style.opacity = '0' }
+  }
+
+  // Capture : on lit l'item actif AVANT que showPage() (déclenché par le même
+  // clic, en phase bulle) ne déplace la classe .active vers l'item cliqué.
+  dock.addEventListener('click', (e) => {
+    const toItem = e.target.closest('.dock-item')
+    if (!toItem) return
+    const fromItem = dock.querySelector('.dock-item.active')
+    flyShuttleTo(fromItem, toItem)
+  }, true)
+
+  window.addEventListener('resize', () => { shuttle.style.opacity = '0' })
 })()
 </script>
 <!-- LIGHTBOX -->
