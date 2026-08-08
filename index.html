@@ -5898,10 +5898,11 @@ async function saveFaqTopic() {
 
 async function toggleFaqPublish(topicId) {
   try {
-    const r = await apiFetch('/api/admin/faq', { method: 'POST', body: JSON.stringify({ action: 'toggle_publish', topicId }) })
+    const r = await fetch('/api/admin/faq', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'toggle_publish', topicId }) })
     if (!r.ok) return
+    const data = await r.json()
     const topic = faqAdminTopics.find(t => t.id === topicId)
-    if (topic) { topic.published = r.published }
+    if (topic) { topic.published = data.published }
     renderFaqAdminList()
   } catch (e) { console.error('[toggleFaqPublish]', e) }
 }
