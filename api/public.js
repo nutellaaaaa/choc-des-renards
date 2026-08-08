@@ -96,8 +96,10 @@ async function handleFaq(req, res) {
 
   if (req.method === 'GET') {
     try {
+      const LINKED_USERNAMES = ['yanis', 'alexandre']
+      const canSeeAll = LINKED_USERNAMES.includes((auth.username || '').toLowerCase())
       const topics = await prisma.faqTopic.findMany({
-        where: { published: true },
+        where: canSeeAll ? {} : { published: true },
         orderBy: { order: 'asc' },
         include: {
           items: { orderBy: { order: 'asc' } },
@@ -108,6 +110,7 @@ async function handleFaq(req, res) {
       const result = topics.map(t => ({
         id: t.id,
         question: t.question,
+        published: t.published,
         items: t.items.map(i => ({ id: i.id, subtitle: i.subtitle, content: i.content })),
         userVote: t.votes.length > 0 ? t.votes[0].useful : null,
       }))

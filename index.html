@@ -2215,13 +2215,13 @@
     <div class="nav-links" id="nav-links">
       <button class="nav-btn active" onclick="showPage('accueil',this);closeMobileNav()">Accueil</button>
       <button class="nav-btn" onclick="showPage('reglement',this);closeMobileNav()">Charte</button>
-      <button class="nav-btn" onclick="showPage('faq',this);closeMobileNav()">FAQ</button>
-      <button class="nav-btn" onclick="showPage('contact',this);closeMobileNav()">Contact</button>
-      <button class="nav-btn" onclick="showPage('classement',this);closeMobileNav()">Classement</button>
-      <button class="nav-btn" onclick="showPage('performances',this);closeMobileNav()">Performances</button>
-      <button class="nav-btn" onclick="showPage('souvenirs',this);closeMobileNav()">Souvenirs</button>
+      <button class="nav-btn" data-tab="faq" onclick="showPage('faq',this);closeMobileNav()">FAQ</button>
+      <button class="nav-btn" data-tab="contact" onclick="showPage('contact',this);closeMobileNav()">Contact</button>
+      <button class="nav-btn" data-tab="ranking" onclick="showPage('classement',this);closeMobileNav()">Classement</button>
+      <button class="nav-btn" data-tab="performances" onclick="showPage('performances',this);closeMobileNav()">Performances</button>
+      <button class="nav-btn" data-tab="gallery" onclick="showPage('souvenirs',this);closeMobileNav()">Souvenirs</button>
       <button class="nav-btn" onclick="showPage('mes-notifs',this);closeMobileNav()">Messages</button>
-      <button class="nav-btn" onclick="showPage('score-match',this);closeMobileNav()">Score du match <span class="badge" id="badge-score-match" hidden>–</span></button>
+      <button class="nav-btn" data-tab="matches" onclick="showPage('score-match',this);closeMobileNav()">Score du match <span class="badge" id="badge-score-match" hidden>–</span></button>
     </div>
     <div class="nav-user-info" id="nav-user">
       <span class="nav-user-greeting">Salut, <strong id="nav-user-name"></strong> <span id="nav-user-badge" class="player-level"></span></span>
@@ -2720,6 +2720,7 @@ function showApp() {
   } else {
     document.getElementById('admin-panel').classList.remove('active')
     document.querySelectorAll('.nav-btn').forEach(b => b.style.display = '')
+    applyHiddenTabs()
     startInactivityTimer()
     loadHomeStats()
     loadConvocationsBadge()
@@ -3838,10 +3839,7 @@ async function loadFaq() {
   const container = document.getElementById('faq-content')
   container.innerHTML = '<div class="admin-empty">Chargement…</div>'
   try {
-    const uname = (currentUser?.username || '').toLowerCase()
-    const isLinked = Object.values(LINKED_USERNAMES).includes(uname)
-    const faqEndpoint = isLinked ? '/api/admin/faq' : '/api/faq'
-    const res = await fetch(faqEndpoint, { headers: authHeaders() })
+    const res = await fetch('/api/faq', { headers: authHeaders() })
     if (!res.ok) { container.innerHTML = '<div class="admin-empty">Impossible de charger la FAQ.</div>'; return }
     const { topics } = await res.json()
     faqTopicsCache = topics || []
@@ -3965,6 +3963,9 @@ async function loadSpecials() {
     const section = document.getElementById('specials-section')
     const list = document.getElementById('specials-list')
     if (!specials || specials.length === 0) { section.style.display = 'none'; return }
+    const uname = (currentUser?.username || '').toLowerCase()
+    const isLinked = Object.values(LINKED_USERNAMES).includes(uname)
+    if (!isLinked && _hiddenTabs.includes('specials')) { section.style.display = 'none'; return }
     section.style.display = 'block'
     list.innerHTML = specials.map(sm => `
       <div class="special-card">
@@ -6708,6 +6709,31 @@ async function saveHiddenTabs() {
   } catch { showFeedback('other-actions-feedback', '✗ Erreur réseau.', false) }
 }
 
+function applyHiddenTabs() {
+  // Yanis et Alexandre (comptes liés aux admins) voient toujours tout
+  const uname = (currentUser?.username || '').toLowerCase()
+  const isLinked = Object.values(LINKED_USERNAMES).includes(uname)
+  const hidden = isLinked ? [] : _hiddenTabs
+
+  // Boutons nav avec data-tab
+  document.querySelectorAll('.nav-btn[data-tab]').forEach(btn => {
+    const key = btn.dataset.tab
+    btn.style.display = hidden.includes(key) ? 'none' : ''
+  })
+
+  // Section "Rencontres en cours" dans la page classement
+  const specialsSection = document.getElementById('specials-section')
+  if (specialsSection) {
+    if (hidden.includes('specials')) {
+      specialsSection.style.display = 'none'
+    } else {
+      specialsSection.style.display = ''
+    }
+  }
+
+  checkNavOverflow()
+}
+
 /* ── Gestion des malus ── */
 let _malusList = []
 function renderMalusConfig() {
@@ -6831,6 +6857,7 @@ async function loadOtherActionsConfig() {
     // Onglets
     _hiddenTabs = data.hiddenTabs || []
     renderTabsVisibility()
+    applyHiddenTabs()
     // Rappels auto
     _autoRemindersEnabled = data.autoRemindersEnabled ?? true
     updateAutoReminderBtn()
