@@ -56,13 +56,22 @@ const DEFAULT_MALUS_LIST = [
 // Alias rétrocompatible (utilisé dans les endroits qui lisent MALUS_LIST statiquement)
 let MALUS_LIST = [...DEFAULT_MALUS_LIST]
 
-/** Charge la liste des malus depuis la DB (malusConfig). Retourne DEFAULT_MALUS_LIST si vide. */
+/** Charge la liste des malus depuis la DB (malusConfig). Retourne DEFAULT_MALUS_LIST si vide.
+ *  Le format stocké peut être un tableau de strings (ancien) ou d'objets {text, enabled}.
+ *  Cette fonction retourne uniquement les malus actifs (enabled !== false), sous forme de strings. */
 async function loadMalusList() {
   try {
     const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
     if (state?.malusConfig) {
       const cfg = JSON.parse(state.malusConfig)
-      if (Array.isArray(cfg) && cfg.length > 0) return cfg
+      if (Array.isArray(cfg) && cfg.length > 0) {
+        // Nouveau format : [{text, enabled}]
+        if (cfg[0] && typeof cfg[0] === 'object' && 'text' in cfg[0]) {
+          return cfg.filter(m => m.enabled !== false).map(m => m.text)
+        }
+        // Ancien format : strings — rétrocompatible
+        return cfg
+      }
     }
   } catch {}
   return DEFAULT_MALUS_LIST
@@ -1195,12 +1204,19 @@ async function handleAction(req, res) {
         case 'update_malus_config': {
           const { malusList: newList } = req.body || {}
           if (!Array.isArray(newList)) return res.status(400).json({ error: 'malusList (array) requis.' })
-          const cleaned = newList.map(s => String(s).trim()).filter(s => s.length > 0)
-          if (cleaned.length === 0) return res.status(400).json({ error: 'La liste de malus ne peut pas être vide.' })
+          // Accepte le nouveau format [{text, enabled}] ou l'ancien [strings]
+          const normalized = newList.map(item => {
+            if (typeof item === 'string') return { text: item.trim(), enabled: true }
+            return { text: String(item.text || '').trim(), enabled: item.enabled !== false }
+          }).filter(m => m.text.length > 0)
+          if (normalized.length === 0) return res.status(400).json({ error: 'La liste de malus ne peut pas être vide.' })
+          const cleaned = normalized // objets {text, enabled}
+          const activeTexts = cleaned.filter(m => m.enabled).map(m => m.text)
+          if (activeTexts.length === 0) return res.status(400).json({ error: 'Au moins un malus doit être actif.' })
 
-          // Trouver les malus supprimés et réassigner les matchs planifiés qui les utilisaient
-          const currentList = await loadMalusList()
-          const removed = currentList.filter(m => !cleaned.includes(m))
+          // Trouver les malus qui ne sont plus actifs (supprimés ou désactivés) et réassigner
+          const currentList = await loadMalusList() // strings actifs actuels
+          const removed = currentList.filter(m => !activeTexts.includes(m))
 
           let reassigned = 0
           if (removed.length > 0) {
@@ -1209,13 +1225,13 @@ async function handleAction(req, res) {
               include: { player1: { select: { firstName: true, lastName: true } }, player2: { select: { firstName: true, lastName: true } } },
             })
             for (const pm of affectedMatches) {
-              const newMalus = cleaned[Math.floor(Math.random() * cleaned.length)]
+              const newMalus = activeTexts[Math.floor(Math.random() * activeTexts.length)]
               await prisma.plannedMatch.update({ where: { id: pm.id }, data: { malus: newMalus } })
               await prisma.schedulingLog.create({
                 data: {
                   phase: pm.phase,
                   type: 'avertissement',
-                  message: `Malus modifié automatiquement pour le match #${pm.id} (${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}) : l'ancien malus a été supprimé de la liste. Nouveau malus attribué : « ${newMalus} ».`,
+                  message: `Malus modifié automatiquement pour le match #${pm.id} (${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}) : l'ancien malus est désactivé ou supprimé. Nouveau malus attribué : « ${newMalus} ».`,
                 },
               })
               reassigned++
@@ -1230,7 +1246,7 @@ async function handleAction(req, res) {
 
           return res.status(200).json({
             ok: true,
-            malusList: cleaned,
+            malusList: cleaned, // objets {text, enabled}
             reassigned,
             message: `Liste de malus mise à jour (${cleaned.length} entrée(s))${reassigned > 0 ? `. ${reassigned} match(s) planifié(s) réassigné(s) — voir la console de planification.` : '.'}`,
           })
@@ -1449,11 +1465,28 @@ async function handleMatch(req, res) {
           },
         }),
       ])
-      const dynamicMalusList = await loadMalusList()
       const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
+      // malusListFull : objets {text, enabled} pour l'UI admin
+      // malusList : strings actifs pour la planification (rétrocompatibilité)
+      let malusListFull = []
+      if (state?.malusConfig) {
+        try {
+          const cfg = JSON.parse(state.malusConfig)
+          if (Array.isArray(cfg) && cfg.length > 0) {
+            if (typeof cfg[0] === 'object' && 'text' in cfg[0]) {
+              malusListFull = cfg
+            } else {
+              malusListFull = cfg.map(t => ({ text: t, enabled: true }))
+            }
+          }
+        } catch {}
+      }
+      if (malusListFull.length === 0) malusListFull = DEFAULT_MALUS_LIST.map(t => ({ text: t, enabled: true }))
+      const dynamicMalusList = malusListFull.filter(m => m.enabled !== false).map(m => m.text)
       return res.status(200).json({
         pending, published, activeUsers, openSpecials, planned,
-        malusList: dynamicMalusList,
+        malusList: malusListFull,
+        defaultMalusList: DEFAULT_MALUS_LIST,
         autoRemindersEnabled: state?.autoRemindersEnabled ?? true,
         hiddenTabs: JSON.parse(state?.hiddenTabs || '[]'),
       })

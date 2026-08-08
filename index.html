@@ -6119,7 +6119,8 @@ async function loadPlannedMatches() {
     const { planned, activeUsers: au, malusList: ml } = await res.json()
     activeUsers = au || []
     plannedData = planned || []
-    malusList = ml || []
+    // malusList pour les selects : on ne garde que les textes des malus actifs
+    malusList = (ml || []).filter(m => typeof m === 'string' ? true : m.enabled !== false).map(m => typeof m === 'string' ? m : m.text)
     setBadge('badge-planned', plannedData.length)
     if (plannedData.length === 0) {
       list.innerHTML = '<div class="admin-empty">Aucun match planifié. Cliquez sur "+ Planifier un match".</div>'
@@ -6735,38 +6736,52 @@ function applyHiddenTabs() {
 }
 
 /* ── Gestion des malus ── */
-let _malusList = []
+let _malusList = [] // [{text, enabled}]
 function renderMalusConfig() {
   const container = document.getElementById('malus-config-list')
   if (!container) return
-  container.innerHTML = _malusList.map((m, i) => `
-    <div style="display:flex;gap:0.5rem;align-items:center">
-      <input type="text" value="${esc(m)}" data-malus-idx="${i}" style="flex:1;background:var(--dark2);border:1px solid var(--dark4);border-radius:6px;color:var(--white);padding:0.4rem 0.75rem;font-family:var(--font-body);font-size:0.88rem" oninput="_malusList[${i}]=this.value">
-      <button class="btn-sm btn-danger" onclick="removeMalusItem(${i})" title="Supprimer ce malus">✕</button>
-    </div>
-  `).join('')
+  container.innerHTML = _malusList.map((m, i) => {
+    const enabled = m.enabled !== false
+    return `
+    <div style="display:flex;gap:0.5rem;align-items:center;opacity:${enabled ? '1' : '0.5'}">
+      <input type="text" value="${esc(m.text)}" data-malus-idx="${i}"
+        style="flex:1;background:var(--dark2);border:1px solid ${enabled ? 'var(--dark4)' : '#555'};border-radius:6px;color:${enabled ? 'var(--white)' : 'var(--gray)'};padding:0.4rem 0.75rem;font-family:var(--font-body);font-size:0.88rem;text-decoration:${enabled ? 'none' : 'line-through'}"
+        oninput="_malusList[${i}].text=this.value">
+      <button class="btn-sm ${enabled ? 'btn-edit' : 'btn-add'}" onclick="toggleMalusItem(${i})" title="${enabled ? 'Désactiver ce malus' : 'Réactiver ce malus'}" style="min-width:90px">${enabled ? '⏸ Désactiver' : '▶ Réactiver'}</button>
+      <button class="btn-sm btn-danger" onclick="removeMalusItem(${i})" title="Supprimer définitivement ce malus">✕</button>
+    </div>`
+  }).join('')
 }
 function addMalusItem() {
-  _malusList.push('')
+  _malusList.push({ text: '', enabled: true })
   renderMalusConfig()
-  // Focus le dernier input
   const inputs = document.querySelectorAll('#malus-config-list input[type=text]')
   if (inputs.length) inputs[inputs.length - 1].focus()
+}
+function toggleMalusItem(idx) {
+  _malusList[idx].enabled = !(_malusList[idx].enabled !== false)
+  renderMalusConfig()
 }
 function removeMalusItem(idx) {
   _malusList.splice(idx, 1)
   renderMalusConfig()
 }
 async function saveMalusConfig() {
-  // Relire les valeurs actuelles des inputs (en cas d'édition directe)
+  // Relire les valeurs actuelles des inputs
   const inputs = document.querySelectorAll('#malus-config-list input[type=text]')
-  const malusList = [...inputs].map(i => i.value.trim()).filter(v => v.length > 0)
+  inputs.forEach(inp => {
+    const idx = parseInt(inp.dataset.malusIdx, 10)
+    if (!isNaN(idx) && _malusList[idx]) _malusList[idx].text = inp.value.trim()
+  })
+  const malusList = _malusList.filter(m => m.text.length > 0)
+  const activeCount = malusList.filter(m => m.enabled !== false).length
   if (malusList.length === 0) return alert('La liste de malus ne peut pas être vide.')
-  if (!confirm(`Enregistrer la liste de malus (${malusList.length} entrée(s)) ?`)) return
+  if (activeCount === 0) return alert('Au moins un malus doit être actif.')
+  if (!confirm(`Enregistrer la liste de malus (${malusList.length} entrée(s), dont ${activeCount} actif(s)) ?`)) return
   try {
     const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'update_malus_config', malusList }) })
     const data = await res.json()
-    if (res.ok) { _malusList = malusList; renderMalusConfig(); showFeedback('other-actions-feedback', '✓ ' + data.message, true) }
+    if (res.ok) { _malusList = data.malusList || malusList; renderMalusConfig(); showFeedback('other-actions-feedback', '✓ ' + data.message, true) }
     else showFeedback('other-actions-feedback', '✗ ' + data.error, false)
   } catch { showFeedback('other-actions-feedback', '✗ Erreur réseau.', false) }
 }
@@ -6776,11 +6791,11 @@ async function resetMalusConfig() {
     const res = await fetch('/api/admin/match', { headers: authHeaders() })
     if (!res.ok) return
     const data = await res.json()
-    // loadMalusList retourne DEFAULT_MALUS_LIST si malusConfig est vide — on envoie une liste vide pour forcer le reset
-    const saveRes = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'update_malus_config', malusList: data.defaultMalusList || [] }) })
+    const defaultList = (data.defaultMalusList || []).map(t => ({ text: t, enabled: true }))
+    const saveRes = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'update_malus_config', malusList: defaultList }) })
     const saveData = await saveRes.json()
     if (saveRes.ok) {
-      _malusList = saveData.malusList || []
+      _malusList = saveData.malusList || defaultList
       renderMalusConfig()
       showFeedback('other-actions-feedback', '✓ Liste de malus réinitialisée.', true)
     }
