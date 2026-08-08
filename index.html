@@ -3838,7 +3838,10 @@ async function loadFaq() {
   const container = document.getElementById('faq-content')
   container.innerHTML = '<div class="admin-empty">Chargement…</div>'
   try {
-    const res = await fetch('/api/faq', { headers: authHeaders() })
+    const uname = (currentUser?.username || '').toLowerCase()
+    const isLinked = Object.values(LINKED_USERNAMES).includes(uname)
+    const faqEndpoint = isLinked ? '/api/admin/faq' : '/api/faq'
+    const res = await fetch(faqEndpoint, { headers: authHeaders() })
     if (!res.ok) { container.innerHTML = '<div class="admin-empty">Impossible de charger la FAQ.</div>'; return }
     const { topics } = await res.json()
     faqTopicsCache = topics || []
@@ -3853,7 +3856,7 @@ async function loadFaq() {
       <div class="article" data-topic-id="${t.id}" onclick="toggleFaqArticle(this, ${t.id})">
         <div class="article-header">
           <div class="article-num">${String(i + 1).padStart(2, '0')}</div>
-          <div class="article-title">${esc(t.question)}</div>
+          <div class="article-title">${esc(t.question)}${t.published === false ? ' <span style="font-size:0.7rem;font-weight:600;padding:0.15rem 0.45rem;border-radius:12px;background:#2a2a1a;color:#bbb;border:1px solid #444;vertical-align:middle">⬤ Brouillon</span>' : ''}</div>
           <div class="article-chevron">▾</div>
         </div>
         <div class="article-body">
