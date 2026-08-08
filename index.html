@@ -1335,6 +1335,7 @@
       <button class="admin-tab" onclick="adminTab('planning',this)">Planification</button>
       <button class="admin-tab" onclick="adminTab('notify',this)">Notifier un joueur</button>
       <button class="admin-tab" onclick="adminTab('planned',this)">Matchs planifiés <span class="badge badge-info" id="badge-planned">–</span></button>
+      <button class="admin-tab" onclick="adminTab('whatsapp',this)">🟢 Communication WhatsApp <span class="badge" id="badge-whatsapp" hidden>–</span></button>
       <button class="admin-tab" onclick="adminTab('publication',this)">Publication matchs <span class="badge" id="badge-pending-matches" hidden>–</span></button>
       <button class="admin-tab" onclick="adminTab('notifications-list',this)">Notifications <span class="badge" id="badge-notifs" hidden>–</span></button>
       <button class="admin-tab" onclick="adminTab('faq',this)">FAQ <span class="badge badge-info" id="badge-faq">–</span></button>
@@ -1542,12 +1543,46 @@
             </div>
           </div>
         </div>
+        <div class="form-group">
+          <label>Canal d'envoi</label>
+          <div style="display:flex;gap:0.6rem">
+            <button type="button" class="btn-sm btn-edit" id="notify-channel-site" onclick="setNotifyChannel('site')" style="flex:1">🔔 Sur le site</button>
+            <button type="button" class="btn-sm" id="notify-channel-whatsapp" onclick="setNotifyChannel('whatsapp')" style="flex:1">🟢 Boutons WhatsApp</button>
+          </div>
+        </div>
         <div class="form-group"><label>Titre</label><input type="text" id="notify-title" placeholder="Ex : Rappel de match…"></div>
-        <div class="form-group"><label>Message</label><textarea id="notify-message" rows="4" placeholder="Rédigez votre message…"></textarea></div>
+        <div class="form-group">
+          <label>Message</label>
+          <textarea id="notify-message" rows="4" placeholder="Rédigez votre message…"></textarea>
+          <div id="notify-vars-hint" class="admin-empty" style="display:none;font-size:0.78rem;padding:0.5rem 0;text-align:left">
+            Variables disponibles : <span id="notify-vars-list"></span>
+          </div>
+        </div>
         <div id="notify-error" class="modal-error"></div>
         <div id="notify-success" class="modal-success"></div>
-        <button class="btn-modal-save" style="width:100%" onclick="sendNotification()">Envoyer la notification</button>
+        <button class="btn-modal-save" style="width:100%" id="notify-submit-btn" onclick="sendNotification()">Envoyer la notification</button>
       </div>
+    </div>
+
+    <!-- Communication WhatsApp -->
+    <div id="admin-whatsapp" class="admin-section">
+      <div class="admin-section-header">
+        <h3>🟢 Communication WhatsApp</h3>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+          <button class="btn-sm btn-edit" onclick="openWhatsappTemplatesModal()">✎ Modifier les messages types</button>
+          <button class="btn-sm btn-danger" onclick="deleteAllWhatsappMessages()">🗑 Tout supprimer</button>
+        </div>
+      </div>
+
+      <div class="progress-row" style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+        <span style="font-size:13px;color:var(--gray)">Boutons restants à envoyer</span>
+        <span style="font-size:13px;font-weight:600"><span id="wa-count">0</span> / <span id="wa-total">0</span></span>
+      </div>
+      <div style="height:6px;background:var(--dark4);border-radius:3px;overflow:hidden;margin-bottom:1.25rem">
+        <div id="wa-progress-fill" style="height:100%;background:#25D366;border-radius:3px;transition:width .4s ease;width:0%"></div>
+      </div>
+
+      <div id="whatsapp-messages-list"><div class="admin-empty">Chargement…</div></div>
     </div>
 
     <!-- Rencontre spéciale (conservée pour les anciennes références) -->
@@ -1559,6 +1594,7 @@
         <h3>Matchs planifiés (à venir)</h3>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
           <button class="btn-sm btn-edit" onclick="notifyNextMatches()">🦊 Notifier les joueurs de leur prochain match</button>
+          <button class="btn-sm btn-edit" onclick="generateWhatsappNextMatch()">🟢 Générer les notifications WhatsApp</button>
           <button class="btn-sm btn-accept" onclick="openPlannedAddModal()">+ Planifier un match</button>
         </div>
       </div>
@@ -1675,7 +1711,8 @@
           <p>Lorsqu'ils sont activés, les joueurs reçoivent une notification 48h avant la deadline d'un match si le score n'a pas encore été saisi. Vous pouvez aussi envoyer les rappels manuellement.</p>
           <div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:0.6rem">
             <button class="btn-sm btn-edit" id="btn-toggle-auto-reminders" onclick="toggleAutoReminders()">…</button>
-            <button class="btn-sm btn-accept" onclick="sendRemindersManual()">Envoyer maintenant</button>
+            <button class="btn-sm btn-accept" onclick="sendRemindersManual()">Envoyer maintenant sur le site</button>
+            <button class="btn-sm btn-accept" onclick="generateWhatsappReminders()">🟢 Envoyer maintenant sur WhatsApp</button>
           </div>
         </div>
         <div class="other-action-card" style="grid-column:1/-1">
@@ -1967,6 +2004,31 @@
     <div class="modal-actions">
       <button class="btn-modal-cancel" onclick="closeModal('planned-modal')">Annuler</button>
       <button class="btn-modal-save" onclick="savePlannedMatch()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modèles de messages WhatsApp -->
+<div id="whatsapp-templates-modal" class="admin-modal-bg">
+  <div class="admin-modal" style="max-width:640px">
+    <h3>Modèles de messages <span>WhatsApp</span></h3>
+    <div class="admin-empty" style="font-size:0.8rem;text-align:left;padding:0.5rem 0 1rem">
+      Cliquez sur une variable pour l'insérer dans le champ actif. Les variables non reconnues restent affichées telles quelles.
+      <div id="wa-template-vars" style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.6rem"></div>
+    </div>
+    <div class="form-group">
+      <label>🦊 Message "prochain match"</label>
+      <textarea id="wa-template-next_match" rows="4" onfocus="waActiveTemplateField='wa-template-next_match'"></textarea>
+      <button class="btn-sm btn-edit" style="margin-top:0.4rem" onclick="saveWhatsappTemplate('next_match')">Enregistrer ce modèle</button>
+    </div>
+    <div class="form-group">
+      <label>⏰ Message "rappel de score"</label>
+      <textarea id="wa-template-reminder" rows="4" onfocus="waActiveTemplateField='wa-template-reminder'"></textarea>
+      <button class="btn-sm btn-edit" style="margin-top:0.4rem" onclick="saveWhatsappTemplate('reminder')">Enregistrer ce modèle</button>
+    </div>
+    <div id="wa-template-feedback" class="modal-success"></div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeModal('whatsapp-templates-modal')">Fermer</button>
     </div>
   </div>
 </div>
@@ -4436,6 +4498,7 @@ function adminTab(name, btn) {
   if (name === 'contact') loadContactAdmin()
   if (name === 'other-actions') { loadDataVersions(); loadOtherActionsConfig() }
   if (name === 'alerts') loadAlerts()
+  if (name === 'whatsapp') loadWhatsappTab()
 }
 
 function pubSubTab(name, btn) {
@@ -5576,6 +5639,25 @@ function quickNotify(userId, name) {
   }, 100)
 }
 
+let notifyChannel = 'site' // 'site' | 'whatsapp'
+
+function setNotifyChannel(channel) {
+  notifyChannel = channel
+  document.getElementById('notify-channel-site').classList.toggle('btn-edit', channel === 'site')
+  document.getElementById('notify-channel-whatsapp').classList.toggle('btn-edit', channel === 'whatsapp')
+  document.querySelector('label[for=""]') // no-op, kept for safety
+  const titleGroup = document.getElementById('notify-title').closest('.form-group')
+  titleGroup.style.display = channel === 'whatsapp' ? 'none' : ''
+  document.getElementById('notify-vars-hint').style.display = channel === 'whatsapp' ? 'block' : 'none'
+  document.getElementById('notify-submit-btn').textContent = channel === 'whatsapp' ? '🟢 Générer les boutons WhatsApp' : 'Envoyer la notification'
+  if (channel === 'whatsapp' && !document.getElementById('notify-vars-list').dataset.loaded) {
+    fetch('/api/admin/whatsapp', { headers: authHeaders() }).then(r => r.json()).then(d => {
+      document.getElementById('notify-vars-list').textContent = (d.variables || []).map(v => `[${v}]`).join(' · ')
+      document.getElementById('notify-vars-list').dataset.loaded = '1'
+    }).catch(() => {})
+  }
+}
+
 async function sendNotification() {
   const title   = document.getElementById('notify-title').value.trim()
   const message = document.getElementById('notify-message').value.trim()
@@ -5584,8 +5666,21 @@ async function sendNotification() {
   errorEl.textContent = ''; successEl.textContent = ''
   const selected = Array.from(document.querySelectorAll('.notify-player-cb:checked')).map(cb => parseInt(cb.value))
   if (selected.length === 0) { errorEl.textContent = 'Sélectionnez au moins un joueur.'; return }
-  if (!title)  { errorEl.textContent = 'Titre requis.'; return }
   if (!message){ errorEl.textContent = 'Message requis.'; return }
+
+  if (notifyChannel === 'whatsapp') {
+    const res = await fetch('/api/admin/whatsapp', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'generate_custom', userIds: selected, message }) })
+    const data = await res.json()
+    if (!res.ok) { errorEl.textContent = data.error||'Erreur.'; return }
+    successEl.textContent = `✓ ${data.count} bouton(s) WhatsApp généré(s) — voir l'onglet Communication WhatsApp.`
+    document.getElementById('notify-message').value = ''
+    notifySelectAll(false)
+    document.getElementById('notify-dropdown').classList.remove('open')
+    setTimeout(() => { successEl.textContent = '' }, 4000)
+    return
+  }
+
+  if (!title)  { errorEl.textContent = 'Titre requis.'; return }
   const res = await fetch('/api/admin/notifications', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'send', userIds: selected, title, message }) })
   const data = await res.json()
   if (!res.ok) { errorEl.textContent = data.error||'Erreur.'; return }
@@ -5595,6 +5690,128 @@ async function sendNotification() {
   notifySelectAll(false)
   document.getElementById('notify-dropdown').classList.remove('open')
   setTimeout(() => { successEl.textContent = '' }, 3000)
+}
+
+/* ══════════════ COMMUNICATION WHATSAPP ══════════════ */
+let waMessages = []
+let waActiveTemplateField = 'wa-template-next_match'
+
+async function loadWhatsappTab() {
+  const res = await fetch('/api/admin/whatsapp', { headers: authHeaders() })
+  if (!res.ok) return
+  const data = await res.json()
+  waMessages = data.messages || []
+  window._waTemplates = data.templates || {}
+  window._waVariables = data.variables || []
+  setBadge('badge-whatsapp', waMessages.filter(m => !m.sent).length)
+  renderWhatsappMessages()
+}
+
+function renderWhatsappMessages() {
+  const pending = waMessages.filter(m => !m.sent)
+  const total = waMessages.length
+  document.getElementById('wa-count').textContent = pending.length
+  document.getElementById('wa-total').textContent = total
+  document.getElementById('wa-progress-fill').style.width = total > 0 ? `${(pending.length / total) * 100}%` : '0%'
+
+  const list = document.getElementById('whatsapp-messages-list')
+  if (waMessages.length === 0) {
+    list.innerHTML = '<div class="admin-empty">Aucun message WhatsApp généré. Utilisez les boutons "Générer les notifications WhatsApp" (Matchs planifiés / Actions autres) ou "Notifier un joueur" en mode WhatsApp.</div>'
+    return
+  }
+
+  const typeLabel = { next_match: '🦊 Prochain match', reminder: '⏰ Rappel score', custom: '✎ Message libre' }
+
+  list.innerHTML = waMessages.map(m => `
+    <div class="other-action-card" style="${m.sent ? 'opacity:0.45' : ''}">
+      <h4>${typeLabel[m.type] || m.type} — ${esc(capName(m.user.firstName))} ${esc(capName(m.user.lastName))} <span style="color:var(--gray);font-weight:400">(@${esc(m.user.username)})</span></h4>
+      <p style="white-space:pre-wrap">${esc(m.content)}</p>
+      <div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:0.6rem">
+        ${m.sent
+          ? `<span class="badge" style="background:var(--dark4)">✓ Envoyé</span>`
+          : `<button class="btn-sm btn-accept" onclick="sendWhatsappMessage(${m.id}, '${m.phone}')">🟢 Envoyer via WhatsApp</button>`
+        }
+        <button class="btn-sm btn-danger" onclick="deleteWhatsappMessage(${m.id})">Supprimer</button>
+      </div>
+    </div>
+  `).join('')
+}
+
+function sendWhatsappMessage(id, phone) {
+  const msg = waMessages.find(m => m.id === id)
+  if (!msg) return
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg.content)}`, '_blank')
+  fetch('/api/admin/whatsapp', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'mark_sent', id }) })
+    .then(() => loadWhatsappTab())
+}
+
+async function deleteWhatsappMessage(id) {
+  if (!confirm('Supprimer ce message WhatsApp généré ?')) return
+  await fetch('/api/admin/whatsapp', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'delete', id }) })
+  await loadWhatsappTab()
+}
+
+async function deleteAllWhatsappMessages() {
+  if (!confirm('Supprimer TOUS les messages WhatsApp générés (envoyés ou non) ? Action irréversible.')) return
+  await fetch('/api/admin/whatsapp', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'delete_all' }) })
+  await loadWhatsappTab()
+}
+
+async function generateWhatsappNextMatch() {
+  try {
+    const res = await fetch('/api/admin/whatsapp', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'generate_next_match' }) })
+    const data = await res.json()
+    if (!res.ok) { alert(data.error || 'Erreur.'); return }
+    alert(data.message || `${data.count} bouton(s) généré(s).`)
+    if (data.count > 0) await loadWhatsappTab()
+  } catch (e) { alert('Erreur réseau.') }
+}
+
+async function generateWhatsappReminders() {
+  try {
+    const res = await fetch('/api/admin/whatsapp', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'generate_reminders' }) })
+    const data = await res.json()
+    if (!res.ok) { alert(data.error || 'Erreur.'); return }
+    alert(data.message || `${data.count} bouton(s) généré(s).`)
+    if (data.count > 0) await loadWhatsappTab()
+  } catch (e) { alert('Erreur réseau.') }
+}
+
+async function openWhatsappTemplatesModal() {
+  if (!window._waTemplates) {
+    const res = await fetch('/api/admin/whatsapp', { headers: authHeaders() })
+    const data = await res.json()
+    window._waTemplates = data.templates || {}
+    window._waVariables = data.variables || []
+  }
+  document.getElementById('wa-template-next_match').value = window._waTemplates.next_match || ''
+  document.getElementById('wa-template-reminder').value = window._waTemplates.reminder || ''
+  document.getElementById('wa-template-vars').innerHTML = (window._waVariables || []).map(v =>
+    `<button type="button" class="btn-sm btn-edit" style="padding:0.2rem 0.5rem;font-size:0.72rem" onclick="insertWaVariable('${v.replace(/'/g,"\\'")}')">[${esc(v)}]</button>`
+  ).join('')
+  document.getElementById('whatsapp-templates-modal').classList.add('open')
+}
+
+function insertWaVariable(varName) {
+  const field = document.getElementById(waActiveTemplateField)
+  if (!field) return
+  const start = field.selectionStart ?? field.value.length
+  const end = field.selectionEnd ?? field.value.length
+  field.value = field.value.slice(0, start) + `[${varName}]` + field.value.slice(end)
+  field.focus()
+}
+
+async function saveWhatsappTemplate(type) {
+  const content = document.getElementById('wa-template-' + type).value
+  const feedback = document.getElementById('wa-template-feedback')
+  const res = await fetch('/api/admin/whatsapp', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'save_template', type, content }) })
+  const data = await res.json()
+  if (!res.ok) { feedback.className = 'modal-error'; feedback.textContent = data.error || 'Erreur.'; return }
+  window._waTemplates = window._waTemplates || {}
+  window._waTemplates[type] = content
+  feedback.className = 'modal-success'
+  feedback.textContent = '✓ Modèle enregistré.'
+  setTimeout(() => { feedback.textContent = '' }, 3000)
 }
 
 async function sendSpecialMatch() {

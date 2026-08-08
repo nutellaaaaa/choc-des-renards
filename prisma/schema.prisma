@@ -57,6 +57,7 @@ model User {
   faqVotes       FaqVote[]
   contactMessages ContactMessage[]
   botTasks       BotTask[]
+  whatsappMessages WhatsappMessage[]
 }
 
 model LoginEvent {
@@ -207,9 +208,14 @@ model PlannedMatch {
   deadlineAt  DateTime? // scheduledDate + cycleLengthDays - deadlineHoursBeforeCycleEnd
   forfeited   Boolean  @default(false) // passé à true par le balayage automatique (forfait 0-0)
 
+  // horodatage de génération des boutons WhatsApp "prochain match" pour ce cycle
+  // (informatif, calqué sur notifiedAt) — remis à null si le match est modifié (planned_edit)
+  whatsappGeneratedAt DateTime?
+
   player1 User @relation("PlannedPlayer1", fields: [player1Id], references: [id])
   player2 User @relation("PlannedPlayer2", fields: [player2Id], references: [id])
   notifications Notification[]
+  whatsappMessages WhatsappMessage[]
 }
 
 model Notification {
@@ -359,6 +365,34 @@ model AdminAlert {
   meta      Json?
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
+}
+
+// ═══════════════════ COMMUNICATION WHATSAPP ═══════════════════
+
+// Un seul enregistrement par type de message ('next_match' | 'reminder').
+// Contenu éditable par l'admin, avec variables [xxx] substituées à la génération.
+model WhatsappTemplate {
+  id        Int      @id @default(autoincrement())
+  type      String   @unique // 'next_match' | 'reminder'
+  content   String
+  updatedAt DateTime @updatedAt
+}
+
+// Un message WhatsApp "généré" = un bouton d'envoi dans l'onglet Communication
+// WhatsApp. Reste en base jusqu'à suppression manuelle ou envoi (marqué sent).
+model WhatsappMessage {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  type           String   // 'next_match' | 'reminder' | 'custom'
+  phone          String
+  content        String
+  plannedMatchId Int?
+  sent           Boolean  @default(false)
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plannedMatch PlannedMatch? @relation(fields: [plannedMatchId], references: [id], onDelete: SetNull)
 }
 
 // ═══════════════════ BOTS DE TEST ═══════════════════

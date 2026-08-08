@@ -228,6 +228,8 @@ module.exports = async function handler(req, res) {
       return handleBots(req, res)
     case 'alerts':
       return handleAlerts(req, res)
+    case 'whatsapp':
+      return handleWhatsapp(req, res)
     default:
       return res.status(400).json({ error: 'resource invalide ou manquant.' })
   }
@@ -606,6 +608,313 @@ async function handleNotifications(req, res) {
   }
 
   return res.status(400).json({ error: 'Action invalide.' })
+}
+
+/* ============================================================
+ * WHATSAPP — templates personnalisables + génération/gestion des boutons
+ * d'envoi WhatsApp (liens wa.me), affichés dans l'onglet admin
+ * "Communication WhatsApp". Un WhatsappMessage = un bouton en attente
+ * d'envoi (ou déjà envoyé/marqué comme tel), jamais envoyé automatiquement
+ * par le serveur : c'est l'admin qui clique et ouvre WhatsApp lui-même.
+ * ============================================================ */
+
+const WHATSAPP_VARS = [
+  'nom',
+  'prénom',
+  'pseudo',
+  'tel',
+  "date du prochain match de l'utilisateur",
+  "nom et prénom et classement de l'adversaire du prochain match de l'utilisateur",
+  'date de début du duel',
+  "date limite pour remplir le score du prochain match de l'utilisateur",
+  "date limite de remplissage de score qui n'a pas été respectée",
+  'potentiel malus pour le joueur lors de son prochain match',
+]
+
+const WHATSAPP_DEFAULT_TEMPLATES = {
+  next_match: `Bonjour [prénom], vous affrontez [nom et prénom et classement de l'adversaire du prochain match de l'utilisateur] le [date du prochain match de l'utilisateur]. Merci de saisir votre score avant le [date limite pour remplir le score du prochain match de l'utilisateur]. 🦊`,
+  reminder: `Bonjour [prénom], il vous reste peu de temps pour saisir le score de votre match contre [nom et prénom et classement de l'adversaire du prochain match de l'utilisateur] ! Deadline : [date limite pour remplir le score du prochain match de l'utilisateur]. ⏰`,
+}
+
+function describeMalusForUser(pm, userId) {
+  if (!pm || !pm.malus) return 'aucun'
+  const isTarget = (pm.malusTarget === 1 && pm.player1Id === userId) || (pm.malusTarget === 2 && pm.player2Id === userId)
+  return isTarget ? pm.malus : 'aucun (le malus concerne l\'adversaire)'
+}
+
+/** Dictionnaire de variables pour un joueur donné, à partir de son "prochain
+ *  match" planifié (pm peut être null → variables associées à '—'). */
+function buildWhatsappVars(user, pm, opponent) {
+  return {
+    'nom': user.lastName,
+    'prénom': user.firstName,
+    'pseudo': user.username,
+    'tel': user.phone || '—',
+    "date du prochain match de l'utilisateur": pm?.scheduledDate ? fmtDate(pm.scheduledDate) : '—',
+    "nom et prénom et classement de l'adversaire du prochain match de l'utilisateur": opponent ? `${opponent.firstName} ${opponent.lastName} (${opponent.category || 'NC'})` : '—',
+    'date de début du duel': pm?.scheduledDate ? fmtDate(pm.scheduledDate) : '—',
+    "date limite pour remplir le score du prochain match de l'utilisateur": pm?.deadlineAt ? fmtDateTime(pm.deadlineAt) : '—',
+    "date limite de remplissage de score qui n'a pas été respectée": (pm?.forfeited && pm?.deadlineAt) ? fmtDateTime(pm.deadlineAt) : '—',
+    'potentiel malus pour le joueur lors de son prochain match': describeMalusForUser(pm, user.id),
+  }
+}
+
+function renderWhatsappTemplate(template, vars) {
+  return template.replace(/\[([^\]]+)\]/g, (full, key) => (key in vars ? vars[key] : full))
+}
+
+async function getWhatsappTemplate(type) {
+  const row = await prisma.whatsappTemplate.findUnique({ where: { type } })
+  return row?.content || WHATSAPP_DEFAULT_TEMPLATES[type] || ''
+}
+
+// Accepte '06 12 34 56 78', '+33612345678', '0033612345678'… → '336...' (format wa.me, sans +)
+function normalizePhoneForWa(phone) {
+  if (!phone) return null
+  let digits = phone.replace(/[^\d+]/g, '')
+  if (digits.startsWith('+')) digits = digits.slice(1)
+  else if (digits.startsWith('00')) digits = digits.slice(2)
+  else if (digits.startsWith('0')) digits = '33' + digits.slice(1) // France par défaut
+  return digits || null
+}
+
+async function handleWhatsapp(req, res) {
+  const payload = requireAdmin(req, res)
+  if (!payload) return
+
+  if (req.method === 'GET') {
+    try {
+      const [messages, templateRows] = await Promise.all([
+        prisma.whatsappMessage.findMany({
+          orderBy: { createdAt: 'asc' },
+          include: { user: { select: { id: true, firstName: true, lastName: true, username: true } } },
+        }),
+        prisma.whatsappTemplate.findMany(),
+      ])
+      const templates = {}
+      for (const type of ['next_match', 'reminder']) {
+        const row = templateRows.find(t => t.type === type)
+        templates[type] = row?.content ?? WHATSAPP_DEFAULT_TEMPLATES[type]
+      }
+      return res.status(200).json({ messages, templates, variables: WHATSAPP_VARS })
+    } catch (err) {
+      console.error('[admin/whatsapp GET]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' })
+
+  const { action } = req.body || {}
+
+  if (action === 'save_template') {
+    const { type, content } = req.body || {}
+    if (!['next_match', 'reminder'].includes(type)) return res.status(400).json({ error: 'type invalide.' })
+    if (!content || !content.trim()) return res.status(400).json({ error: 'Contenu requis.' })
+    try {
+      const row = await prisma.whatsappTemplate.upsert({
+        where: { type },
+        update: { content: content.trim() },
+        create: { type, content: content.trim() },
+      })
+      return res.status(200).json({ ok: true, template: row, message: 'Modèle enregistré.' })
+    } catch (err) {
+      console.error('[admin/whatsapp save_template]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  // Génère les boutons "prochain match" pour tous les joueurs éligibles —
+  // miroir de notify_next_send, mais crée des WhatsappMessage au lieu de
+  // Notification. Un joueur/match déjà généré n'est pas régénéré (cf.
+  // computeNextMatchWhatsappTargets) tant que le match n'est pas modifié.
+  if (action === 'generate_next_match') {
+    try {
+      const targets = await computeNextMatchWhatsappTargets()
+      if (targets.length === 0) {
+        return res.status(200).json({ ok: true, count: 0, message: 'Aucun joueur à générer : tous ont déjà leurs boutons WhatsApp pour ce cycle (ou aucun match planifié n\'a de date).' })
+      }
+      const template = await getWhatsappTemplate('next_match')
+      let count = 0
+      const touchedPmIds = new Set()
+      for (const t of targets) {
+        const phone = normalizePhoneForWa(t.user.phone)
+        if (!phone) continue
+        const vars = buildWhatsappVars(t.user, t.plannedMatch, t.opponent)
+        const content = renderWhatsappTemplate(template, vars)
+        await prisma.whatsappMessage.create({
+          data: { userId: t.userId, type: 'next_match', phone, content, plannedMatchId: t.plannedMatch.id },
+        })
+        touchedPmIds.add(t.plannedMatch.id)
+        count++
+      }
+      for (const pmId of touchedPmIds) {
+        await prisma.plannedMatch.update({ where: { id: pmId }, data: { whatsappGeneratedAt: new Date() } }).catch(() => {})
+      }
+      return res.status(200).json({ ok: true, count, message: `${count} bouton(s) WhatsApp généré(s).` })
+    } catch (err) {
+      console.error('[admin/whatsapp generate_next_match]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  // Génère les boutons "rappel de score" — miroir de send_reminders_manual.
+  if (action === 'generate_reminders') {
+    try {
+      const now = new Date()
+      const deadline48h = new Date(now.getTime() + 48 * 60 * 60 * 1000)
+      const upcoming = await prisma.plannedMatch.findMany({
+        where: { forfeited: false, notifiedAt: { not: null }, deadlineAt: { gte: now, lte: deadline48h } },
+        include: {
+          player1: { select: { id: true, firstName: true, lastName: true, username: true, phone: true, category: true } },
+          player2: { select: { id: true, firstName: true, lastName: true, username: true, phone: true, category: true } },
+        },
+      })
+      const template = await getWhatsappTemplate('reminder')
+      let count = 0
+      for (const pm of upcoming) {
+        for (const { player, opponent } of [
+          { player: pm.player1, opponent: pm.player2 },
+          { player: pm.player2, opponent: pm.player1 },
+        ]) {
+          if (ADMIN_USERNAMES.includes(player.username.toLowerCase())) continue
+          const already = await prisma.whatsappMessage.findFirst({
+            where: { userId: player.id, plannedMatchId: pm.id, type: 'reminder', createdAt: { gte: new Date(now.getTime() - 12 * 60 * 60 * 1000) } },
+          })
+          if (already) continue
+          const phone = normalizePhoneForWa(player.phone)
+          if (!phone) continue
+          const vars = buildWhatsappVars(player, pm, opponent)
+          const content = renderWhatsappTemplate(template, vars)
+          await prisma.whatsappMessage.create({
+            data: { userId: player.id, type: 'reminder', phone, content, plannedMatchId: pm.id },
+          })
+          count++
+        }
+      }
+      return res.status(200).json({ ok: true, count, message: `${count} bouton(s) de rappel généré(s).` })
+    } catch (err) {
+      console.error('[admin/whatsapp generate_reminders]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  // Message libre (individuel ou groupe) depuis "Notifier un joueur" en mode
+  // WhatsApp : un bouton généré par destinataire, message personnalisé.
+  if (action === 'generate_custom') {
+    const { userIds, message } = req.body || {}
+    if (!Array.isArray(userIds) || userIds.length === 0) return res.status(400).json({ error: 'Au moins un joueur requis.' })
+    if (!message || !message.trim()) return res.status(400).json({ error: 'Message requis.' })
+    try {
+      let count = 0
+      for (const rawId of userIds) {
+        const uid = parseInt(rawId, 10)
+        if (isNaN(uid)) continue
+        const user = await prisma.user.findUnique({ where: { id: uid } })
+        if (!user || ADMIN_USERNAMES.includes(user.username.toLowerCase())) continue
+        const phone = normalizePhoneForWa(user.phone)
+        if (!phone) continue
+
+        const pm = await prisma.plannedMatch.findFirst({
+          where: { forfeited: false, scheduledDate: { not: null }, OR: [{ player1Id: uid }, { player2Id: uid }] },
+          orderBy: { scheduledDate: 'asc' },
+          include: {
+            player1: { select: { id: true, firstName: true, lastName: true, category: true } },
+            player2: { select: { id: true, firstName: true, lastName: true, category: true } },
+          },
+        })
+        const opponent = pm ? (pm.player1Id === uid ? pm.player2 : pm.player1) : null
+        const vars = buildWhatsappVars(user, pm, opponent)
+        const content = renderWhatsappTemplate(message, vars)
+
+        await prisma.whatsappMessage.create({
+          data: { userId: uid, type: 'custom', phone, content, plannedMatchId: pm?.id || null },
+        })
+        count++
+      }
+      return res.status(201).json({ ok: true, count, message: `${count} bouton(s) WhatsApp généré(s).` })
+    } catch (err) {
+      console.error('[admin/whatsapp generate_custom]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  if (action === 'mark_sent') {
+    const { id } = req.body || {}
+    const mid = parseInt(id, 10)
+    if (isNaN(mid)) return res.status(400).json({ error: 'id invalide.' })
+    try {
+      await prisma.whatsappMessage.update({ where: { id: mid }, data: { sent: true, sentAt: new Date() } })
+      return res.status(200).json({ ok: true })
+    } catch (err) {
+      console.error('[admin/whatsapp mark_sent]', err)
+      return res.status(500).json({ error: 'Erreur serveur ou message introuvable.' })
+    }
+  }
+
+  if (action === 'delete') {
+    const { id } = req.body || {}
+    const mid = parseInt(id, 10)
+    if (isNaN(mid)) return res.status(400).json({ error: 'id invalide.' })
+    try {
+      await prisma.whatsappMessage.delete({ where: { id: mid } })
+      return res.status(200).json({ ok: true })
+    } catch (err) {
+      console.error('[admin/whatsapp delete]', err)
+      return res.status(500).json({ error: 'Erreur serveur ou message introuvable.' })
+    }
+  }
+
+  if (action === 'delete_all') {
+    try {
+      const result = await prisma.whatsappMessage.deleteMany({})
+      return res.status(200).json({ ok: true, count: result.count, message: `${result.count} message(s) supprimé(s).` })
+    } catch (err) {
+      console.error('[admin/whatsapp delete_all]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  return res.status(400).json({ error: 'Action invalide.' })
+}
+
+// Variante WhatsApp de computeNextMatchTargets (voir plus bas dans ce fichier) :
+// le "déjà généré" est tracé via l'existence d'un WhatsappMessage
+// (type='next_match', plannedMatchId, userId) plutôt que Notification, pour
+// permettre au canal WhatsApp et au canal site d'être générés indépendamment.
+async function computeNextMatchWhatsappTargets() {
+  const matches = await prisma.plannedMatch.findMany({
+    where: { forfeited: false, scheduledDate: { not: null } },
+    orderBy: { scheduledDate: 'asc' },
+    include: {
+      player1: { select: { id: true, firstName: true, lastName: true, username: true, phone: true, category: true } },
+      player2: { select: { id: true, firstName: true, lastName: true, username: true, phone: true, category: true } },
+    },
+  })
+
+  const nextByUser = new Map()
+  for (const pm of matches) {
+    if (!nextByUser.has(pm.player1Id)) nextByUser.set(pm.player1Id, pm)
+    if (!nextByUser.has(pm.player2Id)) nextByUser.set(pm.player2Id, pm)
+  }
+  if (nextByUser.size === 0) return []
+
+  const candidateMatchIds = [...new Set([...nextByUser.values()].map(pm => pm.id))]
+  const alreadySent = await prisma.whatsappMessage.findMany({
+    where: { type: 'next_match', plannedMatchId: { in: candidateMatchIds } },
+    select: { userId: true, plannedMatchId: true },
+  })
+  const sentKeys = new Set(alreadySent.map(n => `${n.plannedMatchId}-${n.userId}`))
+
+  const targets = []
+  for (const [userId, pm] of nextByUser) {
+    const user = pm.player1Id === userId ? pm.player1 : pm.player2
+    if (ADMIN_USERNAMES.includes(user.username.toLowerCase())) continue
+    if (sentKeys.has(`${pm.id}-${userId}`)) continue
+    const isP1 = pm.player1Id === userId
+    targets.push({ userId, user: isP1 ? pm.player1 : pm.player2, opponent: isP1 ? pm.player2 : pm.player1, plannedMatch: pm })
+  }
+  return targets
 }
 
 /* ============================================================
@@ -1932,12 +2241,21 @@ async function handleMatch(req, res) {
           note: note ? note.trim() : null,
           phase: phase || 'PHASE1',
           roundNumber: phase === 'PHASE2' ? (parseInt(round, 10) || null) : null,
+          // Modification du planning → on "dégrise" les boutons de notification
+          // (site + WhatsApp) : les anciennes notifications/messages générés pour
+          // ce match ne reflètent plus les infos à jour.
+          notifiedAt: null,
+          whatsappGeneratedAt: null,
         },
         include: {
           player1: { select: { id: true, firstName: true, lastName: true, username: true, category: true } },
           player2: { select: { id: true, firstName: true, lastName: true, username: true, category: true } },
         },
       })
+      // Supprime les traces "déjà généré" liées à ce match pour que
+      // computeNextMatchTargets / computeNextMatchWhatsappTargets le reproposent.
+      await prisma.notification.deleteMany({ where: { plannedMatchId: pmid, type: 'next_match' } }).catch(() => {})
+      await prisma.whatsappMessage.deleteMany({ where: { plannedMatchId: pmid, type: 'next_match', sent: false } }).catch(() => {})
       return res.status(200).json({ ok: true, plannedMatch: pm })
     } catch (err) {
       console.error('[planned_edit]', err)
