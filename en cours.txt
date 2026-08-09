@@ -4,7 +4,6 @@
 - Ajouter un moyen de choisir de jouer l'animation du lancement du site
 - Nouveau réglement 
 - Deuxième case de consentement à l'inscription
-- Nouvel onglet utilisateur "Mon profil" : pseudo, nom, prénom, tèl, catégorie (niveau), actif/inactif pour la saison 20..-20.., inscrit depuis le, nb de connexions au site, temps passé sur le site, nb de matchs joués, nb de matchs gagnés/nb de matchs perdus, nb de points marqués, nb de notifications reçues, nb de contacts envoyés (aucune information modifiable par le joueur, seulement consultable)
 - Pouvoir ajouter une photo au moment de rentrer les résultats d'un match
 - Dans les matchs à publier, retirer les doublons, ie un match publié implique que l'autre le soit aussi (seul le match avec le premier joueur gagnant apparaît à l'admin dans les matchs à publier)
 - Revoir la mise en évidence du bouton correspondant au moyen de canal choisi dans "notifier un joueur"
@@ -123,6 +122,7 @@ Voici un petit récapitulatif des statuts des matchs si jamais ce n'était pas t
 - Amélioration des visuels admin
 - Remplacer les boutons du panneau admin par un nuage d'icônes flottantes sur lesquels on peut passer la souris pour avoir le titre de la section, et évidemment cliquer
 - Articles Charte et FAQ fermés 
+- Nouvel onglet utilisateur "Mon profil" : pseudo, nom, prénom, tèl, catégorie (niveau), actif/inactif pour la saison 20..-20.., inscrit depuis le, nb de connexions au site, temps passé sur le site, nb de matchs joués, nb de matchs gagnés/nb de matchs perdus, nb de points marqués, nb de notifications reçues, nb de contacts envoyés (aucune information modifiable par le joueur, seulement consultable)
 
 
 

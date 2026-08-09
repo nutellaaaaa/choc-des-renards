@@ -2553,7 +2553,7 @@
     <span class="nav-logo-label">Le Choc des <em>Renards</em></span>
   </a>
   <div class="nav-user-info" id="nav-user">
-    <span class="nav-user-greeting">Salut, <strong id="nav-user-name"></strong> <span id="nav-user-badge" class="player-level"></span></span>
+    <span class="nav-user-greeting">Salut, <strong id="nav-user-name"></strong> <span id="nav-user-badge" class="player-level" style="display : none"></span></span>
     <button class="nav-switch-btn" id="nav-switch-btn" onclick="switchAccount()" style="display:none"></button>
     <button class="nav-logout-btn" onclick="logout()">Déconnexion</button>
   </div>
@@ -3734,21 +3734,32 @@ async function loadMonProfil() {
     const matchesData = matchesRes.ok ? await matchesRes.json() : {}
     const notifsData  = notifsRes.ok  ? await notifsRes.json()  : {}
 
-    // Nb de contacts envoyés : endpoint GET optionnel, peut ne pas exister côté joueur
-    let nbContacts = '—'
-    try {
-      const contactRes = await fetch('/api/contact', { headers: authHeaders() })
-      if (contactRes.ok) {
-        const contactData = await contactRes.json()
-        const msgs = contactData.messages || contactData.contactMessages || []
-        nbContacts = msgs.length
-      }
-    } catch(_) {}
+    const players = matchesData.players || []
+    // Le player "me" dans /api/matches contient createdAt, category, active, phone
+    // selon ce que le backend expose — on le fusionne avec currentUser (priorité player)
+    const mePlayer   = players.find(p => p.id === currentUser.id) || {}
+    const me         = { played: 0, wins: 0, losses: 0, points: 0, ...mePlayer }
 
-    const players    = matchesData.players || []
-    const me         = players.find(p => p.id === currentUser.id) || { played: 0, wins: 0, losses: 0, points: 0 }
+    // Enrichir currentUser avec les champs du player (phone, active, createdAt)
+    // que le backend ne renvoie pas forcément au login, mais inclut dans /api/matches
+    if (mePlayer.phone     !== undefined) currentUser.phone     = mePlayer.phone
+    if (mePlayer.active    !== undefined) currentUser.active    = mePlayer.active
+    if (mePlayer.createdAt !== undefined) currentUser.createdAt = mePlayer.createdAt
+    if (mePlayer.category  !== undefined) currentUser.category  = mePlayer.category
+    try { localStorage.setItem('cdr_user', JSON.stringify(currentUser)) } catch(_) {}
     const matches    = (matchesData.matches || []).filter(m => m.userId === currentUser.id || m.user?.id === currentUser.id)
     const notifications = notifsData.notifications || []
+
+    // Champs profil : priorité au player API (plus complet), fallback currentUser
+    const phone     = me.phone     || currentUser.phone     || null
+    const active    = me.active    !== undefined ? me.active    : (currentUser.active !== undefined ? currentUser.active : true)
+    const createdRaw = me.createdAt || currentUser.createdAt || null
+    const createdAt  = createdRaw ? new Date(createdRaw) : null
+    const cat        = me.category || currentUser.category || 'NC'
+
+    // Nb de contacts envoyés : nécessite un endpoint GET dédié côté serveur,
+    // non disponible actuellement — affiché comme non disponible
+    const nbContacts = null
 
     // Calcul des points marqués (somme des playerScore de tous les sets)
     let totalPtsMarques = 0
@@ -3757,9 +3768,6 @@ async function loadMonProfil() {
     })
 
     const catLabels = { N: 'National', R: 'Régional', D: 'Départemental', P: 'Promotion', NC: 'Non classé' }
-    const cat = currentUser.category || 'NC'
-    const isActive = currentUser.active !== false
-    const createdAt = currentUser.createdAt ? new Date(currentUser.createdAt) : null
 
     // Saison courante (ex: 2025-2026) basée sur l'année en cours
     const now = new Date()
@@ -3784,7 +3792,7 @@ async function loadMonProfil() {
           </div>
           <div class="profil-row">
             <span class="profil-label">Téléphone</span>
-            <span class="profil-value">${esc(currentUser.phone || '—')}</span>
+            <span class="profil-value">${phone ? esc(phone) : '<span style="color:var(--gray);font-style:italic">Non disponible</span>'}</span>
           </div>
           <div class="profil-row">
             <span class="profil-label">Catégorie</span>
@@ -3796,14 +3804,14 @@ async function loadMonProfil() {
           <div class="profil-row">
             <span class="profil-label">Statut</span>
             <span class="profil-value">
-              <span class="profil-active-badge ${isActive ? 'active' : 'inactive'}">
-                ${isActive ? '● Actif' : '○ Inactif'}
+              <span class="profil-active-badge ${active ? 'active' : 'inactive'}">
+                ${active ? '● Actif' : '○ Inactif'}
               </span>
             </span>
           </div>
           <div class="profil-row">
             <span class="profil-label">Inscrit depuis</span>
-            <span class="profil-value">${createdAt ? createdAt.toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' }) : '—'}</span>
+            <span class="profil-value">${createdAt ? createdAt.toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' }) : '<span style="color:var(--gray);font-style:italic">Non disponible</span>'}</span>
           </div>
         </div>
       </div>
@@ -3830,7 +3838,7 @@ async function loadMonProfil() {
           <span class="lbl">Notifications reçues</span>
         </div>
         <div class="profil-stat">
-          <span class="val">${nbContacts}</span>
+          <span class="val">${nbContacts !== null ? nbContacts : '<span style="font-size:1rem;color:var(--gray)">—</span>'}</span>
           <span class="lbl">Contacts envoyés</span>
         </div>
       </div>
