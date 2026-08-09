@@ -1402,7 +1402,7 @@
         <input type="checkbox" id="reg-rgpd">
         <label for="reg-rgpd">Je consens à ce que mes données soient collectées et utilisées pour l'organisation du Choc Des Renards (promis, pas de fouille sauvage). Pour plus d'informations, nous vous encourageons à vous renseigner sur <a href="#" onclick="showPrivacyPage(); return false;">Vos données et vos droits</a>.</label>
       </div>
-      <div class="checkbox-group">
+      <div class="checkbox-group" style="display: none">
         <input type="checkbox" id="reg-ack">
         <label for="reg-ack"><strong>J'ai bien pris connaissance de toutes les informations</strong> relatives à mon inscription au Choc des Renards, notamment le règlement, le format des matchs, les bonus &amp; malus, et les conditions de participation.</label>
       </div>
@@ -2633,10 +2633,12 @@
 </div>
 
 <!-- PAGE RÈGLEMENT -->
+```html
 <div id="page-reglement" class="page">
   <div class="section">
     <h1 class="section-title">Char<span>te</span></h1>
     <p class="section-subtitle">Charte officielle du Choc des Renards</p>
+
     <div class="reglement-tools">
       <div class="reglement-tools-text"><strong>Version PDF disponible</strong><br>Téléchargez la charte complète du Choc des Renards au format PDF.</div>
       <a class="pdf-btn" href="reglement-choc-des-renards.pdf" target="_blank" rel="noopener">Télécharger le PDF</a>
@@ -2655,8 +2657,8 @@
       <div class="article-body">
         <p>Le Choc des Renards s'organise en deux phases :</p>
         <ul>
-          <li><span><strong>Phase 1 — Septembre à Janvier :</strong> l'ensemble des joueurs est réparti dans des poules. À l'issue, les joueurs sont séparés en deux groupes selon leur classement dans leur poule.</span></li>
-          <li><span><strong>Phase 2 — Février à Juin :</strong> format phases finales en ronde suisse.</span></li>
+          <li><span><strong>Phase 1 — Septembre à Janvier :</strong> l'ensemble des joueurs est réparti dans des poules. À l'issue de cette phase, les joueurs sont séparés et placés dans deux groupes en fonction de leur classement au sein de leur poule.</span></li>
+          <li><span><strong>Phase 2 — Février à Juin :</strong> format de rondes suisses.</span></li>
         </ul>
       </div>
     </div>
@@ -2665,37 +2667,40 @@
       <div class="article-header"><div class="article-num">03</div><div class="article-title">Format des affrontements</div><div class="article-chevron">▾</div></div>
       <div class="article-body">
         <ul>
-          <li><span>Les joueurs reçoivent par message le numéro de téléphone et le nom de leur adversaire <strong>un dimanche</strong>.</span></li>
-          <li><span>Ils ont <strong>deux semaines</strong> à compter de ce jour pour effectuer leur match.</span></li>
-          <li><span>Le match se déroule en <strong>3 sets gagnants de 11 points secs</strong> (sans points d'écart). Pas de pause pendant le set. Un changement de côté est réalisé à chaque set.</span></li>
+          <li><span>Les joueurs reçoivent par message le numéro de téléphone ainsi que le nom de leur adversaire <strong>un dimanche</strong>.</span></li>
+          <li><span>Ils ont <strong>deux semaines</strong> à compter de ce jour pour disputer leur match, en s'organisant comme ils le souhaitent avec leur adversaire.</span></li>
+          <li><span>Le match se déroule en <strong>BO5 (3 sets gagnants) de 11 points secs</strong> (sans points d'écart). Il n'y a pas de pause pendant le set. Un changement de côté est réalisé à chaque set.</span></li>
           <li><span>Les volants sont fournis par les joueurs ou empruntés dans les caisses. Les autres modalités suivent le règlement officiel de la FFBAD.</span></li>
-          <li><span>À l'issue de l'affrontement, le vainqueur communique les scores à Yanis avant <strong>le dernier samedi</strong> de la période des deux semaines.</span></li>
+          <li><span>À l'issue de l'affrontement, le <strong>vainqueur uniquement</strong> communique les scores du match <strong>via la plateforme CDR</strong>, avant le <strong>dernier samedi</strong> de la période des deux semaines.</span></li>
         </ul>
       </div>
     </div>
 
     <div class="article" onclick="toggleArticle(this)">
-      <div class="article-header"><div class="article-num">04</div><div class="article-title">Bonus &amp; Malus</div><div class="article-chevron">▾</div></div>
+      <div class="article-header"><div class="article-num">04</div><div class="article-title">Désavantages</div><div class="article-chevron">▾</div></div>
       <div class="article-body">
-        <p>Afin d'équilibrer certains affrontements, des <strong>désavantages</strong> seront attribués au joueur le mieux classé dans les cas suivants : <strong>P contre R</strong>, <strong>P contre N</strong> ou <strong>D contre N</strong>.</p>
-        <p>Le malus est tiré au sort parmi la liste suivante :</p>
+        <p>Afin d'équilibrer certains affrontements et de les rendre plus divertissants, des <strong>malus</strong> seront attribués au joueur le mieux classé (et à lui seulement) en simple si son adversaire est <strong>NC et non lui</strong>, ou dans les cas suivants : <strong>P contre R</strong>, <strong>P contre N</strong> ou <strong>D contre N</strong>.</p>
+
+        <p>Le malus est tiré au sort et communiqué aux joueurs <strong>au moment de l'annonce de l'affrontement</strong>, parmi la liste suivante :</p>
+
         <div class="malus-grid">
-          <div class="malus-item">Interdiction de smasher ou de tendre droit</div>
+          <div class="malus-item">Interdiction de smasher ou de tendre le volant</div>
           <div class="malus-item">Porter un cache-œil</div>
           <div class="malus-item">Interdiction de taper le volant au-dessus de la bande</div>
-          <div class="malus-item">Jouer en demi-terrain pour le joueur le moins bien classé (le demi-terrain change selon le service en cours)</div>
+          <div class="malus-item">Jouer en demi-terrain (le demi-terrain change selon le service en cours)</div>
           <div class="malus-item">Jouer avec une raquette courte</div>
           <div class="malus-item">Jouer avec une raquette lestée</div>
           <div class="malus-item">Jouer avec une raquette de précision</div>
           <div class="malus-item">Jouer avec un bras dans le dos constamment</div>
-          <div class="malus-item">Interdiction de faire un coup droit</div>
-          <div class="malus-item">Interdiction de faire un revers</div>
+          <div class="malus-item">Interdiction de faire un coup droit (ou un revers)</div>
+          <div class="malus-item">Interdiction de jouer droit (ou croisé)</div>
           <div class="malus-item">Annoncer chaque coup à voix haute avant de le jouer</div>
-          <div class="malus-item">Les couloirs font partie du terrain du joueur le plus classé</div>
-          <div class="malus-item">Les points du joueur le moins classé comptent double</div>
-          <div class="malus-item">Le point est marqué par le joueur le mieux classé uniquement s'il touche le sol avant la raquette de l'adversaire</div>
-          <div class="malus-item">Le joueur le moins classé marque le point</div>
-          <div class="malus-item">Zone restrictive changeant à chaque set : rivière, box, couloir du fond, box puis rivière</div>
+          <div class="malus-item">Les couloirs font partie du terrain du joueur le mieux classé</div>
+          <div class="malus-item">Les points de l'adversaire comptent double</div>
+          <div class="malus-item">Le point est marqué uniquement si le volant touche le sol avant l'adversaire (corps, vêtements ou raquette) ; il est nul s'il est gagné d'une autre manière</div>
+          <div class="malus-item">Le point est marqué seulement si le volant touche l'adversaire avant le sol</div>
+          <div class="malus-item">Le point est marqué uniquement si l'adversaire fait faute ou out</div>
+          <div class="malus-item">Le point est marqué uniquement si le volant touche le sol uniquement dans une zone donnée ; la zone change à chaque set : rivière, box, couloir du fond, box puis rivière</div>
         </div>
       </div>
     </div>
@@ -2703,12 +2708,14 @@
     <div class="article" onclick="toggleArticle(this)">
       <div class="article-header"><div class="article-num">05</div><div class="article-title">Exemptions</div><div class="article-chevron">▾</div></div>
       <div class="article-body">
-        <p>Dans des cas rares (voyage, blessure, maladie, décès…), un affrontement peut être annulé. L'organisation sera très reconnaissante d'être prévenue le plus tôt possible.</p>
-        <p><strong>Aucun affrontement</strong> ne sera réalisé durant les <strong>vacances scolaires</strong>.</p>
+        <p>Dans de rares cas (voyage, blessure, maladie, décès...), un affrontement peut être annulé et l'organisation du choc sera très reconnaissante d'être prévenue le plus tôt possible <strong>par l'envoi d'un message sur la plateforme CDR</strong>.</p>
+        <p>De plus, <strong>aucun affrontement ne sera réalisé durant les vacances scolaires.</strong></p>
       </div>
     </div>
+
   </div>
 </div>
+
 
 <!-- PAGE FAQ -->
 <div id="page-faq" class="page">
