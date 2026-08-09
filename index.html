@@ -1092,7 +1092,6 @@
   .dock-item:hover { color: var(--gray-light); background: var(--dark4); }
   .dock-item.active { color: var(--orange); background: none; }
   .dock-item.active svg { transform: scale(1.08); }
-  .dock-item[style*="display: none"] { display: none !important; }
 
   .dock-label {
     position: absolute; left: calc(100% + 12px); top: 50%; transform: translateY(-50%) translateX(-6px);
@@ -2676,6 +2675,12 @@ function showPage(id, btn) {
   document.getElementById('page-' + id).classList.add('active')
   if (btn) btn.classList.add('active')
   window.scrollTo(0, 0)
+  // Charte et FAQ démarrent toujours avec tous les articles fermés, qu'un article
+  // ait été laissé ouvert ou non lors d'une précédente visite (navigation interne
+  // à la SPA — pageshow/pagehide ne se déclenchent pas ici, voir plus bas).
+  if (id === 'reglement' || id === 'faq') {
+    document.querySelectorAll('#page-' + id + ' .article.open').forEach(closeArticle)
+  }
   if (id === 'classement') loadClassement()
   if (id === 'performances') loadPerformances()
   if (id === 'souvenirs') loadGallery()
@@ -2805,16 +2810,19 @@ function showApp() {
       }
     }
   }
+  const dock = document.getElementById('dock')
   if (currentUser && currentUser.role === 'ADMIN') {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
     document.getElementById('admin-panel').classList.add('active')
     document.querySelectorAll('.nav-btn').forEach(b => b.style.display = 'none')
+    if (dock) dock.style.display = 'none'
     startInactivityTimer()
     loadAllAdminDataWithProgress()
     loadHomeStats()
   } else {
     document.getElementById('admin-panel').classList.remove('active')
     document.querySelectorAll('.nav-btn').forEach(b => b.style.display = '')
+    if (dock) dock.style.display = ''
     applyHiddenTabs()
     startInactivityTimer()
     loadHomeStats()
@@ -3985,8 +3993,13 @@ function faqVoteRowHtml(t) {
 
 function toggleFaqArticle(el, topicId) {
   const wasOpen = el.classList.contains('open')
-  const body = el.querySelector('.article-body')
+
+  // Ferme tous les articles FAQ ouverts (un seul article ouvert à la fois,
+  // même comportement que la Charte).
+  document.querySelectorAll('.article.open').forEach(a => { if (a !== el) closeArticle(a) })
+
   el.classList.toggle('open')
+  const body = el.querySelector('.article-body')
   if (!wasOpen) {
     // Hauteur réelle du contenu plutôt qu'une valeur fixe : évite de tronquer
     // les sujets qui contiennent plusieurs paragraphes.

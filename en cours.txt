@@ -1,24 +1,26 @@
 ---------- Fonctionnalités en cours d'implémentation ----------
 - Sur téléphone, assure-toi que la personne soit bien déconnectée automatiquement 
-- L'admin choisit, pour chacun des article faq, s'il rend visible publiquement celle-ci ou pas. Ainsi, il peut publier un article ultérieurement ou ne jamais le publier et le conserver à titre informatif pour lui-même. 
-- Rajoute les malus auto aux couple N/DC, D/NC, P/NC. 
-- Dans actions et autres, l'admin peut modifier la liste des malus (en décocher ou en ajouter). Si un malus est supprimé, les potentiels matchs prévus qui utilisaient ce malus doivent être modifiés pour utiliser un autre malus. Un log apparait alors dans la console de l'automate d'aide à la planification pour prévenir du changement. 
-- Remplace les rappels automatiquement envoyés pour remplir les matchs par une commande admin qui active ou désactive cette fonctionnalité auto + une commande qui le fait manuellement 
-- Dans l'historique des notifications envoyées aux joueurs, l'admin peut cliquer sur l'une d'elles pour en afficher le contenu
-- Dans actions et autres, l'admin peut cocher/décocher les onglets qu'il veut rendre disponible au public (par exemple, il peut retirer l'onglet performances qui n'est pas essentiel et le proposer plus tard dans la saison)
-- Ajoute une heure de déconnexion réaliste aux bots
-- Dans l'onglet matchs planifiés, l'admin doit avoir la possibilité de notifier les joueurs de leur prochain match via Whatsapp. Pour cela, une petite interface doit s'ouvrir
+- Amélioration des visuels + Articles Charte et FAQ fermés --> Session en cours sur a.fillon657
+- Limite nb utilisations malus
+- Ajouter un moyen de choisir de jouer l'animation du lancement du site
+- Nouveau réglement 
+- Deuxième case de consentement à l'inscription
+- Nouvel onglet utilisateur "Mon profil" : pseudo, nom, prénom, tèl, catégorie (niveau), actif/inactif pour la saison 20..-20.., inscrit depuis le, nb de connexions au site, temps passé sur le site, nb de matchs joués, nb de matchs gagnés/nb de matchs perdus, nb de points marqués, nb de notifications reçues, nb de contacts envoyés (aucune information modifiable par le joueur, seulement consultable)
+- Pouvoir ajouter une photo au moment de rentrer les résultats d'un match
+- Dans les matchs à publier, retirer les doublons, ie un match publié implique que l'autre le soit aussi (seul le match avec le premier joueur gagnant apparaît à l'admin dans les matchs à publier)
+- Remplacer les boutons du panneau admin par un nuage d'icônes flottantes sur lesquels on peut passer la souris pour avoir le titre de la section, et évidemment cliquer
+- Revoir la mise en évidence du bouton correspondant au moyen de canal choisi dans "notifier un joueur"
 
 
 ---------- Bugs en cours de réparation ----------
 - Sous-titre "Choc des renards" du logo de bondy à mettre en blanc
-- Retirer le contour du bouton autour de "cliquer pour commencer" qui clignote
-- Non chargement de la page accueil au lancement du site 
 - Pas de déconnexion mobile
+- Déconnexion forcée des utilisateurs
+- Réponse à un contact
+- Bots persistants dans Performances
+- Retirer dock-brand dans la navbarre
+- Déplacer le bouton avec la catégorie (niveau) à côté du pseudo du joueur vers l'onglet Mon profil
 
----------- Fonctionnalités supplémentaires -----------
- - Envoyer des messages aux participants sur WhatsApp pour les matchs 
- - Transformer le site en une appli mobile
 
  
 ---------- Done ----------
@@ -107,6 +109,17 @@ Voici un petit récapitulatif des statuts des matchs si jamais ce n'était pas t
 - Historique de progression d'un joueur : un petit graphe (points/victoires dans le temps) sur la modale joueur — tu as déjà tout en base (matches, createdAt), juste à agréger.
 
 - Création de snapshot de la base de donnée
+
+- L'admin choisit, pour chacun des article faq, s'il rend visible publiquement celle-ci ou pas. Ainsi, il peut publier un article ultérieurement ou ne jamais le publier et le conserver à titre informatif pour lui-même. 
+- Rajoute les malus auto aux couple N/DC, D/NC, P/NC. 
+- Dans actions et autres, l'admin peut modifier la liste des malus (en décocher ou en ajouter). Si un malus est supprimé, les potentiels matchs prévus qui utilisaient ce malus doivent être modifiés pour utiliser un autre malus. Un log apparait alors dans la console de l'automate d'aide à la planification pour prévenir du changement. 
+- Remplace les rappels automatiquement envoyés pour remplir les matchs par une commande admin qui active ou désactive cette fonctionnalité auto + une commande qui le fait manuellement 
+- Dans l'historique des notifications envoyées aux joueurs, l'admin peut cliquer sur l'une d'elles pour en afficher le contenu
+- Dans actions et autres, l'admin peut cocher/décocher les onglets qu'il veut rendre disponible au public (par exemple, il peut retirer l'onglet performances qui n'est pas essentiel et le proposer plus tard dans la saison)
+- Ajoute une heure de déconnexion réaliste aux bots
+- Dans l'onglet matchs planifiés, l'admin doit avoir la possibilité de notifier les joueurs de leur prochain match via Whatsapp. Pour cela, une petite interface doit s'ouvrir
+
+- Intégration messages Whatsapp
 
 
 
