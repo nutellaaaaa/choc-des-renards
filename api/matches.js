@@ -114,6 +114,7 @@ module.exports = async function handler(req, res) {
         select: {
           id: true, username: true, firstName: true, lastName: true,
           category: true, accepted: true, banned: true, active: true, createdAt: true,
+          phone: true,
           matches: {
             where: { published: true },
             orderBy: { matchDate: 'desc' },
@@ -125,11 +126,17 @@ module.exports = async function handler(req, res) {
         },
       })
       if (!user) return res.status(404).json({ error: 'Joueur introuvable.' })
+      // Le téléphone n'est renvoyé que pour soi-même ou par un admin —
+      // cet endpoint accepte un userId arbitraire, on évite d'exposer
+      // le numéro de tous les joueurs à n'importe quel compte connecté.
+      const canSeePhone = isAdmin || auth.userId === uid
       return res.status(200).json({
         user: {
           id: user.id, username: user.username,
           firstName: user.firstName, lastName: user.lastName,
           category: user.category, active: user.active,
+          createdAt: user.createdAt,
+          phone: canSeePhone ? user.phone : undefined,
           ...computeStats(user.matches),
           matches: user.matches,
         },

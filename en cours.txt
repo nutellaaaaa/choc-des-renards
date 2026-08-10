@@ -14,7 +14,8 @@
 - Réponse à un contact
 - Bots persistants dans Performances
 - Informations indisponibles dans l'onglet "Mon profil" --> Session en cours sur a.fillon257
- 
+- Scrollbar navbarre téléphone
+
 ---------- Done ----------
 - Retirer nb phases et nb mois sur l'accueil
 - Ajouter nb matchs joués (somme du nombre de matchs joués par chaque joueurs divisée par deux)
