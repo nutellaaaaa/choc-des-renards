@@ -1,11 +1,9 @@
 ---------- Fonctionnalités en cours d'implémentation ----------
 - Sur téléphone, assure-toi que la personne soit bien déconnectée automatiquement 
 - Limite nb utilisations malus
-- Ajouter un moyen de choisir de jouer l'animation du lancement du site
 - Pouvoir ajouter une photo au moment de rentrer les résultats d'un match
 - Dans les matchs à publier, retirer les doublons, ie un match publié implique que l'autre le soit aussi (seul le match avec le premier joueur gagnant apparaît à l'admin dans les matchs à publier)
-- Revoir la mise en évidence du bouton correspondant au moyen de canal choisi dans "notifier un joueur"
-
+- Analyse complète de la logique du site 
 
 ---------- Bugs en cours de réparation ----------
 - Sous-titre "Choc des renards" du logo de bondy à mettre en blanc
@@ -13,8 +11,6 @@
 - Déconnexion forcée des utilisateurs
 - Réponse à un contact
 - Bots persistants dans Performances
-- Scrollbar navbarre téléphone
-- Beug écran d'accueil utilisateur navbarre
 
 ---------- Done ----------
 - Retirer nb phases et nb mois sur l'accueil
@@ -124,5 +120,9 @@ Voici un petit récapitulatif des statuts des matchs si jamais ce n'était pas t
 - Deuxième case de consentement à l'inscription à retirer
 - Nouveau réglement 
 
+- Supprimer l'animation du lancement du site
+- Revoir la mise en évidence du bouton correspondant au moyen de canal choisi dans "notifier un joueur"
+- Scrollbar navbarre téléphone
+- Beug écran d'accueil utilisateur navbarre
 
 
