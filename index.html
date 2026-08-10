@@ -476,8 +476,100 @@
     100% { transform: translate(-50%,-50%) rotate(var(--ang, 0deg)) translateY(var(--dist, 220px)) scale(1.4); opacity: 0; }
   }
 
-  /* Étape 2 : vidéo plein écran */
-  .intro-video-wrap video { width: 100%; height: 100%; object-fit: cover; }
+  /* Étape 2 : animation volant */
+  .intro-anim-wrap { background: var(--dark); overflow: hidden; }
+
+  .intro-anim-court-line {
+    position: absolute; left: 8%; right: 8%; bottom: 14%; height: 2px; background: var(--dark4);
+  }
+  .intro-anim-court-line::before {
+    content: ''; position: absolute; left: 50%; top: -4px; width: 2px; height: 10px;
+    background: var(--orange); transform: translateX(-50%); opacity: 0.7;
+  }
+
+  .intro-anim-racket {
+    position: absolute; left: 16%; bottom: 24%; width: 70px; height: 70px;
+    opacity: 0; transform: scale(0.7) rotate(-18deg);
+  }
+  .intro-anim-racket.run { animation: iaObjIn 0.4s 0.15s forwards; }
+  @keyframes iaObjIn { to { opacity: 1; transform: scale(1) rotate(-18deg); } }
+
+  .intro-anim-net {
+    position: absolute; left: 50%; bottom: 14%; width: 2px; height: 32%;
+    transform: translateX(-50%); opacity: 0;
+  }
+  .intro-anim-net.run { animation: iaNetIn 0.4s 0.75s forwards; }
+  @keyframes iaNetIn { from { opacity: 0; transform: translateX(-50%) scale(0.6); } to { opacity: 1; transform: translateX(-50%) scale(1); } }
+  .ia-net-post { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: var(--dark4); }
+  .ia-net-tape { position: absolute; top: 0; left: -13px; width: 28px; height: 5px; background: var(--orange); border-radius: 2px; }
+  .ia-net-mesh {
+    position: absolute; top: 5px; left: -13px; width: 28px; height: calc(100% - 5px);
+    background-image: repeating-linear-gradient(45deg, var(--dark4) 0 1px, transparent 1px 8px),
+                      repeating-linear-gradient(-45deg, var(--dark4) 0 1px, transparent 1px 8px);
+    opacity: 0.55;
+  }
+
+  .intro-anim-shuttle {
+    position: absolute; top: 0; left: 0; width: 34px; height: 44px;
+    transform-origin: 50% 50%; opacity: 0;
+  }
+  .intro-anim-shuttle.run {
+    animation: iaFlightPath 2.7s cubic-bezier(.3,.1,.3,1) 0.1s forwards,
+               iaShuttleFade 0.35s 2.75s forwards;
+  }
+  @keyframes iaFlightPath {
+    0%   { opacity: 1; transform: translate(8vw,-10vh)   rotate(200deg) scale(1); }
+    16%  { transform: translate(15vw,63vh)  rotate(340deg) scale(1); }
+    17%  { transform: translate(15vw,63vh)  rotate(340deg) scale(1.25,0.7); }
+    18%  { transform: translate(16vw,60vh)  rotate(360deg) scale(1); }
+    38%  { transform: translate(38vw,20vh)  rotate(520deg) scale(1); }
+    58%  { transform: translate(50vw,63vh)  rotate(680deg) scale(1); }
+    59%  { transform: translate(50vw,63vh)  rotate(680deg) scale(1.25,0.7); }
+    60%  { transform: translate(51vw,60vh)  rotate(700deg) scale(1); }
+    76%  { transform: translate(66vw,38vh)  rotate(800deg) scale(1); }
+    90%  { transform: translate(78vw,63vh)  rotate(880deg) scale(1); }
+    91%  { transform: translate(78vw,63vh)  rotate(880deg) scale(1.25,0.7); }
+    100% { transform: translate(79vw,58vh)  rotate(900deg) scale(1); }
+  }
+  @keyframes iaShuttleFade { to { opacity: 0; } }
+
+  .intro-anim-impact {
+    position: absolute; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--orange-light); opacity: 0; pointer-events: none;
+    box-shadow: 0 0 0 0 rgba(255,146,0,0.6);
+  }
+  .intro-anim-impact.i1 { left: 16%; bottom: 24%; }
+  .intro-anim-impact.i2 { left: 50%; bottom: 24%; --ia-tx: -50%; }
+  .intro-anim-impact.i3 { left: 79%; bottom: 24%; }
+  .intro-anim-impact.i1.run { animation: iaImpact 0.5s 0.52s forwards; }
+  .intro-anim-impact.i2.run { animation: iaImpact 0.5s 1.55s forwards; }
+  .intro-anim-impact.i3.run { animation: iaImpact 0.5s 2.44s forwards; }
+  @keyframes iaImpact {
+    0%   { opacity: 1; transform: scale(0.4) translateX(var(--ia-tx,0)); box-shadow: 0 0 0 0 rgba(255,146,0,0.55); }
+    100% { opacity: 0; transform: scale(2.6) translateX(var(--ia-tx,0)); box-shadow: 0 0 0 22px rgba(255,146,0,0); }
+  }
+
+  .intro-anim-brand {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    opacity: 0; pointer-events: none;
+  }
+  .intro-anim-brand.run { animation: iaBrandIn 0.7s 2.95s forwards; }
+  @keyframes iaBrandIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .ia-brand-underline {
+    width: 0; height: 3px; background: var(--orange); margin-bottom: 1.1rem; border-radius: 2px;
+  }
+  .intro-anim-brand.run .ia-brand-underline { animation: iaLineGrow 0.5s 3.15s forwards; }
+  @keyframes iaLineGrow { to { width: 64px; } }
+  .ia-brand-title {
+    font-family: var(--font-display); color: var(--white);
+    font-size: clamp(2.4rem,7vw,4.2rem); letter-spacing: 0.05em; line-height: 1;
+  }
+  .ia-brand-title em { color: var(--orange); font-style: normal; display: block; }
+  .ia-brand-sub {
+    margin-top: 0.9rem; font-family: var(--font-heading); font-size: 0.85rem;
+    letter-spacing: 0.28em; text-transform: uppercase; color: var(--gray);
+  }
 
   /* Étape 3 : chargement fictif */
   .intro-loading { flex-direction: column; gap: 1.25rem; background: var(--dark); }
@@ -1441,9 +1533,54 @@
     <div class="intro-click-label">Cliquez pour commencer</div>
   </div>
 
-  <!-- Étape 2 : vidéo plein écran, son à fond -->
-  <div id="intro-video-wrap" class="intro-stage intro-video-wrap">
-    <video id="intro-video" src="cdr-animation.mp4" preload="auto" playsinline></video>
+  <!-- Étape 2 : animation volant -->
+  <div id="intro-anim-wrap" class="intro-stage intro-anim-wrap">
+    <div class="intro-anim-court-line"></div>
+
+    <div class="intro-anim-racket">
+      <svg viewBox="0 0 70 70" width="70" height="70">
+        <ellipse cx="35" cy="26" rx="20" ry="24" fill="none" stroke="#3a3a3a" stroke-width="2.5"/>
+        <g stroke="#2A2A2A" stroke-width="1">
+          <line x1="35" y1="4" x2="35" y2="48"/>
+          <line x1="18" y1="10" x2="52" y2="10"/>
+          <line x1="16" y1="16" x2="54" y2="16"/>
+          <line x1="15" y1="22" x2="55" y2="22"/>
+          <line x1="15" y1="28" x2="55" y2="28"/>
+          <line x1="16" y1="34" x2="54" y2="34"/>
+          <line x1="18" y1="40" x2="52" y2="40"/>
+          <line x1="24" y1="6" x2="24" y2="46"/>
+          <line x1="29" y1="4" x2="29" y2="48"/>
+          <line x1="41" y1="4" x2="41" y2="48"/>
+          <line x1="46" y1="6" x2="46" y2="46"/>
+        </g>
+        <rect x="31" y="48" width="8" height="20" rx="3" fill="#2A2A2A"/>
+      </svg>
+    </div>
+
+    <div class="intro-anim-net">
+      <div class="ia-net-post"></div>
+      <div class="ia-net-mesh"></div>
+      <div class="ia-net-tape"></div>
+    </div>
+
+    <div class="intro-anim-shuttle">
+      <svg viewBox="0 0 34 44" width="34" height="44">
+        <polygon points="17,2 4,30 30,30" fill="#EDEDED" opacity="0.92"/>
+        <polygon points="17,2 12,30 22,30" fill="#FF9200" opacity="0.5"/>
+        <ellipse cx="17" cy="35" rx="7" ry="8" fill="#F5F5F5"/>
+        <ellipse cx="17" cy="35" rx="7" ry="8" fill="none" stroke="#c9c9c9" stroke-width="0.6"/>
+      </svg>
+    </div>
+
+    <div class="intro-anim-impact i1"></div>
+    <div class="intro-anim-impact i2"></div>
+    <div class="intro-anim-impact i3"></div>
+
+    <div class="intro-anim-brand">
+      <div class="ia-brand-underline"></div>
+      <div class="ia-brand-title">CHOC <em>DES RENARDS</em></div>
+      <div class="ia-brand-sub">Bienvenue sur le tournoi</div>
+    </div>
   </div>
 
   <!-- Étape 3 : chargement fictif -->
@@ -3354,38 +3491,30 @@ function introClickBurst(e) {
 }
 
 function introStartVideo(e) {
-  const gate  = document.getElementById('intro-gate')
-  const wrap  = document.getElementById('intro-video-wrap')
-  const video = document.getElementById('intro-video')
+  const gate = document.getElementById('intro-gate')
+  const wrap = document.getElementById('intro-anim-wrap')
 
   introClickBurst(e)
 
-  video.muted = false
-  video.volume = 1
-  try { video.currentTime = 0 } catch {}
-
-  const goNext = () => introGoToLoading()
-  video.onended = goNext
-  clearTimeout(video._introFallback)
-  video._introFallback = setTimeout(goNext, 6000) // garde-fou si la vidéo ne se termine pas normalement
-
-  const playPromise = video.play()
-  if (playPromise && playPromise.catch) {
-    playPromise.catch(() => goNext()) // vidéo bloquée/introuvable : on n'immobilise jamais l'utilisateur
-  }
-
-  // Laisse le jet d'encre se déployer entièrement à l'écran avant de basculer vers la vidéo
+  // Laisse le jet d'encre se déployer avant de basculer vers l'animation
   setTimeout(() => {
     gate.classList.remove('visible')
     wrap.classList.add('visible')
+
+    // Déclenche toutes les animations CSS en ajoutant la classe .run
+    wrap.querySelectorAll('.intro-anim-racket, .intro-anim-net, .intro-anim-shuttle, .intro-anim-impact, .intro-anim-brand')
+        .forEach(el => el.classList.add('run'))
+
+    // Durée totale de l'animation (brand visible ~3.15s + 1.2s de lisibilité = ~4.3s)
+    clearTimeout(wrap._introFallback)
+    wrap._introFallback = setTimeout(() => introGoToLoading(), 4400)
   }, 1150)
 }
 
 function introGoToLoading() {
-  const video   = document.getElementById('intro-video')
-  const wrap    = document.getElementById('intro-video-wrap')
+  const wrap    = document.getElementById('intro-anim-wrap')
   const loading = document.getElementById('intro-loading')
-  video.pause()
+  clearTimeout(wrap._introFallback)
   wrap.classList.remove('visible')
   loading.classList.add('visible')
 
@@ -3428,8 +3557,12 @@ function introFinish() {
     overlay.classList.add('hidden')
     overlay.style.transition = ''; overlay.style.opacity = ''
     document.querySelectorAll('#intro-overlay .intro-stage').forEach(s => s.classList.remove('visible'))
-    const video = document.getElementById('intro-video')
-    video.pause(); try { video.currentTime = 0 } catch {}
+    // Réinitialise l'animation pour la prochaine ouverture éventuelle
+    const animWrap = document.getElementById('intro-anim-wrap')
+    if (animWrap) {
+      animWrap.querySelectorAll('.intro-anim-racket, .intro-anim-net, .intro-anim-shuttle, .intro-anim-impact, .intro-anim-brand')
+              .forEach(el => el.classList.remove('run'))
+    }
     // L'accueil a été préparé par showApp() bien avant, pendant que l'overlay noir de
     // l'intro le masquait : sans ceci, l'utilisateur ne voit jamais les chiffres défiler
     // ni le logo apparaître — tout se serait déjà joué "hors écran". On relance donc ces
@@ -3443,7 +3576,8 @@ function introFinish() {
 }
 
 function introSkip() {
-  document.getElementById('intro-video').pause()
+  const wrap = document.getElementById('intro-anim-wrap')
+  if (wrap) clearTimeout(wrap._introFallback)
   introFinish()
 }
 
@@ -3487,7 +3621,6 @@ function showPendingBack() {
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin() })
   document.getElementById('reg-confirm').addEventListener('keydown', e => { if (e.key === 'Enter') handleRegister() })
-  document.getElementById('intro-video').load() // précharge la vidéo pour un démarrage instantané au clic
   initAuth()
 })
 
