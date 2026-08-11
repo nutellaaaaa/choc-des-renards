@@ -181,16 +181,16 @@
   .pdf-btn { background: var(--orange); color: #000; border: none; cursor: pointer; font-family: var(--font-heading); font-size: 1rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.9rem 2.5rem; border-radius: 8px; transition: all 0.2s; text-decoration: none; display: inline-flex; align-items: center; gap: 0.6rem; }
   .pdf-btn:hover { background: var(--orange-light); transform: translateY(-2px); }
   /* Visionneuse PDF de la charte — empêche le téléchargement facile */
-  .pdf-viewer-wrap { position: relative; width: 100%; height: clamp(420px, 70vh, 820px); background: var(--dark2); border: 1px solid var(--dark4); border-left: 3px solid var(--orange); border-radius: 12px; overflow: hidden; margin-bottom: 2rem; }
+  .pdf-viewer-wrap { position: relative; width: 100%; height: clamp(520px, 75vh, 920px); background: var(--dark2); border: 1px solid var(--dark4); border-left: 3px solid var(--orange); border-radius: 12px; overflow: hidden; margin-bottom: 2rem; }
   .pdf-viewer-frame { width: 100%; height: 100%; border: 0; display: block; background: #525659; }
   /* Overlay transparent au-dessus du PDF : bloque le clic-droit / sélection / menu de téléchargement du lecteur intégré du navigateur */
-  .pdf-viewer-shield { position: absolute; inset: 0; z-index: 2; background: transparent; cursor: default; }
+  .pdf-viewer-shield { position: absolute; inset: 0; z-index: 2; background: transparent; pointer-events: none; cursor: default; }
   .pdf-viewer-fallback { position: absolute; inset: 0; z-index: 3; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; text-align: center; padding: 1.5rem; color: var(--gray-light); font-size: 0.95rem; background: var(--dark2); }
   .pdf-viewer-fallback .fv-icon { font-size: 2.4rem; }
   .pdf-viewer-toolbar { position: absolute; top: 0.6rem; right: 0.6rem; z-index: 4; display: flex; gap: 0.4rem; }
   .pdf-viewer-toolbar button { background: var(--dark3); border: 1px solid var(--dark4); color: var(--gray-light); font-family: var(--font-heading); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; padding: 0.4rem 0.7rem; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
   .pdf-viewer-toolbar button:hover { border-color: var(--orange); color: var(--orange); }
-  @media (max-width: 640px) { .pdf-viewer-wrap { height: 60vh; } }
+  @media (max-width: 640px) { .pdf-viewer-wrap { height: 65vh; } }
 
   /* RÈGLEMENT */
   .article { background: var(--dark2); border: 1px solid var(--dark4); border-radius: 12px; padding: 1.75rem 2rem; margin-bottom: 1.25rem; transition: border-color 0.2s; }
@@ -2871,8 +2871,7 @@
     <h1 class="section-title">Char<span>te</span></h1>
     <p class="section-subtitle">Charte officielle du Choc des Renards</p>
     <div class="reglement-tools">
-      <div class="reglement-tools-text"><strong>Lire la charte en ligne</strong><br>Consultez la charte complète du Choc des Renards directement dans la visionneuse ci-dessous (le téléchargement est désactivé).</div>
-      <button class="pdf-btn" type="button" onclick="openCharteFullscreen()">⛶ Plein écran</button>
+      <div class="reglement-tools-text"><strong>Lire la charte en ligne</strong><br>Consultez la charte complète du Choc des Renards directement dans la visionneuse ci-dessous. Le téléchargement est désactivé ; utilisez la barre de défilement pour lire le document en entier.</div>
     </div>
 
     <!-- Visionneuse PDF de la charte : le PDF est affiché en lecture seule.
@@ -2880,10 +2879,9 @@
          sélection et le bouton « Télécharger » de la barre d'outils du lecteur
          intégré du navigateur. On force aussi le paramètre #toolbar=0 (Chrome)
          et embed=true pour limiter l'affichage des contrôles. -->
-    <div class="pdf-viewer-wrap" id="charte-viewer-wrap">
+    <div class="pdf-viewer-wrap" id="charte-viewer-wrap" oncontextmenu="return false" ondragstart="return false">
       <div class="pdf-viewer-toolbar">
-        <button type="button" onclick="openCharteFullscreen()" title="Plein écran">⛶</button>
-        <button type="button" onclick="reloadCharteViewer()" title="Recharger">↻</button>
+        <button type="button" onclick="reloadCharteViewer()" title="Recharger la visionneuse">↻</button>
       </div>
       <iframe class="pdf-viewer-frame" id="charte-viewer-frame"
               src="reglement-choc-des-renards.pdf#toolbar=0&amp;navpanes=0&amp;view=FitH"
@@ -3229,10 +3227,44 @@
 })()
 
 /* ══════════════ NAVIGATION ══════════════ */
+// Mapping page ID -> cle d'onglet (data-tab) pour le controle de visibilite.
+// Les pages sans cle (accueil, reglement, mes-notifs, confidentialite) sont
+// toujours accessibles. Les autres sont soumises au filtre _hiddenTabs.
+const PAGE_TO_TAB = {
+  classement: 'ranking',
+  'score-match': 'matches',
+  performances: 'performances',
+  souvenirs: 'gallery',
+  faq: 'faq',
+  contact: 'contact',
+  'mon-profil': 'profil',
+}
+// Pages toujours accessibles (pas soumises au filtre des onglets caches)
+const ALWAYS_ACCESSIBLE_PAGES = ['accueil', 'reglement', 'mes-notifs', 'confidentialite']
+function isTabHiddenForUser(tabKey) {
+  if (!tabKey) return false
+  // Les comptes lies (yanis, alexandre) voient toujours tout
+  const uname = (currentUser?.username || '').toLowerCase()
+  if (Object.values(LINKED_USERNAMES).includes(uname)) return false
+  return _hiddenTabs.includes(tabKey)
+}
 function showPage(id, btn) {
+  // Controle de securite : empecher l'acces aux pages dont l'onglet est cache.
+  // Meme si le bouton de navigation est masque, showPage() peut etre appele
+  // programmatiquement (dock, JS). On verifie donc systematiquement.
+  if (!ALWAYS_ACCESSIBLE_PAGES.includes(id)) {
+    const tabKey = PAGE_TO_TAB[id]
+    if (tabKey && isTabHiddenForUser(tabKey)) {
+      // Rediriger vers l'accueil au lieu d'afficher la page cachee
+      console.warn('[showPage] acces bloque a la page cachee:', id)
+      showPage('accueil', document.getElementById('nav-accueil-btn'))
+      return
+    }
+  }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'))
-  document.getElementById('page-' + id).classList.add('active')
+  const pageEl = document.getElementById('page-' + id)
+  if (pageEl) pageEl.classList.add('active')
   if (btn) btn.classList.add('active')
   window.scrollTo(0, 0)
   // Charte et FAQ démarrent toujours avec tous les articles fermés, qu'un article
@@ -3314,12 +3346,9 @@ function toggleArticle(el) {
 const CHARTE_PDF = 'reglement-choc-des-renards.pdf'
 
 function openCharteFullscreen() {
-  // Ouvre le PDF plein écran avec la barre d'outils du lecteur désactivée
-  const w = window.open(CHARTE_PDF + '#toolbar=0&navpanes=0&view=FitH', '_blank', 'noopener,noreferrer')
-  if (!w) {
-    // Pop-up bloqué : on recharge la visionneuse intégrée
-    reloadCharteViewer()
-  }
+  // Le plein écran est désactivé car il permettrait de télécharger le PDF.
+  // On recharge simplement la visionneuse intégrée.
+  reloadCharteViewer()
 }
 
 function reloadCharteViewer() {
@@ -3420,7 +3449,7 @@ async function verifySession() {
         localStorage.setItem('cdr_user', JSON.stringify(data.user))
       }
     }
-  } catch (e) { /* erreur réseau : on ne déconnecte pas (hors-ligne) */ }
+  } catch (e) { console.warn('[verifySession] failed:', e) }
 }
 
 function showApp() {
@@ -3469,6 +3498,10 @@ function showApp() {
     // même s'il avait quitté le site depuis une autre page (ex. FAQ) lors d'une session précédente.
     showPage('accueil', document.getElementById('nav-accueil-btn'))
     applyHiddenTabs()
+    // Charger les onglets caches des le depart pour les utilisateurs non-admin.
+    // Sans cela, _hiddenTabs reste vide jusqu'au premier appel a loadClassement/
+    // loadPerformances, et les onglets caches seraient visibles temporairement.
+    loadHiddenTabsForUser()
     startInactivityTimer()
     loadHomeStats()
     loadConvocationsBadge()
@@ -4394,25 +4427,39 @@ function checkStaleSessionOnLoad() {
 // actif. S'appuie sur l'endpoint /api/login?action=me qui vérifie aussi le
 // forceLogout. Toutes les 5 min tant que la page est visible.
 let heartbeatTimer = null
+async function checkSessionServer() {
+  if (!localStorage.getItem('cdr_token')) return
+  try {
+    const res = await fetch('/api/login?action=me', { headers: authHeaders() })
+    if (res.status === 401 || res.status === 403) {
+      const data = await res.json().catch(() => ({}))
+      logout(data.forceLogout ? 'forced' : 'inactivity')
+    }
+  } catch (e) {
+    console.warn('[heartbeat] session check failed:', e)
+  }
+}
 function startSessionHeartbeat() {
   if (isInactivityExempt()) return
   stopSessionHeartbeat()
   const beat = async () => {
-    if (document.hidden) return // pas de heartbeat en arrière-plan
+    if (document.hidden) return
     if (!localStorage.getItem('cdr_token')) return
     persistLastActivity()
-    try {
-      const res = await fetch('/api/login?action=me', { headers: authHeaders() })
-      if (res.status === 401 || res.status === 403) {
-        const data = await res.json().catch(() => ({}))
-        logout(data.forceLogout ? 'forced' : 'inactivity')
-      }
-    } catch {}
+    await checkSessionServer()
   }
-  heartbeatTimer = setInterval(beat, 5 * 60 * 1000)
+  // Intervalle court (60 s) pour detecter rapidement un forceLogout admin
+  heartbeatTimer = setInterval(beat, 60 * 1000)
+  document.addEventListener('visibilitychange', onHeartbeatVisibilityChange)
+}
+function onHeartbeatVisibilityChange() {
+  if (!document.hidden && localStorage.getItem('cdr_token')) {
+    checkSessionServer()
+  }
 }
 function stopSessionHeartbeat() {
   if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null }
+  document.removeEventListener('visibilitychange', onHeartbeatVisibilityChange)
 }
 function handleMobileVisibility() {
   if (isInactivityExempt()) return
@@ -4464,8 +4511,15 @@ async function loadClassement() {
   try {
     const res = await fetch('/api/matches', { headers: authHeaders() })
     if (!res.ok) { container.innerHTML = '<div class="admin-empty">Impossible de charger le classement.</div>'; return }
-    const { phase, round, players, poules, phase2Groups } = await res.json()
-    classementPlayers = players || []
+    const { phase, round, players, poules, phase2Groups, hiddenTabs } = await res.json()
+    // Charger les onglets caches pour les utilisateurs non-admin (ils n'ont
+    // pas acces a /api/admin/match qui fournit hiddenTabs normalement)
+    if (Array.isArray(hiddenTabs) && hiddenTabs.length >= 0) {
+      _hiddenTabs = hiddenTabs
+      applyHiddenTabs()
+    }
+    // Filtre de securite cote client : exclure les bots (pseudo bot_[nombre])
+    classementPlayers = (players || []).filter(p => p && p.username && !/^bot_\d+$/i.test(p.username))
 
     document.getElementById('classement-subtitle').textContent = 'Phase en cours : ' + phaseLabel(phase, round)
 
@@ -4633,8 +4687,15 @@ async function loadPerformances() {
   try {
     const res = await fetch('/api/matches', { headers: authHeaders() })
     if (!res.ok) { container.innerHTML = '<div class="admin-empty">Impossible de charger les performances.</div>'; return }
-    const { phase, players } = await res.json()
-    perfPlayers = players || []
+    const { phase, players, hiddenTabs } = await res.json()
+    // Charger les onglets caches pour les utilisateurs non-admin
+    if (Array.isArray(hiddenTabs) && hiddenTabs.length >= 0) {
+      _hiddenTabs = hiddenTabs
+      applyHiddenTabs()
+    }
+    // Filtre de securite cote client : exclure les bots (pseudo bot_[nombre])
+    // meme si l'API en renvoie encore (snapshot stale non nettoye)
+    perfPlayers = (players || []).filter(p => p && p.username && !/^bot_\d+$/i.test(p.username))
     classementPlayers = perfPlayers // réutilise la modale de détail joueur (showPlayerDetail / bindPlayerRows)
     perfBestProgressionId = computeBestProgressionId(perfPlayers)
 
@@ -7110,17 +7171,50 @@ async function toggleContactTreated(contactId, treated) {
   } catch (e) { console.error('[toggleContactTreated]', e) }
 }
 
-function replyToContact(userId, contactId, subject) {
+async function replyToContact(userId, contactId, subject) {
   // Marque directement la demande comme traitée puisqu'on y répond
   toggleContactTreated(contactId, true)
 
+  // IMPORTANT : on ne passe PAS par adminTab('notify') qui déclencherait
+  // loadPlayersForNotify() en parallèle (sans await). Cette tâche en arrière-plan
+  // reconstruit le HTML des checkboxes (renderNotifyPlayerList) APRÈS que
+  // selectNotifyRecipient les ait cochées, dÃ©truisant l'Ã©tat cochÃ©.
+  // On affiche donc l'onglet notify manuellement SANS déclencher le rechargement,
+  // puis on charge les joueurs en sÃ©quence avec await, puis on coche.
+  document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'))
+  document.querySelectorAll('.admin-tabs > .admin-tab').forEach(b => b.classList.remove('active'))
+  const notifySection = document.getElementById('admin-notify')
+  if (notifySection) notifySection.classList.add('active')
   const notifyBtn = document.querySelector('[onclick*="notify"]')
-  adminTab('notify', notifyBtn)
-  // On doit attendre que loadPlayersForNotify() (asynchrone, déclenchée par
-  // adminTab) ait peuplé allPlayersForNotify et rendu les checkboxes avant de
-  // pouvoir cocher le destinataire. Sinon aucune case n'est cochée et l'envoi
-  // échoue avec « Sélectionnez au moins un joueur ».
-  selectNotifyRecipient(userId, subject)
+  if (notifyBtn) notifyBtn.classList.add('active')
+  const hub = document.getElementById('kingdom-hub')
+  const wrap = document.getElementById('admin-content-wrap')
+  if (hub) hub.classList.add('hide')
+  if (wrap) wrap.style.display = 'block'
+  closeMobileNav()
+  window.scrollTo(0, 0)
+
+  // Charger les joueurs en séquence (await) et attendre le rendu complet
+  try { await loadPlayersForNotify() } catch(e) { console.error('[replyToContact] loadPlayersForNotify failed', e) }
+  // Laisser un tick au navigateur pour finaliser le rendu du DOM
+  await new Promise(r => setTimeout(r, 30))
+
+  // Maintenant que les checkboxes existent, cocher le destinataire
+  let found = false
+  document.querySelectorAll('.notify-player-cb').forEach(cb => {
+    const match = parseInt(cb.value) === userId
+    cb.checked = match
+    if (match) found = true
+  })
+  updateNotifyDropdownLabel()
+  const titleEl = document.getElementById('notify-title')
+  if (titleEl) titleEl.value = `Réponse à ${subject}`
+  const msgEl = document.getElementById('notify-message')
+  if (msgEl) {
+    msgEl.value = ''
+    msgEl.focus()
+  }
+  if (!found) console.warn('[replyToContact] destinataire non trouvé dans la liste, userId=', userId)
 }
 
 // Coche un unique destinataire dans le dropdown de notification, en attendant
@@ -7844,6 +7938,22 @@ async function saveHiddenTabs() {
     if (res.ok) { _hiddenTabs = hiddenTabs; renderTabsVisibility(); showFeedback('other-actions-feedback', '✓ ' + data.message, true) }
     else showFeedback('other-actions-feedback', '✗ ' + data.error, false)
   } catch { showFeedback('other-actions-feedback', '✗ Erreur réseau.', false) }
+}
+
+// Charge les onglets caches pour les utilisateurs non-admin.
+// L'endpoint /api/matches renvoie hiddenTabs (accessible a tous les comptes
+// connectes). On l'appelle ici specifiquement pour recuperer la config des
+// onglets caches le plus tot possible apres la connexion.
+async function loadHiddenTabsForUser() {
+  try {
+    const res = await fetch('/api/matches', { headers: authHeaders() })
+    if (!res.ok) return
+    const data = await res.json()
+    if (Array.isArray(data.hiddenTabs)) {
+      _hiddenTabs = data.hiddenTabs
+      applyHiddenTabs()
+    }
+  } catch(e) { console.error('[loadHiddenTabsForUser]', e) }
 }
 
 function applyHiddenTabs() {

@@ -61,9 +61,14 @@ module.exports = async function handler(req, res) {
       const isAdmin = ['admin', 'root'].includes(user.username.toLowerCase()) || user.role === 'ADMIN'
       // L'admin n'est jamais soumis au forceLogout (sinon il se déconnecterait lui-même)
       if (!isAdmin && user.forceLogout) {
-        // Réinitialiser le flag pour ne pas bloquer la prochaine connexion
-        await prisma.user.update({ where: { id: user.id }, data: { forceLogout: false } })
-        // Clôturer l'événement de connexion en cours
+        // IMPORTANT : on NE réinitialise PAS le flag forceLogout ici.
+        // Le reset se fait uniquement lors d'une vraie connexion (POST /api/login)
+        // ou via l'admin. Si on le reset ici et que le fetch côté client échoue
+        // (réseau coupé, onglet en arrière-plan, etc.), le flag serait déjà à
+        // false au prochain heartbeat et l'utilisateur ne serait jamais déconnecté.
+        // En gardant le flag à true, chaque heartbeat/verifySession recevra le 401
+        // jusqu'à ce que le client confirme la déconnexion (logout) puis se reconnecte.
+        // Clôturer l'événement de connexion en cours (idempotent)
         try {
           await prisma.loginEvent.updateMany({
             where: { userId: user.id, logoutAt: null },

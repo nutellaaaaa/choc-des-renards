@@ -206,17 +206,34 @@ module.exports = async function handler(req, res) {
         const snapshot = JSON.parse(state.rankingSnapshot)
         const frozenOrder = snapshot.players || snapshot
 
+        // Filtre empirique : exclure les bots du snapshot.
+        // Les bots générés puis supprimés peuvent rester dans le snapshot
+        // (rankingSnapshot) même après leur suppression. On exclut tout
+        // pseudo de la forme bot_[nombre] ainsi que les entrées marquees isBot.
+        const isBotUsername = (u) => {
+          if (!u || !u.username) return false
+          return /^bot_\d+$/i.test(u.username)
+        }
+        const isBotEntry = (fp) => (fp && fp.isBot) || isBotUsername(fp)
+
+        // Filtrer les bots du snapshot AVANT de l'utiliser
+        const cleanFrozenOrder = frozenOrder.filter(fp => !isBotEntry(fp))
+
         // Réordonner selon le snapshot (position figée), mais stats live
         const liveMap = {}
         for (const p of livePlayers) liveMap[p.id] = p
 
-        // Joueurs dans l'ordre du snapshot avec stats live
-        const ordered = frozenOrder
-          .map(fp => liveMap[fp.id] || { ...fp })
+        // Joueurs dans l'ordre du snapshot avec stats live.
+        // On ne garde que les joueurs qui existent encore en live (liveMap) :
+        // les entrées du snapshot qui ne sont plus en live sont soit des bots
+        // (déjà filtrés) soit des comptes supprimés/désactivés qu'on ne
+        // doit pas afficher non plus.
+        const ordered = cleanFrozenOrder
+          .map(fp => liveMap[fp.id])
           .filter(Boolean)
 
         // Joueurs nouveaux (pas dans le snapshot) → en fin
-        const frozenIds = new Set(frozenOrder.map(p => p.id))
+        const frozenIds = new Set(cleanFrozenOrder.map(p => p.id))
         const newPlayers = livePlayers.filter(p => !frozenIds.has(p.id))
 
         orderedPlayers = [...ordered, ...newPlayers]
@@ -243,6 +260,11 @@ module.exports = async function handler(req, res) {
       }
     })
 
+    // Onglets caches : renvoyes a tous les utilisateurs (pas seulement admin)
+    // pour que le client puisse masquer les onglets et bloquer l'acces aux pages.
+    let hiddenTabsArr = []
+    try { hiddenTabsArr = JSON.parse(state.hiddenTabs || '[]') } catch {}
+
     const response = {
       phase: state.currentPhase,
       round: state.currentRound,
@@ -250,6 +272,7 @@ module.exports = async function handler(req, res) {
       poules: poulesWithStats,
       phase2Groups,
       rankingFrozen: !!state.rankingSnapshot,
+      hiddenTabs: hiddenTabsArr,
     }
     if (isAdmin) response.fromSnapshot = !!state.rankingSnapshot
 
