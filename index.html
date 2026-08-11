@@ -1555,6 +1555,17 @@
   .medal-shape--trophee  { clip-path: polygon(20% 0, 80% 0, 80% 15%, 70% 30%, 75% 45%, 60% 45%, 55% 80%, 70% 85%, 70% 95%, 30% 95%, 30% 85%, 45% 80%, 40% 45%, 25% 45%, 30% 30%, 20% 15%); }
   .medal-shape--insigne  { clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
   .medal-shape--sceau    { border-radius: 12px; clip-path: polygon(0 15%, 15% 0, 85% 0, 100% 15%, 100% 85%, 85% 100%, 15% 100%, 0 85%); }
+  .medal-shape--etoile   { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
+  .medal-shape--pentagone { clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%); }
+  .medal-shape--octogramme { clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); }
+  .medal-shape--fleche   { clip-path: polygon(0% 40%, 60% 40%, 60% 15%, 100% 50%, 60% 85%, 60% 60%, 0% 60%); }
+  .medal-shape--croix    { clip-path: polygon(35% 0%, 65% 0%, 65% 35%, 100% 35%, 100% 65%, 65% 65%, 65% 100%, 35% 100%, 35% 65%, 0% 65%, 0% 35%, 35% 35%); }
+  .medal-shape--creneau  { clip-path: polygon(0 20%, 12% 20%, 12% 0, 24% 0, 24% 20%, 38% 20%, 38% 0, 50% 0, 50% 20%, 62% 20%, 62% 0, 74% 0, 74% 20%, 88% 20%, 88% 0, 100% 0, 100% 100%, 0 100%); }
+  .medal-shape--larme    { border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; clip-path: polygon(50% 0%, 90% 50%, 70% 90%, 30% 90%, 10% 50%); }
+  .medal-shape--medaillon { border-radius: 50%; clip-path: ellipse(50% 42% at 50% 50%); }
+  .medal-shape--rune     { clip-path: polygon(15% 0, 85% 0, 95% 12%, 95% 88%, 85% 100%, 15% 100%, 5% 88%, 5% 12%); border-radius: 6px; }
+  .medal-shape--etoile8  { clip-path: polygon(50% 0%, 60% 30%, 90% 10%, 70% 40%, 100% 50%, 70% 60%, 90% 90%, 60% 70%, 50% 100%, 40% 70%, 10% 90%, 30% 60%, 0% 50%, 30% 40%, 10% 10%, 40% 30%); }
+  .medal-shape--fer      { clip-path: polygon(50% 0%, 65% 20%, 75% 15%, 85% 30%, 78% 45%, 70% 42%, 70% 75%, 80% 82%, 80% 100%, 20% 100%, 20% 82%, 30% 75%, 30% 42%, 22% 45%, 15% 30%, 25% 15%, 35% 20%); }
 
   /* ---- Halo de rareté ---- */
   .medal-card[data-rarity="Commune"]    { --rarity-glow: rgba(180,180,180,0.4); }
@@ -1600,29 +1611,34 @@
     font-family: var(--font-heading); letter-spacing: 0.05em;
   }
 
-  /* ---- Animation scintillement (médailles du joueur connecté) ---- */
+  /* ---- Animation scintillement (médailles du joueur connecté) ----
+     Rendue discrète : le scintillement ne se déclenche que par intermittence
+     (longue pause entre deux passages) avec une opacité atténuée, pour ne
+     pas être imposant tout en signalant que la médaille appartient au joueur. */
   @keyframes medalSparkle {
-    0%, 100% { filter: brightness(1) drop-shadow(0 0 0px transparent); }
-    25%      { filter: brightness(1.3) drop-shadow(0 0 8px rgba(255,255,255,0.8)); }
-    50%      { filter: brightness(1.5) drop-shadow(0 0 14px rgba(255,220,100,0.9)); }
-    75%      { filter: brightness(1.25) drop-shadow(0 0 10px rgba(255,255,255,0.7)); }
+    0%, 82%, 100% { filter: brightness(1) drop-shadow(0 0 0px transparent); }
+    88%      { filter: brightness(1.18) drop-shadow(0 0 5px rgba(255,255,255,0.55)); }
+    92%      { filter: brightness(1.28) drop-shadow(0 0 8px rgba(255,220,100,0.6)); }
+    96%      { filter: brightness(1.15) drop-shadow(0 0 5px rgba(255,255,255,0.45)); }
   }
   @keyframes medalShimmer {
-    0%   { transform: translateX(-120%) rotate(20deg); }
-    100% { transform: translateX(220%) rotate(20deg); }
+    0%, 78%   { transform: translateX(-120%) rotate(20deg); opacity: 0; }
+    82%       { opacity: 0.28; }
+    90%       { transform: translateX(120%) rotate(20deg); opacity: 0.28; }
+    94%, 100% { transform: translateX(220%) rotate(20deg); opacity: 0; }
   }
   .medal-card.is-mine {
     border-color: var(--orange);
     box-shadow: 0 0 20px rgba(255,109,0,0.2);
   }
   .medal-card.is-mine .medal-shape {
-    animation: medalSparkle 2.5s ease-in-out infinite;
+    animation: medalSparkle 7s ease-in-out infinite;
   }
   .medal-card.is-mine::after {
     content: '';
     position: absolute; top: 0; left: 0; width: 40%; height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-    animation: medalShimmer 3s ease-in-out infinite;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent);
+    animation: medalShimmer 9s ease-in-out infinite;
     pointer-events: none;
   }
   .medal-mine-tag {
@@ -1631,6 +1647,152 @@
     font-family: var(--font-heading); font-size: 0.62rem; font-weight: 700;
     padding: 0.15rem 0.5rem; border-radius: 10px;
     letter-spacing: 0.05em; z-index: 3;
+  }
+
+  /* ============================================================
+     EFFETS ANIMÉS DES MÉDAILLES
+     Chaque effet est piloté par des variables CSS personnalisées posées
+     sur .medal-card : --anim-i (intensité 0..1), --anim-s (vitesse,
+     facteur >1 = plus rapide), --anim-f (fréquence 0..1).
+     Les keyframes sont conçus pour rester discrets aux faibles valeurs.
+     ============================================================ */
+  .medal-card[data-anim] .medal-visual { --ai: var(--anim-i, 0.5); }
+  .medal-card .medal-anim-layer {
+    position: absolute; inset: -18px; pointer-events: none; z-index: 1;
+    overflow: visible;
+  }
+
+  /* --- Flammes dansantes --- */
+  @keyframes maFlame {
+    0%, 100% { transform: translateY(0) scaleY(1) scaleX(1); opacity: calc(var(--ai, 0.5) * 0.7); }
+    25% { transform: translateY(-4px) scaleY(1.15) scaleX(0.9); }
+    50% { transform: translateY(-7px) scaleY(0.95) scaleX(1.1); }
+    75% { transform: translateY(-3px) scaleY(1.1) scaleX(0.95); }
+  }
+  .medal-card.fx-flammes .medal-anim-layer::before,
+  .medal-card.fx-flammes .medal-anim-layer::after {
+    content: ''; position: absolute; bottom: 6px; width: 16px; height: 26px;
+    background: radial-gradient(ellipse at 50% 100%, rgba(255,140,0,calc(var(--ai,0.5)*0.9)), rgba(255,69,0,calc(var(--ai,0.5)*0.5)) 50%, transparent 75%);
+    border-radius: 50% 50% 40% 40% / 70% 70% 40% 40%; filter: blur(1.5px);
+    animation: maFlame calc(1.6s / var(--anim-s, 1)) ease-in-out infinite;
+  }
+  .medal-card.fx-flammes .medal-anim-layer::before { left: 18%; }
+  .medal-card.fx-flammes .medal-anim-layer::after { right: 18%; animation-delay: calc(-0.5s / var(--anim-s, 1)); }
+
+  /* --- Ronces qui s'enroulent --- */
+  @keyframes maThorns {
+    0% { stroke-dashoffset: 220; opacity: 0; }
+    15% { opacity: calc(var(--ai, 0.5) * 0.8); }
+    60% { stroke-dashoffset: 0; opacity: calc(var(--ai, 0.5) * 0.8); }
+    80%, 100% { stroke-dashoffset: 0; opacity: calc(var(--ai, 0.5) * 0.5); }
+  }
+  .medal-card.fx-ronces .medal-anim-layer svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .medal-card.fx-ronces .medal-anim-layer svg path {
+    fill: none; stroke: rgba(34,80,40,calc(var(--ai,0.5)*0.85)); stroke-width: 2.2; stroke-linecap: round;
+    stroke-dasharray: 220; animation: maThorns calc(6s / var(--anim-s, 1)) ease-in-out infinite;
+  }
+  .medal-card.fx-ronces .medal-anim-layer svg path:nth-child(2) { animation-delay: calc(-2s / var(--anim-s, 1)); }
+
+  /* --- Étoiles scintillantes --- */
+  @keyframes maTwinkle {
+    0%, 100% { opacity: 0; transform: scale(0.4); }
+    50% { opacity: calc(var(--ai, 0.5) * 0.9); transform: scale(1); }
+  }
+  .medal-card.fx-etoiles .medal-anim-layer span {
+    position: absolute; color: rgba(255,235,150,calc(var(--ai,0.5))); font-size: 0.7rem;
+    text-shadow: 0 0 6px rgba(255,220,100,calc(var(--ai,0.5)*0.8));
+    animation: maTwinkle calc(2.2s / var(--anim-s, 1)) ease-in-out infinite;
+  }
+  .medal-card.fx-etoiles .medal-anim-layer span:nth-child(1) { top: 0%; left: 20%; animation-delay: 0s; }
+  .medal-card.fx-etoiles .medal-anim-layer span:nth-child(2) { top: 10%; right: 8%; animation-delay: calc(-0.7s / var(--anim-s, 1)); }
+  .medal-card.fx-etoiles .medal-anim-layer span:nth-child(3) { bottom: 4%; left: 10%; animation-delay: calc(-1.4s / var(--anim-s, 1)); }
+  .medal-card.fx-etoiles .medal-anim-layer span:nth-child(4) { bottom: 8%; right: 18%; animation-delay: calc(-0.4s / var(--anim-s, 1)); }
+
+  /* --- Particules lumineuses --- */
+  @keyframes maParticle {
+    0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
+    20% { opacity: calc(var(--ai, 0.5) * 0.8); }
+    100% { transform: translate(var(--px, 0px), var(--py, -28px)) scale(1); opacity: 0; }
+  }
+  .medal-card.fx-particules .medal-anim-layer span {
+    position: absolute; bottom: 8px; left: 50%; width: 5px; height: 5px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(180,220,255,calc(var(--ai,0.5))), transparent 70%);
+    box-shadow: 0 0 6px rgba(150,200,255,calc(var(--ai,0.5)*0.7));
+    animation: maParticle calc(3s / var(--anim-s, 1)) ease-out infinite;
+  }
+  .medal-card.fx-particules .medal-anim-layer span:nth-child(1) { --px: -14px; --py: -24px; left: 35%; animation-delay: 0s; }
+  .medal-card.fx-particules .medal-anim-layer span:nth-child(2) { --px: 10px; --py: -30px; left: 55%; animation-delay: calc(-1s / var(--anim-s, 1)); }
+  .medal-card.fx-particules .medal-anim-layer span:nth-child(3) { --px: -4px; --py: -32px; left: 48%; animation-delay: calc(-2s / var(--anim-s, 1)); }
+  .medal-card.fx-particules .medal-anim-layer span:nth-child(4) { --px: 16px; --py: -22px; left: 62%; animation-delay: calc(-0.6s / var(--anim-s, 1)); }
+
+  /* --- Aura qui pulse --- */
+  @keyframes maAura {
+    0%, 100% { transform: scale(1); opacity: calc(var(--ai, 0.5) * 0.35); }
+    50% { transform: scale(1.25); opacity: calc(var(--ai, 0.5) * 0.65); }
+  }
+  .medal-card.fx-aura .medal-anim-layer::before {
+    content: ''; position: absolute; inset: 4px; border-radius: 50%;
+    background: radial-gradient(circle, var(--rarity-glow, rgba(255,109,0,0.5)) 0%, transparent 70%);
+    animation: maAura calc(2.8s / var(--anim-s, 1)) ease-in-out infinite;
+  }
+
+  /* --- Éclairs --- */
+  @keyframes maBolt {
+    0%, 92%, 100% { opacity: 0; }
+    93%, 96% { opacity: calc(var(--ai, 0.5) * 0.9); }
+    94% { opacity: 0.2; }
+  }
+  .medal-card.fx-eclairs .medal-anim-layer svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .medal-card.fx-eclairs .medal-anim-layer svg path {
+    fill: none; stroke: rgba(180,220,255,calc(var(--ai,0.5))); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+    filter: drop-shadow(0 0 4px rgba(150,200,255,calc(var(--ai,0.5)*0.8)));
+    animation: maBolt calc(5s / var(--anim-s, 1)) ease-in-out infinite;
+  }
+  .medal-card.fx-eclairs .medal-anim-layer svg path:nth-child(2) { animation-delay: calc(-2.5s / var(--anim-s, 1)); }
+
+  /* --- Étincelles --- */
+  @keyframes maSpark {
+    0%, 100% { opacity: 0; transform: scale(0.3); }
+    50% { opacity: calc(var(--ai, 0.5) * 0.85); transform: scale(1); }
+  }
+  .medal-card.fx-etincelles .medal-anim-layer span {
+    position: absolute; width: 3px; height: 3px; border-radius: 50%;
+    background: rgba(255,255,210,calc(var(--ai,0.5)));
+    box-shadow: 0 0 5px 1px rgba(255,240,180,calc(var(--ai,0.5)*0.8));
+    animation: maSpark calc(1.4s / var(--anim-s, 1)) ease-in-out infinite;
+  }
+  .medal-card.fx-etincelles .medal-anim-layer span:nth-child(1) { top: 14%; left: 24%; animation-delay: 0s; }
+  .medal-card.fx-etincelles .medal-anim-layer span:nth-child(2) { top: 30%; right: 16%; animation-delay: calc(-0.3s / var(--anim-s, 1)); }
+  .medal-card.fx-etincelles .medal-anim-layer span:nth-child(3) { bottom: 22%; left: 30%; animation-delay: calc(-0.6s / var(--anim-s, 1)); }
+  .medal-card.fx-etincelles .medal-anim-layer span:nth-child(4) { bottom: 14%; right: 28%; animation-delay: calc(-0.9s / var(--anim-s, 1)); }
+  .medal-card.fx-etincelles .medal-anim-layer span:nth-child(5) { top: 50%; left: 12%; animation-delay: calc(-1.1s / var(--anim-s, 1)); }
+
+  /* --- Brillance qui parcourt la médaille --- */
+  @keyframes maShine {
+    0%, 100% { transform: translateX(-130%) rotate(22deg); opacity: 0; }
+    40% { opacity: calc(var(--ai, 0.5) * 0.55); }
+    60% { transform: translateX(130%) rotate(22deg); opacity: calc(var(--ai, 0.5) * 0.55); }
+  }
+  .medal-card.fx-brillance .medal-anim-layer::before {
+    content: ''; position: absolute; top: -10%; left: 0; width: 35%; height: 120%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,calc(var(--ai,0.5)*0.6)), transparent);
+    filter: blur(1px);
+    animation: maShine calc(4s / var(--anim-s, 1)) ease-in-out infinite;
+  }
+
+  /* Couper les animations selon la fréquence (fréquence basse = pauses longues via animation-duration) */
+  .medal-card[data-anim] { --freq-mult: calc(1.6 - var(--anim-f, 0.5)); }
+  .medal-card[data-anim] .medal-anim-layer::before,
+  .medal-card[data-anim] .medal-anim-layer::after,
+  .medal-card[data-anim] .medal-anim-layer span,
+  .medal-card[data-anim] .medal-anim-layer svg path {
+    animation-duration: calc(var(--base-dur, 2s) * var(--freq-mult) / var(--anim-s, 1));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .medal-card[data-anim] .medal-anim-layer::before,
+    .medal-card[data-anim] .medal-anim-layer::after,
+    .medal-card[data-anim] .medal-anim-layer span,
+    .medal-card[data-anim] .medal-anim-layer svg path { animation: none !important; }
   }
 
   /* ---- Section vide vitrine ---- */
@@ -1701,6 +1863,98 @@
   }
   .vitrine-color-swatch:hover { transform: scale(1.15); }
   .vitrine-color-swatch.selected { border-color: var(--white); transform: scale(1.15); }
+  .vitrine-color-custom {
+    display: flex; align-items: center; gap: 0.4rem;
+    margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed var(--dark4);
+  }
+  .vitrine-color-custom label {
+    font-family: var(--font-heading); font-size: 0.72rem; letter-spacing: 0.05em;
+    text-transform: uppercase; color: var(--gray);
+  }
+  .vitrine-color-custom input[type="color"] {
+    width: 34px; height: 34px; padding: 0; border: 1px solid var(--dark4);
+    border-radius: 8px; cursor: pointer; background: transparent;
+  }
+  .vitrine-color-custom input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+  .vitrine-color-custom input[type="color"]::-webkit-color-swatch { border: none; border-radius: 6px; }
+  .vitrine-color-custom input[type="color"]::-moz-color-swatch { border: none; border-radius: 6px; }
+  .vitrine-color-custom-hex {
+    font-family: var(--font-heading); font-size: 0.78rem; color: var(--gray-light);
+    letter-spacing: 0.04em; min-width: 64px;
+  }
+
+  /* Indice sous un label de champ */
+  .vitrine-field-hint {
+    font-family: var(--font-body); font-size: 0.7rem; font-weight: 400;
+    color: var(--gray); text-transform: none; letter-spacing: 0;
+  }
+
+  /* Autocomplete pseudo joueur */
+  .vitrine-autocomplete { position: relative; }
+  .vitrine-autocomplete-list {
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 40;
+    max-height: 200px; overflow-y: auto;
+    background: var(--dark3); border: 1px solid var(--dark4); border-radius: 0 0 8px 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+    display: none;
+  }
+  .vitrine-autocomplete-list.open { display: block; }
+  .vitrine-autocomplete-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+    padding: 0.5rem 0.7rem; cursor: pointer; font-size: 0.85rem; color: var(--gray-light);
+    border-bottom: 1px solid var(--dark4);
+  }
+  .vitrine-autocomplete-item:last-child { border-bottom: none; }
+  .vitrine-autocomplete-item:hover, .vitrine-autocomplete-item.active { background: var(--dark4); color: var(--white); }
+  .vitrine-autocomplete-item .va-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vitrine-autocomplete-item .va-status { font-size: 0.66rem; font-family: var(--font-heading); letter-spacing: 0.04em; text-transform: uppercase; flex-shrink: 0; }
+  .vitrine-autocomplete-item .va-status.active { color: #34d399; }
+  .vitrine-autocomplete-item .va-status.inactive { color: var(--gray); }
+  .vitrine-autocomplete-empty { padding: 0.6rem 0.7rem; font-size: 0.8rem; color: var(--gray); }
+
+  /* Hint "tous les actifs" */
+  .vitrine-allactive-hint {
+    background: var(--dark2); border: 1px dashed var(--dark4); border-radius: 8px;
+    padding: 0.7rem 0.8rem; font-size: 0.82rem; color: var(--gray-light); line-height: 1.45;
+  }
+  .vitrine-allactive-hint strong { color: var(--orange); }
+
+  /* Effets animés — sélecteur multi */
+  .vitrine-anim-effects {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+  }
+  .vitrine-anim-effect-btn {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    background: var(--dark2); border: 1px solid var(--dark4); color: var(--gray-light);
+    font-family: var(--font-heading); font-size: 0.76rem; font-weight: 600; letter-spacing: 0.04em;
+    padding: 0.45rem 0.75rem; border-radius: 20px; cursor: pointer; transition: all 0.15s;
+  }
+  .vitrine-anim-effect-btn:hover { border-color: var(--gray); }
+  .vitrine-anim-effect-btn.selected {
+    border-color: var(--orange); background: rgba(255,109,0,0.15); color: var(--orange-light);
+  }
+  .vitrine-anim-effect-btn .vae-icon { font-size: 0.95rem; }
+  .vitrine-anim-controls {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.8rem;
+    margin-top: 0.8rem; padding: 0.8rem; background: var(--dark2); border-radius: 8px; border: 1px solid var(--dark4);
+  }
+  .vitrine-anim-control { display: flex; flex-direction: column; gap: 0.35rem; }
+  .vitrine-anim-control label {
+    font-family: var(--font-heading); font-size: 0.72rem; letter-spacing: 0.05em;
+    text-transform: uppercase; color: var(--gray); font-weight: 600;
+  }
+  .vitrine-anim-control label span { color: var(--orange); }
+  .vitrine-anim-control input[type="range"] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
+    background: var(--dark4); border-radius: 6px; outline: none;
+  }
+  .vitrine-anim-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--orange); cursor: pointer; box-shadow: 0 0 8px rgba(255,109,0,0.5);
+  }
+  .vitrine-anim-control input[type="range"]::-moz-range-thumb {
+    width: 16px; height: 16px; border-radius: 50%; background: var(--orange); cursor: pointer; border: none;
+  }
 
   /* Aperçu live de la médaille dans le formulaire */
   .vitrine-form-preview {
@@ -2546,7 +2800,6 @@
 
     <!-- VITRINE ADMIN -->
     <div id="admin-vitrine" class="admin-section">
-      <h3 style="font-family:var(--font-heading);font-size:1.2rem;font-weight:700;letter-spacing:0.06em;margin-bottom:1.5rem">Vitrine — Médailles nominatives</h3>
       <div class="vitrine-admin-wrap">
         <div class="vitrine-admin-form" id="vitrine-medal-form">
           <h4 id="vitrine-form-title">+ Créer une nouvelle médaille</h4>
@@ -2558,6 +2811,11 @@
             <div class="vitrine-form-field">
               <label>Couleur</label>
               <div class="vitrine-color-picker" id="vitrine-color-picker"></div>
+              <div class="vitrine-color-custom">
+                <label for="vitrine-custom-color">Perso</label>
+                <input type="color" id="vitrine-custom-color" value="#FFD700" onchange="selectVitrineCustomColor(this.value)">
+                <span class="vitrine-color-custom-hex" id="vitrine-custom-color-hex">#FFD700</span>
+              </div>
               <input type="hidden" id="vitrine-color-input" value="#FFD700">
             </div>
             <div class="vitrine-form-field">
@@ -2572,6 +2830,17 @@
                 <option value="trophee">Trophée</option>
                 <option value="insigne">Insigne militaire</option>
                 <option value="sceau">Sceau</option>
+                <option value="etoile">Étoile</option>
+                <option value="pentagone">Pentagone</option>
+                <option value="octogramme">Octogramme</option>
+                <option value="fleche">Flèche</option>
+                <option value="croix">Croix de chevalier</option>
+                <option value="creneau">Créneau / Forteresse</option>
+                <option value="larme">Larme</option>
+                <option value="medaillon">Médaillon ovale</option>
+                <option value="rune">Pierre runique</option>
+                <option value="etoile8">Étoile à 8 branches</option>
+                <option value="fer">Fer de lance</option>
               </select>
             </div>
             <div class="vitrine-form-field">
@@ -2585,16 +2854,48 @@
               </select>
             </div>
             <div class="vitrine-form-field">
+              <label>Destinataire</label>
+              <select id="vitrine-recipient-mode" onchange="onVitrineRecipientModeChange()">
+                <option value="single">Un joueur précis</option>
+                <option value="all-active">Tous les joueurs actifs</option>
+              </select>
+            </div>
+            <div class="vitrine-form-field" id="vitrine-username-field">
               <label>Pseudo du joueur</label>
-              <input type="text" id="vitrine-username-input" placeholder="ex: renard_du_83" maxlength="100">
+              <div class="vitrine-autocomplete" id="vitrine-username-autocomplete">
+                <input type="text" id="vitrine-username-input" placeholder="Tapez le début du pseudo…" maxlength="100" autocomplete="off" oninput="filterVitrinePlayers()" onfocus="filterVitrinePlayers()">
+                <div class="vitrine-autocomplete-list" id="vitrine-username-suggestions"></div>
+              </div>
+            </div>
+            <div class="vitrine-form-field" id="vitrine-allactive-field" style="display:none">
+              <label>&nbsp;</label>
+              <div class="vitrine-allactive-hint" id="vitrine-allactive-hint">La médaille sera attribuée à <strong>—</strong> joueur(s) actif(s). Une médaille distincte sera créée pour chacun.</div>
             </div>
             <div class="vitrine-form-field">
-              <label>Année de la saison</label>
-              <input type="number" id="vitrine-year-input" min="2000" max="2100" placeholder="ex: 2024">
+              <label>Année de la saison <span class="vitrine-field-hint">(facultatif → médaille intemporelle)</span></label>
+              <input type="text" id="vitrine-year-input" placeholder="ex: 2026-2027" maxlength="9" inputmode="numeric">
             </div>
             <div class="vitrine-form-field" style="grid-column:1/-1">
               <label>Nom de la médaille</label>
               <input type="text" id="vitrine-title-input" placeholder="ex: Champion de la saison" maxlength="200">
+            </div>
+            <div class="vitrine-form-field" style="grid-column:1/-1">
+              <label>Effets animés <span class="vitrine-field-hint">(facultatif — rend la médaille plus vivante, idéale pour les récompenses rares)</span></label>
+              <div class="vitrine-anim-effects" id="vitrine-anim-effects"></div>
+              <div class="vitrine-anim-controls" id="vitrine-anim-controls" style="display:none">
+                <div class="vitrine-anim-control">
+                  <label>Intensité : <span id="vitrine-anim-intensity-val">50</span>%</label>
+                  <input type="range" id="vitrine-anim-intensity" min="10" max="100" value="50" oninput="document.getElementById('vitrine-anim-intensity-val').textContent=this.value; updateVitrinePreview()">
+                </div>
+                <div class="vitrine-anim-control">
+                  <label>Vitesse : <span id="vitrine-anim-speed-val">50</span>%</label>
+                  <input type="range" id="vitrine-anim-speed" min="10" max="200" value="50" oninput="document.getElementById('vitrine-anim-speed-val').textContent=this.value; updateVitrinePreview()">
+                </div>
+                <div class="vitrine-anim-control">
+                  <label>Fréquence : <span id="vitrine-anim-freq-val">50</span>%</label>
+                  <input type="range" id="vitrine-anim-freq" min="10" max="100" value="50" oninput="document.getElementById('vitrine-anim-freq-val').textContent=this.value; updateVitrinePreview()">
+                </div>
+              </div>
             </div>
             <div class="vitrine-form-field" style="grid-column:1/-1">
               <label>Aperçu</label>
@@ -8758,14 +9059,16 @@ function placeAdminTabs() {}
     faq:                '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .5c0 1.5-2 1.8-2 3.3"/><circle cx="12" cy="17" r="0.4" fill="currentColor" stroke="none"/></svg>',
     contact:            '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
     'other-actions':    '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5c.1-.5.1-1 0-1.5l1.8-1.4-2-3.4-2.1.6c-.4-.3-.8-.6-1.3-.8L15.4 5h-4l-.4 2c-.5.2-.9.5-1.3.8l-2.1-.6-2 3.4L7.4 12c-.1.5-.1 1 0 1.5l-1.8 1.4 2 3.4 2.1-.6c.4.3.8.6 1.3.8l.4 2h4l.4-2c.5-.2.9-.5 1.3-.8l2.1.6 2-3.4-1.8-1.4z"/></svg>',
-    alerts:             '<svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4"/><circle cx="12" cy="17" r="0.4" fill="currentColor" stroke="none"/></svg>'
+    alerts:             '<svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4"/><circle cx="12" cy="17" r="0.4" fill="currentColor" stroke="none"/></svg>',
+    vitrine:            '<svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4z"/><path d="M7 5H4v2a3 3 0 003 3M17 5h3v2a3 3 0 01-3 3"/></svg>'
   }
   const SECTION_LABELS = {
     users:'Utilisateurs', pending:'En attente', history:'Connexions',
     phase:'Phase du tournoi', poules:'Organiser la phase', planning:'Planification',
     notify:'Notifier un joueur', planned:'Matchs planifiés', whatsapp:'Communication WhatsApp',
     publication:'Publication matchs', 'notifications-list':'Notifications',
-    faq:'FAQ', contact:'Contacts', 'other-actions':'Actions & autres', alerts:'Alertes'
+    faq:'FAQ', contact:'Contacts', 'other-actions':'Actions & autres', alerts:'Alertes',
+    vitrine:'Vitrine — Médailles'
   }
 
   function injectSectionHeaders() {
@@ -8984,19 +9287,35 @@ async function loadVitrine() {
     if (!res.ok) { container.innerHTML = '<div class="vitrine-empty"><span>🏅</span>Impossible de charger la vitrine.</div>'; return }
     const data = await res.json()
     _vitrineMedals = data.medals || []
-    // Remplir le filtre des années
+    // Remplir le filtre des années (chaînes "2026-2027" + option intemporelle)
     const yearFilter = document.getElementById('vitrine-year-filter')
     if (yearFilter) {
-      const years = [...new Set(_vitrineMedals.map(m => m.seasonYear))].sort((a, b) => b - a)
+      const years = [...new Set(_vitrineMedals.map(m => m.seasonYear).filter(y => y && !(typeof y === 'number' && isNaN(y))))].sort((a, b) => {
+        const ka = typeof a === 'string' ? parseInt(a.split('-')[0], 10) : a
+        const kb = typeof b === 'string' ? parseInt(b.split('-')[0], 10) : b
+        return kb - ka
+      })
+      const hasIntemporelle = _vitrineMedals.some(m => !m.seasonYear || m.seasonYear === '' || (typeof m.seasonYear === 'number' && isNaN(m.seasonYear)))
       const currentVal = yearFilter.value
       yearFilter.innerHTML = '<option value="">Toutes les années</option>' +
-        years.map(y => `<option value="${y}" ${String(y) === currentVal ? 'selected' : ''}>Saison ${y}</option>`).join('')
+        years.map(y => `<option value="${y}" ${String(y) === currentVal ? 'selected' : ''}>Saison ${y}</option>`).join('') +
+        (hasIntemporelle ? `<option value="__intemporelle__" ${'__intemporelle__' === currentVal ? 'selected' : ''}>Intemporelles</option>` : '')
     }
     renderVitrine()
   } catch (e) {
     console.error('[loadVitrine]', e)
     container.innerHTML = '<div class="vitrine-empty"><span>🏅</span>Erreur de chargement.</div>'
   }
+}
+
+function isIntemporelle(m) {
+  return m.seasonYear === null || m.seasonYear === undefined || m.seasonYear === '' || (typeof m.seasonYear === 'number' && isNaN(m.seasonYear))
+}
+
+function medalYearSortKey(m) {
+  if (isIntemporelle(m)) return -1
+  const y = m.seasonYear
+  return typeof y === 'string' ? (parseInt(y.split('-')[0], 10) || 0) : y
 }
 
 function renderVitrine() {
@@ -9012,14 +9331,21 @@ function renderVitrine() {
   const rarityFilter = document.getElementById('vitrine-rarity-filter')?.value || ''
 
   let medals = [..._vitrineMedals]
-  if (yearFilter) medals = medals.filter(m => String(m.seasonYear) === yearFilter)
+  if (yearFilter) {
+    if (yearFilter === '__intemporelle__') {
+      medals = medals.filter(m => isIntemporelle(m))
+    } else {
+      medals = medals.filter(m => String(m.seasonYear) === yearFilter)
+    }
+  }
   if (rarityFilter) medals = medals.filter(m => m.rarity === rarityFilter)
 
   medals.sort((a, b) => {
-    if (sortVal === 'year-desc') return b.seasonYear - a.seasonYear || (VITRINE_RARITY_ORDER[b.rarity] ?? 0) - (VITRINE_RARITY_ORDER[a.rarity] ?? 0)
-    if (sortVal === 'year-asc')  return a.seasonYear - b.seasonYear || (VITRINE_RARITY_ORDER[b.rarity] ?? 0) - (VITRINE_RARITY_ORDER[a.rarity] ?? 0)
-    if (sortVal === 'rarity-desc') return (VITRINE_RARITY_ORDER[b.rarity] ?? 0) - (VITRINE_RARITY_ORDER[a.rarity] ?? 0) || b.seasonYear - a.seasonYear
-    if (sortVal === 'rarity-asc')  return (VITRINE_RARITY_ORDER[a.rarity] ?? 0) - (VITRINE_RARITY_ORDER[b.rarity] ?? 0) || b.seasonYear - a.seasonYear
+    const ya = medalYearSortKey(a), yb = medalYearSortKey(b)
+    if (sortVal === 'year-desc') return yb - ya || (VITRINE_RARITY_ORDER[b.rarity] ?? 0) - (VITRINE_RARITY_ORDER[a.rarity] ?? 0)
+    if (sortVal === 'year-asc')  return ya - yb || (VITRINE_RARITY_ORDER[b.rarity] ?? 0) - (VITRINE_RARITY_ORDER[a.rarity] ?? 0)
+    if (sortVal === 'rarity-desc') return (VITRINE_RARITY_ORDER[b.rarity] ?? 0) - (VITRINE_RARITY_ORDER[a.rarity] ?? 0) || yb - ya
+    if (sortVal === 'rarity-asc')  return (VITRINE_RARITY_ORDER[a.rarity] ?? 0) - (VITRINE_RARITY_ORDER[b.rarity] ?? 0) || yb - ya
     return 0
   })
 
@@ -9031,9 +9357,15 @@ function renderVitrine() {
   container.innerHTML = medals.map(m => {
     const mineTag = m.isMine ? '<div class="medal-mine-tag">À TOI !</div>' : ''
     const mineClass = m.isMine ? ' is-mine' : ''
+    const yearLine = isIntemporelle(m) ? '<div class="medal-year" style="opacity:0.55">Médaille intemporelle</div>' : `<div class="medal-year">Saison ${esc(m.seasonYear)}</div>`
+    const cfg = parseAnimConfig(m)
+    const animLayer = buildAnimLayerHTML(cfg)
+    const fxClasses = cfg ? ' ' + cfg.effects.map(k => 'fx-' + k).join(' ') : ''
+    const animAttrs = cfg ? ` data-anim="1" style="--anim-i:${cfg.intensity};--anim-s:${cfg.speed};--anim-f:${cfg.frequency}"` : ''
     return `<div class="medal-card${mineClass}" data-rarity="${esc(m.rarity)}">
       ${mineTag}
-      <div class="medal-visual">
+      <div class="medal-visual${fxClasses}"${animAttrs}>
+        ${animLayer}
         <div class="medal-shape medal-shape--${esc(m.shape)}" style="background:${esc(m.color)}">
           <span class="medal-symbol">${esc(m.symbol)}</span>
         </div>
@@ -9041,7 +9373,7 @@ function renderVitrine() {
       <div class="medal-rarity-badge" data-rarity="${esc(m.rarity)}">${esc(m.rarity)}</div>
       <div class="medal-title">${esc(m.title)}</div>
       <div class="medal-recipient"><strong>${esc(m.username)}</strong></div>
-      <div class="medal-year">Saison ${esc(m.seasonYear)}</div>
+      ${yearLine}
     </div>`
   }).join('')
 }
@@ -9053,9 +9385,25 @@ let _adminMedals = []
 let _editingMedalId = null
 let _selectedSymbol = '🏆'
 let _selectedColor = '#FFD700'
+let _selectedAnimEffects = []
+let _vitrinePlayers = []          // liste des joueurs pour l'autocomplete
+let _vitrineActiveCount = 0       // nombre de joueurs actifs
+let _vitrinePlayersLoaded = false
 
-const MEDAL_SYMBOLS = ['🏆','👑','⚔️','🛡️','🔥','⭐','🎯','💎','🐉','🦊','⚡','🏅','☠️','🎖️','💥','🌟','💀','🏁','🔍','📜']
-const MEDAL_COLORS = ['#FFD700','#FF6D00','#C0C0C0','#409CFF','#A855F7','#FF5C55','#10B981','#3B82F6','#EC4899','#F59E0B','#8B5CF6','#EF4444','#14B8A6','#6366F1','#F97316']
+const MEDAL_SYMBOLS = ['🏆','👑','⚔️','🛡️','🔥','⭐','🎯','💎','🐉','🦊','⚡','⚜️','☠️','🏅','💥','🌟','💀','🏁','🔍','📜','🦅','🐺','🦁','🐍','🦉','🦌','🏹','🔱','💫','✨','🌠','🌙','☀️','❄️','🌪️','🌊','🌋','🦾','🗡️','🪓','🧨','🎆','🎇','🪄','🔮','🧿','🎏','♟️','♛','♜','♝','♞','🃏','🎖️','🥇','🥈','🥉','🏵️','🎗️','🪶','🗝️','🔒','🧩','🎲','🪙','💰','🏺','🏰','🏯','🗼','🗿','🛡️','🏹','⚜️','🔱','🌟','💫','🔥','❄️','⚡']
+const MEDAL_COLORS = ['#FFD700','#FF6D00','#C0C0C0','#409CFF','#A855F7','#FF5C55','#10B981','#3B82F6','#EC4899','#F59E0B','#8B5CF6','#EF4444','#14B8A6','#6366F1','#F97316','#22D3EE','#A3E635','#FB7185','#E879F9','#FBBF24','#34D399','#60A5FA','#F472B6','#FCD34D','#4ADE80','#2DD4BF','#C084FC','#FB923C','#0EA5E9','#E11D48','#7C3AED','#DB2777','#16A34A','#9333EA','#B45309']
+
+/* Effets animés disponibles : clé = classe CSS, icône + libellé */
+const MEDAL_ANIM_EFFECTS = [
+  { key: 'flammes',    icon: '🔥', label: 'Flammes dansantes' },
+  { key: 'ronces',     icon: '🌿', label: 'Ronces qui s\'enroulent' },
+  { key: 'etoiles',    icon: '⭐', label: 'Étoiles scintillantes' },
+  { key: 'particules', icon: '✨', label: 'Particules lumineuses' },
+  { key: 'aura',       icon: '🔆', label: 'Aura qui pulse' },
+  { key: 'eclairs',    icon: '⚡', label: 'Éclairs' },
+  { key: 'etincelles', icon: '🌟', label: 'Étincelles' },
+  { key: 'brillance',  icon: '💎', label: 'Brillance parcourante' },
+]
 
 function initVitrineSymbolPicker() {
   const picker = document.getElementById('vitrine-symbol-picker')
@@ -9083,9 +9431,152 @@ function initVitrineColorPicker() {
 function selectVitrineColor(color, el) {
   _selectedColor = color
   document.getElementById('vitrine-color-input').value = color
+  const customInput = document.getElementById('vitrine-custom-color')
+  const customHex = document.getElementById('vitrine-custom-color-hex')
+  if (customInput) customInput.value = color
+  if (customHex) customHex.textContent = color.toUpperCase()
   document.querySelectorAll('#vitrine-color-picker .vitrine-color-swatch').forEach(s => s.classList.remove('selected'))
   if (el) el.classList.add('selected')
   updateVitrinePreview()
+}
+
+function selectVitrineCustomColor(color) {
+  _selectedColor = color
+  document.getElementById('vitrine-color-input').value = color
+  const customHex = document.getElementById('vitrine-custom-color-hex')
+  if (customHex) customHex.textContent = color.toUpperCase()
+  document.querySelectorAll('#vitrine-color-picker .vitrine-color-swatch').forEach(s => s.classList.remove('selected'))
+  const match = Array.from(document.querySelectorAll('#vitrine-color-picker .vitrine-color-swatch'))
+    .find(s => s.style.background && rgbToHex(s.style.background).toLowerCase() === color.toLowerCase())
+  if (match) match.classList.add('selected')
+  updateVitrinePreview()
+}
+
+function rgbToHex(rgb) {
+  if (rgb.startsWith('#')) return rgb
+  const m = rgb.match(/\d+/g)
+  if (!m || m.length < 3) return rgb
+  return '#' + m.slice(0, 3).map(n => parseInt(n).toString(16).padStart(2, '0')).join('')
+}
+
+/* ---- Sélecteur d'effets animés (multi) ---- */
+function initVitrineAnimEffects() {
+  const container = document.getElementById('vitrine-anim-effects')
+  if (!container) return
+  container.innerHTML = MEDAL_ANIM_EFFECTS.map(e =>
+    `<button type="button" class="vitrine-anim-effect-btn" data-anim="${e.key}" onclick="toggleVitrineAnimEffect('${e.key}', this)">
+      <span class="vae-icon">${e.icon}</span><span>${e.label}</span>
+    </button>`
+  ).join('')
+  refreshVitrineAnimEffectSelection()
+}
+
+function toggleVitrineAnimEffect(key, btn) {
+  const idx = _selectedAnimEffects.indexOf(key)
+  if (idx === -1) _selectedAnimEffects.push(key)
+  else _selectedAnimEffects.splice(idx, 1)
+  refreshVitrineAnimEffectSelection()
+  document.getElementById('vitrine-anim-controls').style.display = _selectedAnimEffects.length ? '' : 'none'
+  updateVitrinePreview()
+}
+
+function refreshVitrineAnimEffectSelection() {
+  document.querySelectorAll('#vitrine-anim-effects .vitrine-anim-effect-btn').forEach(b => {
+    b.classList.toggle('selected', _selectedAnimEffects.includes(b.dataset.anim))
+  })
+}
+
+function getVitrineAnimConfig() {
+  return {
+    effects: [..._selectedAnimEffects],
+    intensity: parseInt(document.getElementById('vitrine-anim-intensity')?.value || 50, 10) / 100,
+    speed: parseInt(document.getElementById('vitrine-anim-speed')?.value || 50, 10) / 50,   // 50% = 1
+    frequency: parseInt(document.getElementById('vitrine-anim-freq')?.value || 50, 10) / 100,
+  }
+}
+
+/* ---- Autocomplete pseudo joueur ---- */
+async function loadVitrinePlayers() {
+  if (_vitrinePlayersLoaded) return
+  try {
+    const res = await fetch('/api/admin/action', { headers: authHeaders() })
+    if (!res.ok) return
+    const { users } = await res.json()
+    // Tous les utilisateurs acceptés et non bannis (actifs ET inactifs), hors admin/root
+    _vitrinePlayers = (users || []).filter(u => u.accepted && !u.banned && !['admin','root'].includes((u.username || '').toLowerCase()))
+    _vitrineActiveCount = _vitrinePlayers.filter(u => u.active).length
+    _vitrinePlayersLoaded = true
+    updateVitrineAllActiveHint()
+  } catch (e) {
+    console.error('[loadVitrinePlayers]', e)
+  }
+}
+
+function filterVitrinePlayers() {
+  const input = document.getElementById('vitrine-username-input')
+  const list = document.getElementById('vitrine-username-suggestions')
+  if (!input || !list) return
+  const q = input.value.trim().toLowerCase()
+  let pool = _vitrinePlayers
+  if (q) {
+    pool = _vitrinePlayers.filter(u =>
+      (u.username || '').toLowerCase().includes(q) ||
+      (u.firstName + ' ' + u.lastName).toLowerCase().includes(q)
+    )
+  }
+  if (pool.length === 0) {
+    list.innerHTML = '<div class="vitrine-autocomplete-empty">Aucun joueur trouvé.</div>'
+    list.classList.add('open')
+    return
+  }
+  list.innerHTML = pool.slice(0, 50).map(u =>
+    `<div class="vitrine-autocomplete-item" onclick="selectVitrinePlayer('${esc(u.username)}')">
+      <span class="va-name">${esc(u.firstName)} ${esc(u.lastName)} <span style="color:var(--gray)">(@${esc(u.username)})</span></span>
+      <span class="va-status ${u.active ? 'active' : 'inactive'}">${u.active ? 'actif' : 'inactif'}</span>
+    </div>`
+  ).join('')
+  list.classList.add('open')
+}
+
+function selectVitrinePlayer(username) {
+  const input = document.getElementById('vitrine-username-input')
+  const list = document.getElementById('vitrine-username-suggestions')
+  if (input) input.value = username
+  if (list) list.classList.remove('open')
+}
+
+/* Fermer l'autocomplete si clic en dehors */
+document.addEventListener('click', (e) => {
+  const wrap = document.getElementById('vitrine-username-autocomplete')
+  const list = document.getElementById('vitrine-username-suggestions')
+  if (wrap && list && !wrap.contains(e.target)) list.classList.remove('open')
+})
+
+/* ---- Mode destinataire : un joueur / tous les actifs ---- */
+function onVitrineRecipientModeChange() {
+  const mode = document.getElementById('vitrine-recipient-mode').value
+  document.getElementById('vitrine-username-field').style.display = (mode === 'single') ? '' : 'none'
+  document.getElementById('vitrine-allactive-field').style.display = (mode === 'all-active') ? '' : 'none'
+  updateVitrineAllActiveHint()
+}
+
+function updateVitrineAllActiveHint() {
+  const hint = document.getElementById('vitrine-allactive-hint')
+  if (!hint) return
+  const n = _vitrineActiveCount
+  hint.innerHTML = `La médaille sera attribuée à <strong>${n}</strong> joueur(s) actif(s). Une médaille distincte sera créée pour chacun.`
+}
+
+/* ---- Validation du format d'année de saison : "2026-2027" ou "" (intemporelle) ---- */
+function validateVitrineSeasonYear(raw) {
+  const v = (raw || '').trim()
+  if (!v) return { ok: true, value: '' }   // médaille intemporelle
+  const m = v.match(/^(\d{4})-(\d{4})$/)
+  if (!m) return { ok: false, error: 'Format attendu : AAAA-AAAI (ex : 2026-2027). Laissez vide pour une médaille intemporelle.' }
+  const a = parseInt(m[1], 10), b = parseInt(m[2], 10)
+  if (a < 2000 || a > 2100) return { ok: false, error: 'Année de début hors plage (2000-2100).' }
+  if (b !== a + 1) return { ok: false, error: 'L\'année de fin doit être l\'année suivante (ex : 2026-2027).' }
+  return { ok: true, value: v }
 }
 
 function updateVitrinePreview() {
@@ -9103,6 +9594,68 @@ function updateVitrinePreview() {
     rarityEl.textContent = rarity
     rarityEl.setAttribute('data-rarity', rarity)
   }
+  // Aperçu des effets animés sur la prévisualisation
+  renderVitrinePreviewAnimations()
+}
+
+function renderVitrinePreviewAnimations() {
+  const visual = document.getElementById('vitrine-preview-visual')
+  if (!visual) return
+  // retirer les anciennes couches d'animation
+  visual.querySelectorAll('.medal-anim-layer').forEach(l => l.remove())
+  visual.classList.remove('fx-flammes','fx-ronces','fx-etoiles','fx-particules','fx-aura','fx-eclairs','fx-etincelles','fx-brillance')
+  visual.removeAttribute('data-anim')
+  const cfg = getVitrineAnimConfig()
+  if (!cfg.effects.length) return
+  visual.setAttribute('data-anim', '1')
+  visual.style.setProperty('--anim-i', cfg.intensity)
+  visual.style.setProperty('--anim-s', cfg.speed)
+  visual.style.setProperty('--anim-f', cfg.frequency)
+  cfg.effects.forEach(k => visual.classList.add('fx-' + k))
+  // injecter la couche d'animation avec ses éléments selon les effets
+  const layer = document.createElement('div')
+  layer.className = 'medal-anim-layer'
+  // étoiles / particules / étincelles ont besoin de spans
+  if (cfg.effects.includes('etoiles')) layer.innerHTML += '<span>✦</span><span>✦</span><span>✦</span><span>✦</span>'
+  if (cfg.effects.includes('particules')) layer.innerHTML += '<span></span><span></span><span></span><span></span>'
+  if (cfg.effects.includes('etincelles')) layer.innerHTML += '<span></span><span></span><span></span><span></span><span></span>'
+  if (cfg.effects.includes('ronces')) layer.innerHTML += '<svg viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M50 8 C30 25 70 40 50 60 C30 80 70 92 50 98"/><path d="M50 8 C70 25 30 40 50 60 C70 80 30 92 50 98"/></svg>'
+  if (cfg.effects.includes('eclairs')) layer.innerHTML += '<svg viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M55 5 L35 45 L52 45 L42 95"/><path d="M75 10 L60 40 L72 40 L62 80"/></svg>'
+  visual.appendChild(layer)
+}
+
+/* Génère la couche d'animation HTML pour une médaille côté joueur (et admin list) */
+function buildAnimLayerHTML(cfg) {
+  if (!cfg || !cfg.effects || !cfg.effects.length) return ''
+  let inner = ''
+  if (cfg.effects.includes('etoiles')) inner += '<span>✦</span><span>✦</span><span>✦</span><span>✦</span>'
+  if (cfg.effects.includes('particules')) inner += '<span></span><span></span><span></span><span></span>'
+  if (cfg.effects.includes('etincelles')) inner += '<span></span><span></span><span></span><span></span><span></span>'
+  if (cfg.effects.includes('ronces')) inner += '<svg viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M50 8 C30 25 70 40 50 60 C30 80 70 92 50 98"/><path d="M50 8 C70 25 30 40 50 60 C70 80 30 92 50 98"/></svg>'
+  if (cfg.effects.includes('eclairs')) inner += '<svg viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M55 5 L35 45 L52 45 L42 95"/><path d="M75 10 L60 40 L72 40 L62 80"/></svg>'
+  return `<div class="medal-anim-layer">${inner}</div>`
+}
+
+function applyAnimConfigToCard(cardEl, cfg) {
+  if (!cfg || !cfg.effects || !cfg.effects.length) return
+  cardEl.setAttribute('data-anim', '1')
+  cardEl.style.setProperty('--anim-i', cfg.intensity ?? 0.5)
+  cardEl.style.setProperty('--anim-s', cfg.speed ?? 1)
+  cardEl.style.setProperty('--anim-f', cfg.frequency ?? 0.5)
+  cfg.effects.forEach(k => cardEl.classList.add('fx-' + k))
+}
+
+function parseAnimConfig(m) {
+  if (!m) return null
+  let cfg = m.animations
+  if (typeof cfg === 'string') { try { cfg = JSON.parse(cfg) } catch (_) { return null } }
+  if (!cfg || !cfg.effects || !cfg.effects.length) return null
+  return {
+    effects: Array.isArray(cfg.effects) ? cfg.effects : [],
+    intensity: typeof cfg.intensity === 'number' ? cfg.intensity : 0.5,
+    speed: typeof cfg.speed === 'number' ? cfg.speed : 1,
+    frequency: typeof cfg.frequency === 'number' ? cfg.frequency : 0.5,
+  }
 }
 
 async function loadAdminVitrine() {
@@ -9112,11 +9665,14 @@ async function loadAdminVitrine() {
   if (!document.getElementById('vitrine-symbol-picker').innerHTML) {
     initVitrineSymbolPicker()
     initVitrineColorPicker()
+    initVitrineAnimEffects()
     updateVitrinePreview()
     // Bind les changements de select pour l apercu live
     document.getElementById('vitrine-shape-select').addEventListener('change', updateVitrinePreview)
     document.getElementById('vitrine-rarity-select').addEventListener('change', updateVitrinePreview)
   }
+  // Charger la liste des joueurs pour l'autocomplete + compte d'actifs
+  loadVitrinePlayers()
   try {
     const res = await fetch('/api/admin/medals', { headers: authHeaders() })
     if (!res.ok) { list.innerHTML = '<div class="admin-empty">Impossible de charger les médailles.</div>'; return }
@@ -9127,6 +9683,15 @@ async function loadAdminVitrine() {
     console.error('[loadAdminVitrine]', e)
     list.innerHTML = '<div class="admin-empty">Erreur de chargement.</div>'
   }
+}
+
+/* helper de tri d'année : les médailles intemporelles (année vide) sont placées en dernier (desc) / premier (asc) */
+function seasonSortKey(m) {
+  const y = m.seasonYear
+  if (y === null || y === undefined || y === '' || (typeof y === 'number' && isNaN(y))) return -1
+  // si c'est une chaîne "2026-2027", on prend l'année de début
+  if (typeof y === 'string') { const p = y.split('-'); return parseInt(p[0], 10) || 0 }
+  return y
 }
 
 function renderAdminVitrine() {
@@ -9149,16 +9714,26 @@ function renderAdminVitrine() {
   }
 
   medals.sort((a, b) => {
-    if (sortVal === 'year-desc') return b.seasonYear - a.seasonYear || (VITRINE_RARITY_ORDER[b.rarity] ?? 0) - (VITRINE_RARITY_ORDER[a.rarity] ?? 0)
-    if (sortVal === 'year-asc')  return a.seasonYear - b.seasonYear || (VITRINE_RARITY_ORDER[b.rarity] ?? 0) - (VITRINE_RARITY_ORDER[a.rarity] ?? 0)
-    if (sortVal === 'rarity-desc') return (VITRINE_RARITY_ORDER[b.rarity] ?? 0) - (VITRINE_RARITY_ORDER[a.rarity] ?? 0) || b.seasonYear - a.seasonYear
-    if (sortVal === 'rarity-asc')  return (VITRINE_RARITY_ORDER[a.rarity] ?? 0) - (VITRINE_RARITY_ORDER[b.rarity] ?? 0) || b.seasonYear - a.seasonYear
+    const ya = seasonSortKey(a), yb = seasonSortKey(b)
+    if (sortVal === 'year-desc') return yb - ya || (VITRINE_RARITY_ORDER[b.rarity] ?? 0) - (VITRINE_RARITY_ORDER[a.rarity] ?? 0)
+    if (sortVal === 'year-asc')  return ya - yb || (VITRINE_RARITY_ORDER[b.rarity] ?? 0) - (VITRINE_RARITY_ORDER[a.rarity] ?? 0)
+    if (sortVal === 'rarity-desc') return (VITRINE_RARITY_ORDER[b.rarity] ?? 0) - (VITRINE_RARITY_ORDER[a.rarity] ?? 0) || yb - ya
+    if (sortVal === 'rarity-asc')  return (VITRINE_RARITY_ORDER[a.rarity] ?? 0) - (VITRINE_RARITY_ORDER[b.rarity] ?? 0) || yb - ya
     return 0
   })
 
-  list.innerHTML = medals.map(m => `
+  list.innerHTML = medals.map(m => {
+    const cfg = parseAnimConfig(m)
+    const animLayer = buildAnimLayerHTML(cfg)
+    const fxClasses = cfg ? ' ' + cfg.effects.map(k => 'fx-' + k).join(' ') : ''
+    const animAttrs = cfg ? ` data-anim="1" style="--anim-i:${cfg.intensity};--anim-s:${cfg.speed};--anim-f:${cfg.frequency}"` : ''
+    const yearLabel = (m.seasonYear === null || m.seasonYear === undefined || m.seasonYear === '' || (typeof m.seasonYear === 'number' && isNaN(m.seasonYear)))
+      ? '<span style="color:var(--gray);opacity:0.6">intemporelle</span>'
+      : 'Saison ' + esc(m.seasonYear)
+    return `
     <div class="vitrine-admin-item">
-      <div class="medal-visual">
+      <div class="medal-visual${fxClasses}"${animAttrs}>
+        ${animLayer}
         <div class="medal-shape medal-shape--${esc(m.shape)}" style="background:${esc(m.color)}">
           <span class="medal-symbol">${esc(m.symbol)}</span>
         </div>
@@ -9166,15 +9741,21 @@ function renderAdminVitrine() {
       <div class="vitrine-admin-item-info">
         <div class="vitrine-admin-item-title">${esc(m.title)}</div>
         <div class="vitrine-admin-item-meta">
-          <strong>${esc(m.username)}</strong> · ${esc(m.rarity)} · Saison ${esc(m.seasonYear)} · ${esc(m.shape)}
+          <strong>${esc(m.username)}</strong> · ${esc(m.rarity)} · ${yearLabel} · ${esc(m.shape)}${cfg && cfg.effects.length ? ' · ' + cfg.effects.length + ' effet(s)' : ''}
         </div>
       </div>
       <div class="vitrine-admin-item-actions">
         <button class="btn-sm btn-edit" onclick="editMedal(${m.id})">Modifier</button>
         <button class="btn-sm btn-danger" onclick="deleteMedal(${m.id})">Supprimer</button>
       </div>
-    </div>
-  `).join('')
+    </div>`
+  }).join('')
+}
+
+function buildAnimPayload() {
+  const cfg = getVitrineAnimConfig()
+  if (!cfg.effects.length) return null
+  return cfg   // { effects, intensity, speed, frequency }
 }
 
 async function saveMedal() {
@@ -9182,24 +9763,58 @@ async function saveMedal() {
   const color = _selectedColor
   const shape = document.getElementById('vitrine-shape-select').value
   const rarity = document.getElementById('vitrine-rarity-select').value
-  const username = document.getElementById('vitrine-username-input').value.trim()
-  const seasonYear = parseInt(document.getElementById('vitrine-year-input').value, 10)
   const title = document.getElementById('vitrine-title-input').value.trim()
+  const yearRaw = document.getElementById('vitrine-year-input').value
   const feedback = document.getElementById('vitrine-form-feedback')
+  const mode = document.getElementById('vitrine-recipient-mode').value
+  const animations = buildAnimPayload()
 
-  if (!username) { showFeedback('vitrine-form-feedback', '✗ Le pseudo du joueur est requis.', false); return }
+  // Validation de l'année de saison (facultative)
+  const yearCheck = validateVitrineSeasonYear(yearRaw)
+  if (!yearCheck.ok) { showFeedback('vitrine-form-feedback', '✗ ' + yearCheck.error, false); return }
+  const seasonYear = yearCheck.value  // "" si intemporelle
+
   if (!title) { showFeedback('vitrine-form-feedback', '✗ Le nom de la médaille est requis.', false); return }
-  if (isNaN(seasonYear)) { showFeedback('vitrine-form-feedback', '✗ L’année de la saison est invalide.', false); return }
 
-  const body = { symbol, color, shape, rarity, username, seasonYear, title }
+  const baseBody = { symbol, color, shape, rarity, title, seasonYear, animations }
+
   try {
     let res, data
     if (_editingMedalId) {
-      body.id = _editingMedalId
-      res = await fetch('/api/admin/medals', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'update_medal', ...body }) })
-    } else {
-      res = await fetch('/api/admin/medals', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'create_medal', ...body }) })
+      // Édition : un seul joueur
+      const username = document.getElementById('vitrine-username-input').value.trim()
+      if (!username) { showFeedback('vitrine-form-feedback', '✗ Le pseudo du joueur est requis.', false); return }
+      res = await fetch('/api/admin/medals', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'update_medal', id: _editingMedalId, username, ...baseBody }) })
+      data = await res.json()
+      if (res.ok) {
+        showFeedback('vitrine-form-feedback', '✓ ' + data.message, true)
+        cancelMedalEdit()
+        await loadAdminVitrine()
+      } else {
+        showFeedback('vitrine-form-feedback', '✗ ' + (data.error || 'Erreur.'), false)
+      }
+      return
     }
+
+    // Création
+    if (mode === 'all-active') {
+      // Attribuer à tous les joueurs actifs : on envoie une action dédiée
+      res = await fetch('/api/admin/medals', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'create_medal_all_active', ...baseBody }) })
+      data = await res.json()
+      if (res.ok) {
+        showFeedback('vitrine-form-feedback', '✓ ' + (data.message || 'Médailles créées pour tous les joueurs actifs.'), true)
+        cancelMedalEdit()
+        await loadAdminVitrine()
+      } else {
+        showFeedback('vitrine-form-feedback', '✗ ' + (data.error || 'Erreur.'), false)
+      }
+      return
+    }
+
+    // Création simple, un joueur
+    const username = document.getElementById('vitrine-username-input').value.trim()
+    if (!username) { showFeedback('vitrine-form-feedback', '✗ Le pseudo du joueur est requis.', false); return }
+    res = await fetch('/api/admin/medals', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'create_medal', username, ...baseBody }) })
     data = await res.json()
     if (res.ok) {
       showFeedback('vitrine-form-feedback', '✓ ' + data.message, true)
@@ -9222,12 +9837,34 @@ function editMedal(id) {
   _selectedColor = m.color
   document.getElementById('vitrine-shape-select').value = m.shape
   document.getElementById('vitrine-rarity-select').value = m.rarity
+  // Forcer le mode "un joueur précis" en édition
+  document.getElementById('vitrine-recipient-mode').value = 'single'
+  onVitrineRecipientModeChange()
   document.getElementById('vitrine-username-input').value = m.username
-  document.getElementById('vitrine-year-input').value = m.seasonYear
+  document.getElementById('vitrine-year-input').value = (m.seasonYear === null || m.seasonYear === undefined || m.seasonYear === '' || (typeof m.seasonYear === 'number' && isNaN(m.seasonYear))) ? '' : m.seasonYear
   document.getElementById('vitrine-title-input').value = m.title
   document.getElementById('vitrine-color-input').value = m.color
+  const customInput = document.getElementById('vitrine-custom-color')
+  const customHex = document.getElementById('vitrine-custom-color-hex')
+  if (customInput) customInput.value = m.color
+  if (customHex) customHex.textContent = (m.color || '').toUpperCase()
+  // Effets animés
+  const cfg = parseAnimConfig(m)
+  _selectedAnimEffects = cfg ? [...cfg.effects] : []
+  if (_selectedAnimEffects.length) {
+    document.getElementById('vitrine-anim-intensity').value = Math.round((cfg.intensity ?? 0.5) * 100)
+    document.getElementById('vitrine-anim-speed').value = Math.round((cfg.speed ?? 1) * 50)
+    document.getElementById('vitrine-anim-freq').value = Math.round((cfg.frequency ?? 0.5) * 100)
+    document.getElementById('vitrine-anim-intensity-val').textContent = Math.round((cfg.intensity ?? 0.5) * 100)
+    document.getElementById('vitrine-anim-speed-val').textContent = Math.round((cfg.speed ?? 1) * 50)
+    document.getElementById('vitrine-anim-freq-val').textContent = Math.round((cfg.frequency ?? 0.5) * 100)
+    document.getElementById('vitrine-anim-controls').style.display = ''
+  } else {
+    document.getElementById('vitrine-anim-controls').style.display = 'none'
+  }
   initVitrineSymbolPicker()
   initVitrineColorPicker()
+  refreshVitrineAnimEffectSelection()
   updateVitrinePreview()
   document.getElementById('vitrine-form-title').textContent = '✎ Modifier la médaille'
   document.getElementById('vitrine-save-btn').textContent = 'Enregistrer'
@@ -9239,14 +9876,29 @@ function cancelMedalEdit() {
   _editingMedalId = null
   _selectedSymbol = '🏆'
   _selectedColor = '#FFD700'
+  _selectedAnimEffects = []
   document.getElementById('vitrine-shape-select').value = 'ronde'
   document.getElementById('vitrine-rarity-select').value = 'Commune'
+  document.getElementById('vitrine-recipient-mode').value = 'single'
+  onVitrineRecipientModeChange()
   document.getElementById('vitrine-username-input').value = ''
   document.getElementById('vitrine-year-input').value = ''
   document.getElementById('vitrine-title-input').value = ''
   document.getElementById('vitrine-color-input').value = '#FFD700'
+  const customInput = document.getElementById('vitrine-custom-color')
+  const customHex = document.getElementById('vitrine-custom-color-hex')
+  if (customInput) customInput.value = '#FFD700'
+  if (customHex) customHex.textContent = '#FFD700'
+  document.getElementById('vitrine-anim-intensity').value = 50
+  document.getElementById('vitrine-anim-speed').value = 50
+  document.getElementById('vitrine-anim-freq').value = 50
+  document.getElementById('vitrine-anim-intensity-val').textContent = '50'
+  document.getElementById('vitrine-anim-speed-val').textContent = '50'
+  document.getElementById('vitrine-anim-freq-val').textContent = '50'
+  document.getElementById('vitrine-anim-controls').style.display = 'none'
   initVitrineSymbolPicker()
   initVitrineColorPicker()
+  refreshVitrineAnimEffectSelection()
   updateVitrinePreview()
   document.getElementById('vitrine-form-title').textContent = '+ Créer une nouvelle médaille'
   document.getElementById('vitrine-save-btn').textContent = 'Créer la médaille'

@@ -4436,8 +4436,41 @@ async function scheduleUnreadNotificationsForBots() {
    POST : action = create_medal | update_medal | delete_medal
    ============================================================ */
 const VALID_RARITIES = ['Commune', 'Rare', 'Épique', 'Légendaire', 'Mythique']
-const VALID_SHAPES = ['ronde', 'ecusson', 'bouclier', 'couronne', 'diamant', 'hexagone', 'trophee', 'insigne', 'sceau']
+const VALID_SHAPES = ['ronde', 'ecusson', 'bouclier', 'couronne', 'diamant', 'hexagone', 'trophee', 'insigne', 'sceau', 'etoile', 'pentagone', 'octogramme', 'fleche', 'croix', 'creneau', 'larme', 'medaillon', 'rune', 'etoile8', 'fer']
+const VALID_ANIM_EFFECTS = ['flammes', 'ronces', 'etoiles', 'particules', 'aura', 'eclairs', 'etincelles', 'brillance']
 const RARITY_ORDER = { 'Commune': 0, 'Rare': 1, 'Épique': 2, 'Légendaire': 3, 'Mythique': 4 }
+
+/* Valide une année de saison. Accepte :
+   - "" / null / undefined  -> médaille intemporelle (retourne '')
+   - "AAAA-AAAI" où AAAI = AAAA + 1 (ex : "2026-2027")
+   Retourne { ok, value, error } */
+function validateSeasonYear(raw) {
+  if (raw === null || raw === undefined || String(raw).trim() === '') return { ok: true, value: '' }
+  const v = String(raw).trim()
+  const m = v.match(/^(\d{4})-(\d{4})$/)
+  if (!m) return { ok: false, error: 'Format d\'année de saison invalide. Attendu : AAAA-AAAI (ex : 2026-2027), ou vide pour une médaille intemporelle.' }
+  const a = parseInt(m[1], 10), b = parseInt(m[2], 10)
+  if (a < 2000 || a > 2100) return { ok: false, error: 'Année de début hors plage (2000-2100).' }
+  if (b !== a + 1) return { ok: false, error: 'L\'année de fin doit être l\'année suivante (ex : 2026-2027).' }
+  return { ok: true, value: v }
+}
+
+/* Valide et normalise la config d'animation. Retourne une chaîne JSON ou null. */
+function normalizeAnimations(animations) {
+  if (!animations) return null
+  let cfg = animations
+  if (typeof cfg === 'string') { try { cfg = JSON.parse(cfg) } catch (_) { return null } }
+  if (!cfg || typeof cfg !== 'object') return null
+  let effects = Array.isArray(cfg.effects) ? cfg.effects.filter(e => VALID_ANIM_EFFECTS.includes(e)) : []
+  if (!effects.length) return null
+  const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, (typeof n === 'number' && !isNaN(n)) ? n : lo))
+  return JSON.stringify({
+    effects: effects.slice(0, 8),
+    intensity: clamp(cfg.intensity, 0.1, 1),
+    speed: clamp(cfg.speed, 0.2, 4),
+    frequency: clamp(cfg.frequency, 0.1, 1),
+  })
+}
 
 async function handleMedals(req, res) {
   const payload = requireAdmin(req, res)
@@ -4465,9 +4498,9 @@ async function handleMedals(req, res) {
   if (!action) return res.status(400).json({ error: 'action requis.' })
 
   try {
-    // ---- Création ----
+    // ---- Création : un seul joueur ----
     if (action === 'create_medal') {
-      const { symbol, color, shape, rarity, title, username, seasonYear } = req.body || {}
+      const { symbol, color, shape, rarity, title, username, seasonYear, animations } = req.body || {}
       if (!symbol || !shape || !rarity || !title || !username) {
         return res.status(400).json({ error: 'Champs manquants : symbol, shape, rarity, title, username sont requis.' })
       }
@@ -4477,12 +4510,9 @@ async function handleMedals(req, res) {
       if (!VALID_RARITIES.includes(rarity)) {
         return res.status(400).json({ error: 'Rareté invalide.' })
       }
-      const year = parseInt(seasonYear, 10)
-      if (isNaN(year) || year < 2000 || year > 2100) {
-        return res.status(400).json({ error: 'Année de saison invalide.' })
-      }
-      // Vérifier que le pseudo correspond à un joueur existant (optionnel : on accepte quand même)
-      // pour permettre les médailles honorifiques même si le joueur est inactif.
+      const yearCheck = validateSeasonYear(seasonYear)
+      if (!yearCheck.ok) return res.status(400).json({ error: yearCheck.error })
+      const animJson = normalizeAnimations(animations)
       const medal = await prisma.medal.create({
         data: {
           symbol: String(symbol).trim().slice(0, 10),
@@ -4491,31 +4521,67 @@ async function handleMedals(req, res) {
           rarity,
           title: String(title).trim().slice(0, 200),
           username: String(username).trim().slice(0, 100),
-          seasonYear: year,
+          seasonYear: yearCheck.value,
+          animations: animJson,
         },
       })
       return res.status(200).json({ ok: true, medal, message: 'Médaille créée.' })
     }
 
+    // ---- Création : tous les joueurs actifs ----
+    if (action === 'create_medal_all_active') {
+      const { symbol, color, shape, rarity, title, seasonYear, animations } = req.body || {}
+      if (!symbol || !shape || !rarity || !title) {
+        return res.status(400).json({ error: 'Champs manquants : symbol, shape, rarity, title sont requis.' })
+      }
+      if (!VALID_SHAPES.includes(shape)) return res.status(400).json({ error: 'Forme invalide.' })
+      if (!VALID_RARITIES.includes(rarity)) return res.status(400).json({ error: 'Rareté invalide.' })
+      const yearCheck = validateSeasonYear(seasonYear)
+      if (!yearCheck.ok) return res.status(400).json({ error: yearCheck.error })
+      const animJson = normalizeAnimations(animations)
+      // Récupérer tous les utilisateurs acceptés et non bannis (hors admin/root)
+      const users = await prisma.user.findMany({
+        where: { accepted: true, banned: false, NOT: { username: { in: ['admin', 'root'] } } },
+        select: { username: true },
+      })
+      const activeUsers = users.filter(u => u.username && !['admin', 'root'].includes(u.username.toLowerCase()))
+      if (activeUsers.length === 0) {
+        return res.status(400).json({ error: 'Aucun joueur actif trouvé pour attribuer la médaille.' })
+      }
+      const data = activeUsers.map(u => ({
+        symbol: String(symbol).trim().slice(0, 10),
+        color: String(color || '#FFD700').trim().slice(0, 20),
+        shape,
+        rarity,
+        title: String(title).trim().slice(0, 200),
+        username: String(u.username).trim().slice(0, 100),
+        seasonYear: yearCheck.value,
+        animations: animJson,
+      }))
+      const result = await prisma.medal.createMany({ data, skipDuplicates: false })
+      return res.status(200).json({ ok: true, created: result.count, message: result.count + ' médaille(s) créée(s) pour tous les joueurs actifs.' })
+    }
+
     // ---- Modification ----
     if (action === 'update_medal') {
-      const { id, symbol, color, shape, rarity, title, username, seasonYear } = req.body || {}
+      const { id, symbol, color, shape, rarity, title, username, seasonYear, animations } = req.body || {}
       const medalId = parseInt(id, 10)
       if (isNaN(medalId)) return res.status(400).json({ error: 'id requis.' })
       if (shape && !VALID_SHAPES.includes(shape)) return res.status(400).json({ error: 'Forme invalide.' })
       if (rarity && !VALID_RARITIES.includes(rarity)) return res.status(400).json({ error: 'Rareté invalide.' })
-      const year = seasonYear !== undefined ? parseInt(seasonYear, 10) : undefined
-      if (year !== undefined && (isNaN(year) || year < 2000 || year > 2100)) {
-        return res.status(400).json({ error: 'Année de saison invalide.' })
-      }
       const data = {}
       if (symbol !== undefined) data.symbol = String(symbol).trim().slice(0, 10)
-      if (color !== undefined) data.color = String(color).trim().slice(0, 20)
+      if (color !== undefined) data.color = String(color || '#FFD700').trim().slice(0, 20)
       if (shape !== undefined) data.shape = shape
       if (rarity !== undefined) data.rarity = rarity
       if (title !== undefined) data.title = String(title).trim().slice(0, 200)
       if (username !== undefined) data.username = String(username).trim().slice(0, 100)
-      if (year !== undefined) data.seasonYear = year
+      if (seasonYear !== undefined) {
+        const yearCheck = validateSeasonYear(seasonYear)
+        if (!yearCheck.ok) return res.status(400).json({ error: yearCheck.error })
+        data.seasonYear = yearCheck.value
+      }
+      if (animations !== undefined) data.animations = normalizeAnimations(animations)
       const medal = await prisma.medal.update({ where: { id: medalId }, data })
       return res.status(200).json({ ok: true, medal, message: 'Médaille mise à jour.' })
     }

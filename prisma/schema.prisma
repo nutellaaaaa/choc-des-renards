@@ -1,18 +1,22 @@
 // schema.prisma — Choc des Renards
 
+
 generator client {
   provider = "prisma-client-js"
 }
+
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+
 enum Role {
   USER
   ADMIN
 }
+
 
 enum Category {
   N
@@ -22,11 +26,13 @@ enum Category {
   NC
 }
 
+
 enum Phase {
   PHASE0
   PHASE1
   PHASE2
 }
+
 
 model User {
   id           Int      @id @default(autoincrement())
@@ -44,6 +50,7 @@ model User {
   isBot        Boolean  @default(false)
   createdAt    DateTime @default(now())
 
+
   matches        Match[]
   pouleMembers   PouleMember[]
   phase2Members  Phase2GroupMember[]
@@ -60,6 +67,7 @@ model User {
   whatsappMessages WhatsappMessage[]
 }
 
+
 model LoginEvent {
   id        Int      @id @default(autoincrement())
   userId    Int
@@ -71,8 +79,10 @@ model LoginEvent {
   logoutAt  DateTime?
   logoutReason String? // 'manual' | 'inactivity'
 
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
 
 // Historique des inscriptions refusées (conservé après suppression du compte)
 model RefusedRegistration {
@@ -82,6 +92,7 @@ model RefusedRegistration {
   phone     String
   refusedAt DateTime @default(now())
 }
+
 
 model TournamentState {
   id                   Int     @id @default(autoincrement())
@@ -97,6 +108,7 @@ model TournamentState {
   malusConfig          String  @default("[]")
 }
 
+
 model Poule {
   id        Int      @id @default(autoincrement())
   name      String
@@ -105,16 +117,20 @@ model Poule {
   members   PouleMember[]
 }
 
+
 model PouleMember {
   id      Int  @id @default(autoincrement())
   pouleId Int
   userId  Int
 
+
   poule Poule @relation(fields: [pouleId], references: [id], onDelete: Cascade)
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+
   @@unique([pouleId, userId])
 }
+
 
 model Phase2Group {
   id        Int      @id @default(autoincrement())
@@ -123,16 +139,20 @@ model Phase2Group {
   members   Phase2GroupMember[]
 }
 
+
 model Phase2GroupMember {
   id      Int @id @default(autoincrement())
   groupId Int
   userId  Int
 
+
   group Phase2Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
   user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+
   @@unique([groupId, userId])
 }
+
 
 model Match {
   id                Int      @id @default(autoincrement())
@@ -147,11 +167,13 @@ model Match {
   specialMatchId    Int?
   createdAt         DateTime @default(now())
 
+
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   sets         MatchSet[]
   photos       MatchPhoto[]
   specialMatch SpecialMatch? @relation(fields: [specialMatchId], references: [id])
 }
+
 
 model MatchPhoto {
   id        Int      @id @default(autoincrement())
@@ -161,8 +183,10 @@ model MatchPhoto {
   caption   String?
   createdAt DateTime @default(now())
 
+
   match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
 }
+
 
 model MatchSet {
   id            Int @id @default(autoincrement())
@@ -171,8 +195,10 @@ model MatchSet {
   playerScore   Int
   opponentScore Int
 
+
   match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
 }
+
 
 model SpecialMatch {
   id        Int      @id @default(autoincrement())
@@ -185,10 +211,12 @@ model SpecialMatch {
   resolved  Boolean  @default(false)
   createdAt DateTime @default(now())
 
+
   player1  User    @relation("Player1", fields: [player1Id], references: [id])
   player2  User    @relation("Player2", fields: [player2Id], references: [id])
   matches  Match[]
 }
+
 
 // Matchs planifiés (à venir, non encore joués)
 model PlannedMatch {
@@ -203,20 +231,24 @@ model PlannedMatch {
   roundNumber Int?
   createdAt   DateTime @default(now())
 
+
   // ── Planification automatique ──
   notifiedAt  DateTime? // horodatage d'envoi de la notification "prochain match" (snapshot figé, non resynchronisé)
   deadlineAt  DateTime? // scheduledDate + cycleLengthDays - deadlineHoursBeforeCycleEnd
   forfeited   Boolean  @default(false) // passé à true par le balayage automatique (forfait 0-0)
 
+
   // horodatage de génération des boutons WhatsApp "prochain match" pour ce cycle
   // (informatif, calqué sur notifiedAt) — remis à null si le match est modifié (planned_edit)
   whatsappGeneratedAt DateTime?
+
 
   player1 User @relation("PlannedPlayer1", fields: [player1Id], references: [id])
   player2 User @relation("PlannedPlayer2", fields: [player2Id], references: [id])
   notifications Notification[]
   whatsappMessages WhatsappMessage[]
 }
+
 
 model Notification {
   id           Int      @id @default(autoincrement())
@@ -232,13 +264,17 @@ model Notification {
   readAt       DateTime?
   createdAt    DateTime @default(now())
 
+
   plannedMatchId Int?
   plannedMatch   PlannedMatch? @relation(fields: [plannedMatchId], references: [id], onDelete: SetNull)
+
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+
 // ═══════════════════ PLANIFICATION AUTOMATIQUE ═══════════════════
+
 
 // Un jeu de paramètres par phase (PHASE1 / PHASE2), indépendants. Verrouillés
 // (locked = true) dès que la génération a été effectuée ; pour les modifier,
@@ -255,6 +291,7 @@ model SchedulingSettings {
   updatedAt                   DateTime @updatedAt
 }
 
+
 // Périodes de non-jeu, portée globale à tous les joueurs d'une phase donnée.
 model BlackoutPeriod {
   id        Int      @id @default(autoincrement())
@@ -264,6 +301,7 @@ model BlackoutPeriod {
   dateEnd   DateTime
   createdAt DateTime @default(now())
 }
+
 
 // Console de logs — un seul fil actif par phase, vidé et remplacé à chaque
 // nouveau calcul (pas d'historique cumulatif, pas d'onglets datés).
@@ -276,7 +314,9 @@ model SchedulingLog {
   createdAt DateTime @default(now())
 }
 
+
 // ═══════════════════ FAQ ═══════════════════
+
 
 model FaqTopic {
   id             Int      @id @default(autoincrement())
@@ -289,10 +329,12 @@ model FaqTopic {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+
   items FaqItem[]
   views FaqView[]
   votes FaqVote[]
 }
+
 
 model FaqItem {
   id       Int     @id @default(autoincrement())
@@ -301,8 +343,10 @@ model FaqItem {
   content  String  // texte avec mise en forme basique (gras/italique/listes)
   order    Int     @default(0)
 
+
   topic FaqTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
 }
+
 
 // Historique des consultations (utilisateur + horodatage)
 model FaqView {
@@ -311,9 +355,11 @@ model FaqView {
   userId    Int?
   createdAt DateTime @default(now())
 
+
   topic FaqTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
   user  User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 }
+
 
 // Avis "utile" / "pas utile" — un seul vote par utilisateur et par sujet
 model FaqVote {
@@ -323,13 +369,17 @@ model FaqVote {
   useful    Boolean
   createdAt DateTime @default(now())
 
+
   topic FaqTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
   user  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
 
   @@unique([topicId, userId])
 }
 
+
 // ═══════════════════ FORMULAIRE DE CONTACT ═══════════════════
+
 
 model ContactMessage {
   id        Int      @id @default(autoincrement())
@@ -340,10 +390,13 @@ model ContactMessage {
   treated   Boolean  @default(false)
   createdAt DateTime @default(now())
 
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+
 // ═══════════════════ VERSIONS / CORBEILLE ═══════════════════
+
 
 model DataVersion {
   id          Int      @id @default(autoincrement())
@@ -355,7 +408,9 @@ model DataVersion {
   restoredAt  DateTime?
 }
 
+
 // ═══════════════════ ALERTES ADMIN ═══════════════════
+
 
 // Logs d'anomalies : score oublié, connexion admin échouée, pseudo dupliqué.
 model AdminAlert {
@@ -367,7 +422,9 @@ model AdminAlert {
   createdAt DateTime @default(now())
 }
 
+
 // ═══════════════════ COMMUNICATION WHATSAPP ═══════════════════
+
 
 // Un seul enregistrement par type de message ('next_match' | 'reminder').
 // Contenu éditable par l'admin, avec variables [xxx] substituées à la génération.
@@ -377,6 +434,7 @@ model WhatsappTemplate {
   content   String
   updatedAt DateTime @updatedAt
 }
+
 
 // Un message WhatsApp "généré" = un bouton d'envoi dans l'onglet Communication
 // WhatsApp. Reste en base jusqu'à suppression manuelle ou envoi (marqué sent).
@@ -391,11 +449,14 @@ model WhatsappMessage {
   sentAt         DateTime?
   createdAt      DateTime @default(now())
 
+
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   plannedMatch PlannedMatch? @relation(fields: [plannedMatchId], references: [id], onDelete: SetNull)
 }
 
+
 // ═══════════════════ BOTS DE TEST ═══════════════════
+
 
 // File d'actions programmées pour un bot (voir api/admin.js → handleBots).
 // Chaque tâche a une échéance réaliste (dueAt) ; elle n'est exécutée que lors
@@ -411,20 +472,24 @@ model BotTask {
   payload   Json?
   createdAt DateTime @default(now())
 
+
   bot User @relation(fields: [botId], references: [id], onDelete: Cascade)
 }
+
 
 model Medal {
   id         Int      @id @default(autoincrement())
   symbol     String   // emoji du symbole, ex: "🏆", "👑", "⚔️"
   color      String   // code couleur hex, ex: "#FFD700"
-  shape      String   // "ronde" | "ecusson" | "bouclier" | "couronne" | "diamant" | "hexagone" | "trophee" | "insigne" | "sceau"
+  shape      String   // "ronde" | "ecusson" | "bouclier" | "couronne" | "diamant" | "hexagone" | "trophee" | "insigne" | "sceau" | "etoile" | "pentagone" | "octogramme" | "fleche" | "croix" | "creneau" | "larme" | "medaillon" | "rune" | "etoile8" | "fer"
   rarity     String   // "Commune" | "Rare" | "Épique" | "Légendaire" | "Mythique"
   title      String   // nom de la médaille, ex: "Champion de la saison"
   username   String   // pseudo du joueur récompensé
-  seasonYear Int      // année de la saison, ex: 2024
+  seasonYear String   // année de la saison format "AAAA-AAAI" (ex: "2026-2027") ou vide pour intemporelle
+  animations String?  // JSON des effets d animation {effects:[],intensity,speed,frequency}
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
 
   @@index([username])
   @@index([seasonYear])
