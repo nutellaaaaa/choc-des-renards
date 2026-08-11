@@ -368,6 +368,8 @@ module.exports = async function handler(req, res) {
       return handleAlerts(req, res)
     case 'whatsapp':
       return handleWhatsapp(req, res)
+    case 'medals':
+      return handleMedals(req, res)
     default:
       return res.status(400).json({ error: 'resource invalide ou manquant.' })
   }
@@ -4425,4 +4427,114 @@ async function scheduleUnreadNotificationsForBots() {
     toCreate.push({ botId: n.userId, kind: 'read_notification', dueAt, payload: { notificationId: n.id } })
   }
   if (toCreate.length > 0) await prisma.botTask.createMany({ data: toCreate })
+}
+
+/* ============================================================
+   VITRINE — Gestion des médailles nominatives (CRUD)
+   ?resource=medals
+   GET  : liste toutes les médailles
+   POST : action = create_medal | update_medal | delete_medal
+   ============================================================ */
+const VALID_RARITIES = ['Commune', 'Rare', 'Épique', 'Légendaire', 'Mythique']
+const VALID_SHAPES = ['ronde', 'ecusson', 'bouclier', 'couronne', 'diamant', 'hexagone', 'trophee', 'insigne', 'sceau']
+const RARITY_ORDER = { 'Commune': 0, 'Rare': 1, 'Épique': 2, 'Légendaire': 3, 'Mythique': 4 }
+
+async function handleMedals(req, res) {
+  const payload = requireAdmin(req, res)
+  if (!payload) return
+
+  // GET : liste toutes les médailles
+  if (req.method === 'GET') {
+    try {
+      const medals = await prisma.medal.findMany({
+        orderBy: [
+          { seasonYear: 'desc' },
+          { createdAt: 'desc' },
+        ],
+      })
+      return res.status(200).json({ medals })
+    } catch (err) {
+      console.error('[admin/medals GET]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' })
+
+  const { action } = req.body || {}
+  if (!action) return res.status(400).json({ error: 'action requis.' })
+
+  try {
+    // ---- Création ----
+    if (action === 'create_medal') {
+      const { symbol, color, shape, rarity, title, username, seasonYear } = req.body || {}
+      if (!symbol || !shape || !rarity || !title || !username) {
+        return res.status(400).json({ error: 'Champs manquants : symbol, shape, rarity, title, username sont requis.' })
+      }
+      if (!VALID_SHAPES.includes(shape)) {
+        return res.status(400).json({ error: 'Forme invalide.' })
+      }
+      if (!VALID_RARITIES.includes(rarity)) {
+        return res.status(400).json({ error: 'Rareté invalide.' })
+      }
+      const year = parseInt(seasonYear, 10)
+      if (isNaN(year) || year < 2000 || year > 2100) {
+        return res.status(400).json({ error: 'Année de saison invalide.' })
+      }
+      // Vérifier que le pseudo correspond à un joueur existant (optionnel : on accepte quand même)
+      // pour permettre les médailles honorifiques même si le joueur est inactif.
+      const medal = await prisma.medal.create({
+        data: {
+          symbol: String(symbol).trim().slice(0, 10),
+          color: String(color || '#FFD700').trim().slice(0, 20),
+          shape,
+          rarity,
+          title: String(title).trim().slice(0, 200),
+          username: String(username).trim().slice(0, 100),
+          seasonYear: year,
+        },
+      })
+      return res.status(200).json({ ok: true, medal, message: 'Médaille créée.' })
+    }
+
+    // ---- Modification ----
+    if (action === 'update_medal') {
+      const { id, symbol, color, shape, rarity, title, username, seasonYear } = req.body || {}
+      const medalId = parseInt(id, 10)
+      if (isNaN(medalId)) return res.status(400).json({ error: 'id requis.' })
+      if (shape && !VALID_SHAPES.includes(shape)) return res.status(400).json({ error: 'Forme invalide.' })
+      if (rarity && !VALID_RARITIES.includes(rarity)) return res.status(400).json({ error: 'Rareté invalide.' })
+      const year = seasonYear !== undefined ? parseInt(seasonYear, 10) : undefined
+      if (year !== undefined && (isNaN(year) || year < 2000 || year > 2100)) {
+        return res.status(400).json({ error: 'Année de saison invalide.' })
+      }
+      const data = {}
+      if (symbol !== undefined) data.symbol = String(symbol).trim().slice(0, 10)
+      if (color !== undefined) data.color = String(color).trim().slice(0, 20)
+      if (shape !== undefined) data.shape = shape
+      if (rarity !== undefined) data.rarity = rarity
+      if (title !== undefined) data.title = String(title).trim().slice(0, 200)
+      if (username !== undefined) data.username = String(username).trim().slice(0, 100)
+      if (year !== undefined) data.seasonYear = year
+      const medal = await prisma.medal.update({ where: { id: medalId }, data })
+      return res.status(200).json({ ok: true, medal, message: 'Médaille mise à jour.' })
+    }
+
+    // ---- Suppression ----
+    if (action === 'delete_medal') {
+      const { id } = req.body || {}
+      const medalId = parseInt(id, 10)
+      if (isNaN(medalId)) return res.status(400).json({ error: 'id requis.' })
+      await prisma.medal.delete({ where: { id: medalId } })
+      return res.status(200).json({ ok: true, message: 'Médaille supprimée.' })
+    }
+
+    return res.status(400).json({ error: 'action inconnue pour les médailles.' })
+  } catch (err) {
+    console.error('[admin/medals POST]', err)
+    if (err && err.code === 'P2025') {
+      return res.status(404).json({ error: 'Médaille introuvable.' })
+    }
+    return res.status(500).json({ error: 'Erreur serveur.' })
+  }
 }

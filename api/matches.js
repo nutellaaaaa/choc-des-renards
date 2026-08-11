@@ -76,6 +76,30 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // Vitrine — médailles nominatives (membres connect\u00e9s)
+  if (req.query.vitrine === '1') {
+    const auth = requireAuth(req, res)
+    if (!auth) return
+    try {
+      const medals = await prisma.medal.findMany({
+        orderBy: [
+          { seasonYear: 'desc' },
+          { createdAt: 'desc' },
+        ],
+      })
+      // Marquer les médailles appartenant au joueur connecté
+      const myUsername = (auth.username || '').toLowerCase()
+      const enriched = medals.map(m => ({
+        ...m,
+        isMine: (m.username || '').toLowerCase() === myUsername,
+      }))
+      return res.status(200).json({ medals: enriched })
+    } catch (err) {
+      console.error('[matches vitrine]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
   // Rencontres en cours (public)
   if (req.query.public === '1') {
     try {

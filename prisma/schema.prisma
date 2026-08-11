@@ -413,3 +413,20 @@ model BotTask {
 
   bot User @relation(fields: [botId], references: [id], onDelete: Cascade)
 }
+
+model Medal {
+  id         Int      @id @default(autoincrement())
+  symbol     String   // emoji du symbole, ex: "🏆", "👑", "⚔️"
+  color      String   // code couleur hex, ex: "#FFD700"
+  shape      String   // "ronde" | "ecusson" | "bouclier" | "couronne" | "diamant" | "hexagone" | "trophee" | "insigne" | "sceau"
+  rarity     String   // "Commune" | "Rare" | "Épique" | "Légendaire" | "Mythique"
+  title      String   // nom de la médaille, ex: "Champion de la saison"
+  username   String   // pseudo du joueur récompensé
+  seasonYear Int      // année de la saison, ex: 2024
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([username])
+  @@index([seasonYear])
+  @@index([rarity])
+}

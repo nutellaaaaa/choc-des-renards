@@ -181,16 +181,16 @@
   .pdf-btn { background: var(--orange); color: #000; border: none; cursor: pointer; font-family: var(--font-heading); font-size: 1rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.9rem 2.5rem; border-radius: 8px; transition: all 0.2s; text-decoration: none; display: inline-flex; align-items: center; gap: 0.6rem; }
   .pdf-btn:hover { background: var(--orange-light); transform: translateY(-2px); }
   /* Visionneuse PDF de la charte — empêche le téléchargement facile */
-  .pdf-viewer-wrap { position: relative; width: 100%; height: clamp(520px, 75vh, 920px); background: var(--dark2); border: 1px solid var(--dark4); border-left: 3px solid var(--orange); border-radius: 12px; overflow: hidden; margin-bottom: 2rem; }
+  .pdf-viewer-wrap { position: relative; width: 100%; height: clamp(420px, 70vh, 820px); background: var(--dark2); border: 1px solid var(--dark4); border-left: 3px solid var(--orange); border-radius: 12px; overflow: hidden; margin-bottom: 2rem; }
   .pdf-viewer-frame { width: 100%; height: 100%; border: 0; display: block; background: #525659; }
   /* Overlay transparent au-dessus du PDF : bloque le clic-droit / sélection / menu de téléchargement du lecteur intégré du navigateur */
-  .pdf-viewer-shield { position: absolute; inset: 0; z-index: 2; background: transparent; pointer-events: none; cursor: default; }
+  .pdf-viewer-shield { position: absolute; inset: 0; z-index: 2; background: transparent; cursor: default; }
   .pdf-viewer-fallback { position: absolute; inset: 0; z-index: 3; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; text-align: center; padding: 1.5rem; color: var(--gray-light); font-size: 0.95rem; background: var(--dark2); }
   .pdf-viewer-fallback .fv-icon { font-size: 2.4rem; }
   .pdf-viewer-toolbar { position: absolute; top: 0.6rem; right: 0.6rem; z-index: 4; display: flex; gap: 0.4rem; }
   .pdf-viewer-toolbar button { background: var(--dark3); border: 1px solid var(--dark4); color: var(--gray-light); font-family: var(--font-heading); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; padding: 0.4rem 0.7rem; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
   .pdf-viewer-toolbar button:hover { border-color: var(--orange); color: var(--orange); }
-  @media (max-width: 640px) { .pdf-viewer-wrap { height: 65vh; } }
+  @media (max-width: 640px) { .pdf-viewer-wrap { height: 60vh; } }
 
   /* RÈGLEMENT */
   .article { background: var(--dark2); border: 1px solid var(--dark4); border-radius: 12px; padding: 1.75rem 2rem; margin-bottom: 1.25rem; transition: border-color 0.2s; }
@@ -1472,6 +1472,280 @@
   @media (prefers-reduced-motion: reduce) {
     .shuttle, .dock-item, .dock-item::after, .dock-item svg, .dock-label { transition: none !important; animation: none !important; }
   }
+
+  /* ============================================================
+     VITRINE — Médailles nominatives
+     ============================================================ */
+
+  /* ---- Layout général de la vitrine (côté joueur) ---- */
+  .vitrine-wrap { max-width: 1100px; margin: 0 auto; }
+  .vitrine-filters {
+    display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center;
+    margin: 1.2rem 0 1.8rem;
+  }
+  .vitrine-filter-select {
+    background: var(--dark2); border: 1px solid var(--dark4);
+    border-radius: 8px; color: var(--white); padding: 0.5rem 0.9rem;
+    font-family: var(--font-body); font-size: 0.88rem; cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .vitrine-filter-select:hover { border-color: var(--orange); }
+  .vitrine-filter-select option { background: var(--dark2); }
+
+  .vitrine-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1.5rem;
+  }
+  @media (max-width: 600px) {
+    .vitrine-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; }
+  }
+
+  .medal-card {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 0.5rem; padding: 1.4rem 1rem 1.2rem;
+    background: linear-gradient(160deg, var(--dark3), var(--dark2));
+    border: 1px solid var(--dark4);
+    border-radius: 14px;
+    transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
+    position: relative; overflow: hidden;
+  }
+  .medal-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--orange);
+    box-shadow: 0 8px 30px rgba(255,109,0,0.15);
+  }
+
+  /* ---- Le "socle" de la médaille (clip-path selon la forme) ---- */
+  .medal-visual {
+    width: 90px; height: 90px;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    margin-bottom: 0.3rem;
+  }
+  .medal-shape {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    background: var(--medal-color, #FFD700);
+    box-shadow:
+      0 4px 12px rgba(0,0,0,0.4),
+      inset 0 2px 4px rgba(255,255,255,0.3),
+      inset 0 -3px 6px rgba(0,0,0,0.25);
+  }
+  .medal-shape::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(160deg, rgba(255,255,255,0.35) 0%, transparent 45%, transparent 55%, rgba(0,0,0,0.15) 100%);
+    pointer-events: none;
+  }
+  .medal-symbol {
+    font-size: 2.4rem; line-height: 1;
+    z-index: 2; position: relative;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+  }
+
+  /* Formes via clip-path */
+  .medal-shape--ronde    { border-radius: 50%; }
+  .medal-shape--ecusson  { clip-path: polygon(0 0, 100% 0, 100% 65%, 50% 100%, 0 65%); border-radius: 4px 4px 0 0; }
+  .medal-shape--bouclier { clip-path: polygon(8% 5%, 92% 5%, 92% 50%, 50% 95%, 8% 50%); }
+  .medal-shape--couronne { clip-path: polygon(0 100%, 0 30%, 15% 45%, 25% 10%, 40% 40%, 50% 5%, 60% 40%, 75% 10%, 85% 45%, 100% 30%, 100% 100%); }
+  .medal-shape--diamant  { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+  .medal-shape--hexagone { clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%); }
+  .medal-shape--trophee  { clip-path: polygon(20% 0, 80% 0, 80% 15%, 70% 30%, 75% 45%, 60% 45%, 55% 80%, 70% 85%, 70% 95%, 30% 95%, 30% 85%, 45% 80%, 40% 45%, 25% 45%, 30% 30%, 20% 15%); }
+  .medal-shape--insigne  { clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
+  .medal-shape--sceau    { border-radius: 12px; clip-path: polygon(0 15%, 15% 0, 85% 0, 100% 15%, 100% 85%, 85% 100%, 15% 100%, 0 85%); }
+
+  /* ---- Halo de rareté ---- */
+  .medal-card[data-rarity="Commune"]    { --rarity-glow: rgba(180,180,180,0.4); }
+  .medal-card[data-rarity="Rare"]       { --rarity-glow: rgba(64,156,255,0.5); }
+  .medal-card[data-rarity="Épique"]     { --rarity-glow: rgba(168,85,247,0.55); }
+  .medal-card[data-rarity="Légendaire"] { --rarity-glow: rgba(255,165,0,0.6); }
+  .medal-card[data-rarity="Mythique"]   { --rarity-glow: rgba(255,45,85,0.65); }
+
+  .medal-visual::after {
+    content: '';
+    position: absolute; inset: -10px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--rarity-glow, transparent) 0%, transparent 70%);
+    opacity: 0; transition: opacity 0.3s;
+    z-index: 0;
+  }
+  .medal-card:hover .medal-visual::after { opacity: 1; }
+
+  /* ---- Badge de rareté ---- */
+  .medal-rarity-badge {
+    font-family: var(--font-heading); font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 0.2rem 0.7rem; border-radius: 20px;
+    margin-bottom: 0.2rem;
+  }
+  .medal-rarity-badge[data-rarity="Commune"]    { background: rgba(180,180,180,0.2); color: #c0c0c0; border: 1px solid rgba(180,180,180,0.4); }
+  .medal-rarity-badge[data-rarity="Rare"]       { background: rgba(64,156,255,0.15); color: #6bb6ff; border: 1px solid rgba(64,156,255,0.4); }
+  .medal-rarity-badge[data-rarity="Épique"]     { background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.4); }
+  .medal-rarity-badge[data-rarity="Légendaire"] { background: rgba(255,165,0,0.15); color: #ffc14d; border: 1px solid rgba(255,165,0,0.45); }
+  .medal-rarity-badge[data-rarity="Mythique"]   { background: rgba(255,45,85,0.15); color: #ff7a99; border: 1px solid rgba(255,45,85,0.45); }
+
+  .medal-title {
+    font-family: var(--font-heading); font-size: 0.92rem; font-weight: 700;
+    text-align: center; color: var(--white); line-height: 1.25;
+    margin-top: 0.1rem;
+  }
+  .medal-recipient {
+    font-size: 0.82rem; color: var(--gray); text-align: center;
+  }
+  .medal-recipient strong { color: var(--orange); font-weight: 600; }
+  .medal-year {
+    font-size: 0.75rem; color: var(--gray); opacity: 0.7;
+    font-family: var(--font-heading); letter-spacing: 0.05em;
+  }
+
+  /* ---- Animation scintillement (médailles du joueur connecté) ---- */
+  @keyframes medalSparkle {
+    0%, 100% { filter: brightness(1) drop-shadow(0 0 0px transparent); }
+    25%      { filter: brightness(1.3) drop-shadow(0 0 8px rgba(255,255,255,0.8)); }
+    50%      { filter: brightness(1.5) drop-shadow(0 0 14px rgba(255,220,100,0.9)); }
+    75%      { filter: brightness(1.25) drop-shadow(0 0 10px rgba(255,255,255,0.7)); }
+  }
+  @keyframes medalShimmer {
+    0%   { transform: translateX(-120%) rotate(20deg); }
+    100% { transform: translateX(220%) rotate(20deg); }
+  }
+  .medal-card.is-mine {
+    border-color: var(--orange);
+    box-shadow: 0 0 20px rgba(255,109,0,0.2);
+  }
+  .medal-card.is-mine .medal-shape {
+    animation: medalSparkle 2.5s ease-in-out infinite;
+  }
+  .medal-card.is-mine::after {
+    content: '';
+    position: absolute; top: 0; left: 0; width: 40%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    animation: medalShimmer 3s ease-in-out infinite;
+    pointer-events: none;
+  }
+  .medal-mine-tag {
+    position: absolute; top: 8px; right: 8px;
+    background: var(--orange); color: #1a1a1a;
+    font-family: var(--font-heading); font-size: 0.62rem; font-weight: 700;
+    padding: 0.15rem 0.5rem; border-radius: 10px;
+    letter-spacing: 0.05em; z-index: 3;
+  }
+
+  /* ---- Section vide vitrine ---- */
+  .vitrine-empty {
+    grid-column: 1 / -1;
+    text-align: center; padding: 3rem 1rem;
+    color: var(--gray); font-size: 0.95rem;
+  }
+  .vitrine-empty span { font-size: 3rem; display: block; margin-bottom: 0.8rem; opacity: 0.5; }
+
+  /* ============================================================
+     ADMIN VITRINE — formulaire et liste
+     ============================================================ */
+  .vitrine-admin-wrap { max-width: 900px; margin: 0 auto; }
+  .vitrine-admin-form {
+    background: var(--dark3); border: 1px solid var(--dark4);
+    border-radius: 14px; padding: 1.5rem; margin-bottom: 2rem;
+  }
+  .vitrine-admin-form h4 {
+    font-family: var(--font-heading); font-size: 1.05rem; font-weight: 700;
+    letter-spacing: 0.04em; margin-bottom: 1rem; color: var(--orange);
+  }
+  .vitrine-form-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+  }
+  .vitrine-form-field { display: flex; flex-direction: column; gap: 0.35rem; }
+  .vitrine-form-field label {
+    font-size: 0.78rem; color: var(--gray); font-weight: 600;
+    font-family: var(--font-heading); letter-spacing: 0.03em;
+  }
+  .vitrine-form-field input,
+  .vitrine-form-field select {
+    background: var(--dark2); border: 1px solid var(--dark4);
+    border-radius: 8px; color: var(--white); padding: 0.5rem 0.8rem;
+    font-family: var(--font-body); font-size: 0.88rem;
+    transition: border-color 0.2s;
+  }
+  .vitrine-form-field input:focus,
+  .vitrine-form-field select:focus { outline: none; border-color: var(--orange); }
+  .vitrine-form-field select option { background: var(--dark2); }
+
+  /* Sélecteur de symboles (grille d'emojis cliquables) */
+  .vitrine-symbol-picker {
+    display: flex; flex-wrap: wrap; gap: 0.35rem;
+    background: var(--dark2); border: 1px solid var(--dark4);
+    border-radius: 8px; padding: 0.6rem; max-height: 120px; overflow-y: auto;
+  }
+  .vitrine-symbol-btn {
+    width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem; cursor: pointer; border-radius: 8px;
+    border: 2px solid transparent; background: transparent;
+    transition: all 0.15s;
+  }
+  .vitrine-symbol-btn:hover { background: var(--dark4); }
+  .vitrine-symbol-btn.selected {
+    border-color: var(--orange); background: rgba(255,109,0,0.15);
+    transform: scale(1.1);
+  }
+
+  /* Sélecteur de couleur */
+  .vitrine-color-picker {
+    display: flex; flex-wrap: wrap; gap: 0.4rem;
+  }
+  .vitrine-color-swatch {
+    width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+    border: 3px solid transparent; transition: all 0.15s;
+  }
+  .vitrine-color-swatch:hover { transform: scale(1.15); }
+  .vitrine-color-swatch.selected { border-color: var(--white); transform: scale(1.15); }
+
+  /* Aperçu live de la médaille dans le formulaire */
+  .vitrine-form-preview {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 0.5rem; padding: 1rem;
+    background: var(--dark2); border-radius: 10px;
+    border: 1px solid var(--dark4);
+  }
+  .vitrine-form-preview-label {
+    font-size: 0.72rem; color: var(--gray); font-family: var(--font-heading);
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+
+  .vitrine-form-actions {
+    display: flex; gap: 0.7rem; margin-top: 1.2rem; flex-wrap: wrap;
+  }
+
+  /* Liste des médailles (admin) */
+  .vitrine-admin-list {
+    display: flex; flex-direction: column; gap: 0.8rem;
+  }
+  .vitrine-admin-item {
+    display: flex; align-items: center; gap: 1rem;
+    background: var(--dark3); border: 1px solid var(--dark4);
+    border-radius: 12px; padding: 0.8rem 1rem;
+    transition: border-color 0.2s;
+  }
+  .vitrine-admin-item:hover { border-color: var(--dark4); }
+  .vitrine-admin-item .medal-visual { width: 56px; height: 56px; flex-shrink: 0; }
+  .vitrine-admin-item .medal-symbol { font-size: 1.5rem; }
+  .vitrine-admin-item-info { flex: 1; min-width: 0; }
+  .vitrine-admin-item-title {
+    font-family: var(--font-heading); font-weight: 700; font-size: 0.92rem;
+    color: var(--white);
+  }
+  .vitrine-admin-item-meta {
+    font-size: 0.78rem; color: var(--gray); margin-top: 0.15rem;
+  }
+  .vitrine-admin-item-meta strong { color: var(--orange); font-weight: 600; }
+  .vitrine-admin-item-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+
+  .vitrine-admin-filters {
+    display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center;
+    margin-bottom: 1.2rem;
+  }
 </style>
 </head>
 <body>
@@ -1810,6 +2084,7 @@
         <div class="k-stack-grid">
           <button class="k-node size-lg" data-tab="alerts" data-badge-id="badge-alerts" data-badge-type="urgent"><span class="k-node-orb"><svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4"/><circle cx="12" cy="17" r="0.4" fill="currentColor" stroke="none"/></svg></span><span class="k-node-label">Alertes</span></button>
           <button class="k-node size-md" data-tab="other-actions"><span class="k-node-orb"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5c.1-.5.1-1 0-1.5l1.8-1.4-2-3.4-2.1.6c-.4-.3-.8-.6-1.3-.8L15.4 5h-4l-.4 2c-.5.2-.9.5-1.3.8l-2.1-.6-2 3.4L7.4 12c-.1.5-.1 1 0 1.5l-1.8 1.4 2 3.4 2.1-.6c.4.3.8.6 1.3.8l.4 2h4l.4-2c.5-.2.9-.5 1.3-.8l2.1.6 2-3.4-1.8-1.4z"/></svg></span><span class="k-node-label">Actions autres</span></button>
+          <button class="k-node size-md" data-tab="vitrine"><span class="k-node-orb"><svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4z"/><path d="M7 5H4v2a3 3 0 003 3M17 5h3v2a3 3 0 01-3 3"/></svg></span><span class="k-node-label">Vitrine</span></button>
         </div>
       </div>
       <div class="k-stack-territory">
@@ -1841,6 +2116,7 @@
     <button class="admin-tab" onclick="adminTab('faq',this)">FAQ <span class="badge badge-info" id="badge-faq">–</span></button>
     <button class="admin-tab" onclick="adminTab('contact',this)">Contacts <span class="badge" id="badge-contact" hidden>–</span></button>
     <button class="admin-tab" onclick="adminTab('other-actions',this)">Actions autres <span class="badge" hidden>–</span></button>
+    <button class="admin-tab" onclick="adminTab('vitrine',this)">Vitrine <span class="badge" hidden>–</span></button>
     <button class="admin-tab" onclick="adminTab('alerts',this)">Alertes <span class="badge" id="badge-alerts" hidden>–</span></button>
   </div>
 
@@ -2225,7 +2501,7 @@
         </div>
         <div class="other-action-card" style="grid-column:1/-1">
           <h4>⚡ Liste des malus</h4>
-          <p>Gérez la liste des malus utilisés lors de la planification des matchs. Si vous supprimez un malus, les matchs planifiés qui l'utilisaient seront automatiquement réassignés (un log apparaîtra dans la console de planification). <strong>Max simultané</strong> : définissez une limite d'utilisation simultanée (ex: 1 si vous n'avez qu'un seul cache-œil). Les matchs dépassant la limite seront automatiquement réassignés vers d'autres malus.</p>
+          <p>Gérez la liste des malus utilisés lors de la planification des matchs. Si vous supprimez un malus, les matchs planifiés qui l'utilisaient seront automatiquement réassignés (un log apparaîtra dans la console de planification).</p>
           <div id="malus-config-list" style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.8rem"></div>
           <button class="btn-sm btn-add" style="margin-top:0.7rem" onclick="addMalusItem()">+ Ajouter un malus</button>
           <button class="btn-sm btn-accept" style="margin-top:0.7rem;margin-left:0.5rem" onclick="saveMalusConfig()">Enregistrer</button>
@@ -2267,6 +2543,91 @@
       </div>
     </div>
 
+
+    <!-- VITRINE ADMIN -->
+    <div id="admin-vitrine" class="admin-section">
+      <h3 style="font-family:var(--font-heading);font-size:1.2rem;font-weight:700;letter-spacing:0.06em;margin-bottom:1.5rem">Vitrine — Médailles nominatives</h3>
+      <div class="vitrine-admin-wrap">
+        <div class="vitrine-admin-form" id="vitrine-medal-form">
+          <h4 id="vitrine-form-title">+ Créer une nouvelle médaille</h4>
+          <div class="vitrine-form-grid">
+            <div class="vitrine-form-field">
+              <label>Symbole</label>
+              <div class="vitrine-symbol-picker" id="vitrine-symbol-picker"></div>
+            </div>
+            <div class="vitrine-form-field">
+              <label>Couleur</label>
+              <div class="vitrine-color-picker" id="vitrine-color-picker"></div>
+              <input type="hidden" id="vitrine-color-input" value="#FFD700">
+            </div>
+            <div class="vitrine-form-field">
+              <label>Forme</label>
+              <select id="vitrine-shape-select">
+                <option value="ronde">Médaille ronde classique</option>
+                <option value="ecusson">Écusson</option>
+                <option value="bouclier">Bouclier</option>
+                <option value="couronne">Couronne</option>
+                <option value="diamant">Diamant</option>
+                <option value="hexagone">Hexagone</option>
+                <option value="trophee">Trophée</option>
+                <option value="insigne">Insigne militaire</option>
+                <option value="sceau">Sceau</option>
+              </select>
+            </div>
+            <div class="vitrine-form-field">
+              <label>Rareté</label>
+              <select id="vitrine-rarity-select">
+                <option value="Commune">Commune</option>
+                <option value="Rare">Rare</option>
+                <option value="Épique">Épique</option>
+                <option value="Légendaire">Légendaire</option>
+                <option value="Mythique">Mythique</option>
+              </select>
+            </div>
+            <div class="vitrine-form-field">
+              <label>Pseudo du joueur</label>
+              <input type="text" id="vitrine-username-input" placeholder="ex: renard_du_83" maxlength="100">
+            </div>
+            <div class="vitrine-form-field">
+              <label>Année de la saison</label>
+              <input type="number" id="vitrine-year-input" min="2000" max="2100" placeholder="ex: 2024">
+            </div>
+            <div class="vitrine-form-field" style="grid-column:1/-1">
+              <label>Nom de la médaille</label>
+              <input type="text" id="vitrine-title-input" placeholder="ex: Champion de la saison" maxlength="200">
+            </div>
+            <div class="vitrine-form-field" style="grid-column:1/-1">
+              <label>Aperçu</label>
+              <div class="vitrine-form-preview">
+                <div class="vitrine-form-preview-label">Aperçu live</div>
+                <div class="medal-visual" id="vitrine-preview-visual">
+                  <div class="medal-shape medal-shape--ronde" id="vitrine-preview-shape" style="background:#FFD700">
+                    <span class="medal-symbol" id="vitrine-preview-symbol">🏆</span>
+                  </div>
+                </div>
+                <div class="medal-rarity-badge" id="vitrine-preview-rarity" data-rarity="Commune">Commune</div>
+              </div>
+            </div>
+          </div>
+          <div class="vitrine-form-actions">
+            <button class="btn-sm btn-accept" id="vitrine-save-btn" onclick="saveMedal()">Créer la médaille</button>
+            <button class="btn-sm btn-edit" id="vitrine-cancel-btn" onclick="cancelMedalEdit()" style="display:none">Annuler</button>
+          </div>
+          <div id="vitrine-form-feedback" class="modal-success" style="margin-top:0.8rem"></div>
+        </div>
+
+        <div class="vitrine-admin-filters">
+          <select class="vitrine-filter-select" id="vitrine-admin-sort-select" onchange="renderAdminVitrine()">
+            <option value="year-desc">Trier par année (récent → ancien)</option>
+            <option value="year-asc">Trier par année (ancien → récent)</option>
+            <option value="rarity-desc">Trier par rareté (mythique → commune)</option>
+            <option value="rarity-asc">Trier par rareté (commune → mythique)</option>
+          </select>
+          <input type="text" class="perf-search" id="vitrine-admin-search" placeholder="🔍 Rechercher par pseudo ou nom…" oninput="renderAdminVitrine()" style="flex:1;min-width:200px">
+        </div>
+        <div id="vitrine-admin-list" class="vitrine-admin-list"><div class="admin-empty">Chargement…</div></div>
+      </div>
+    </div>
 
     <!-- ALERTES ADMIN -->
     <div id="admin-alerts" class="admin-section">
@@ -2635,19 +2996,6 @@
       <label>Note (optionnelle)</label>
       <textarea id="sc-note" rows="2" placeholder="Contexte, remarques…"></textarea>
     </div>
-    <div class="form-group">
-      <label>Photos (optionnelles)</label>
-      <div class="photo-upload-zone" id="sc-photo-zone"
-           onclick="document.getElementById('sc-photo-input').click()"
-           ondragover="photoDragOver(event,'sc-photo-zone')"
-           ondragleave="photoDragLeave('sc-photo-zone')"
-           ondrop="photoDrop(event,'sc-photo')">
-        <input type="file" id="sc-photo-input" multiple accept="image/*" onchange="handlePhotoSelect(event,'sc-photo')">
-        <div class="photo-upload-label">Glissez des photos ici ou <span>cliquez pour s\u00e9lectionner</span></div>
-      </div>
-      <div class="photo-previews" id="sc-photo-previews"></div>
-      <div class="photo-upload-progress" id="sc-photo-progress"></div>
-    </div>
     <div id="sc-error" class="modal-error"></div>
     <div class="modal-actions">
       <button class="btn-modal-cancel" onclick="closeModal('score-modal')">Annuler</button>
@@ -2820,6 +3168,11 @@
     <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M21 16l-5-4-4 3-3-2-6 5"/></svg>
   </button>
 
+  <button class="nav-btn dock-item" data-tab="vitrine" onclick="showPage('vitrine',this)" aria-label="Vitrine">
+    <span class="dock-label">Vitrine</span>
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4z"/><path d="M7 5H4v2a3 3 0 003 3M17 5h3v2a3 3 0 01-3 3"/></svg>
+  </button>
+
   <button class="nav-btn dock-item" onclick="showPage('reglement',this)" aria-label="Charte">
     <span class="dock-label">Charte</span>
     <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h8l4 4v14H7z"/><path d="M14 3v5h5"/><path d="M9 13h7M9 17h7M9 9h3"/></svg>
@@ -2871,7 +3224,8 @@
     <h1 class="section-title">Char<span>te</span></h1>
     <p class="section-subtitle">Charte officielle du Choc des Renards</p>
     <div class="reglement-tools">
-      <div class="reglement-tools-text"><strong>Lire la charte en ligne</strong><br>Consultez la charte complète du Choc des Renards directement dans la visionneuse ci-dessous. Le téléchargement est désactivé ; utilisez la barre de défilement pour lire le document en entier.</div>
+      <div class="reglement-tools-text"><strong>Lire la charte en ligne</strong><br>Consultez la charte complète du Choc des Renards directement dans la visionneuse ci-dessous (le téléchargement est désactivé).</div>
+      <button class="pdf-btn" type="button" onclick="openCharteFullscreen()">⛶ Plein écran</button>
     </div>
 
     <!-- Visionneuse PDF de la charte : le PDF est affiché en lecture seule.
@@ -2879,12 +3233,13 @@
          sélection et le bouton « Télécharger » de la barre d'outils du lecteur
          intégré du navigateur. On force aussi le paramètre #toolbar=0 (Chrome)
          et embed=true pour limiter l'affichage des contrôles. -->
-    <div class="pdf-viewer-wrap" id="charte-viewer-wrap" oncontextmenu="return false" ondragstart="return false">
+    <div class="pdf-viewer-wrap" id="charte-viewer-wrap">
       <div class="pdf-viewer-toolbar">
-        <button type="button" onclick="reloadCharteViewer()" title="Recharger la visionneuse">↻</button>
+        <button type="button" onclick="openCharteFullscreen()" title="Plein écran">⛶</button>
+        <button type="button" onclick="reloadCharteViewer()" title="Recharger">↻</button>
       </div>
       <iframe class="pdf-viewer-frame" id="charte-viewer-frame"
-              src="reglement-choc-des-renards.pdf#toolbar=0&amp;navpanes=0&amp;view=FitH"
+              src="reglement-choc-des-renards.pdf#toolbar=0&navpanes=0&view=FitH"
               title="Charte du Choc des Renards" referrerpolicy="no-referrer"></iframe>
       <div class="pdf-viewer-shield" id="charte-viewer-shield"
            oncontextmenu="return false" ondragstart="return false"
@@ -3059,6 +3414,36 @@
     </div>
     <div id="gallery-view-matches" style="display:none">
       <div id="gallery-matches-content"><div class="admin-empty">Chargement…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE VITRINE -->
+<div id="page-vitrine" class="page">
+  <div class="section">
+    <h1 class="section-title">Vitri<span>ne</span></h1>
+    <p class="section-subtitle">Les médailles nominatives décernées aux renards méritants</p>
+    <div class="vitrine-wrap">
+      <div class="vitrine-filters">
+        <select class="vitrine-filter-select" id="vitrine-sort-select" onchange="renderVitrine()">
+          <option value="year-desc">Trier par année (récent → ancien)</option>
+          <option value="year-asc">Trier par année (ancien → récent)</option>
+          <option value="rarity-desc">Trier par rareté (mythique → commune)</option>
+          <option value="rarity-asc">Trier par rareté (commune → mythique)</option>
+        </select>
+        <select class="vitrine-filter-select" id="vitrine-year-filter" onchange="renderVitrine()">
+          <option value="">Toutes les années</option>
+        </select>
+        <select class="vitrine-filter-select" id="vitrine-rarity-filter" onchange="renderVitrine()">
+          <option value="">Toutes les raretés</option>
+          <option value="Commune">Commune</option>
+          <option value="Rare">Rare</option>
+          <option value="Épique">Épique</option>
+          <option value="Légendaire">Légendaire</option>
+          <option value="Mythique">Mythique</option>
+        </select>
+      </div>
+      <div id="vitrine-content" class="vitrine-grid"><div class="vitrine-empty"><span>🏅</span>Chargement de la vitrine…</div></div>
     </div>
   </div>
 </div>
@@ -3238,6 +3623,7 @@ const PAGE_TO_TAB = {
   faq: 'faq',
   contact: 'contact',
   'mon-profil': 'profil',
+  vitrine: 'vitrine',
 }
 // Pages toujours accessibles (pas soumises au filtre des onglets caches)
 const ALWAYS_ACCESSIBLE_PAGES = ['accueil', 'reglement', 'mes-notifs', 'confidentialite']
@@ -3280,6 +3666,7 @@ function showPage(id, btn) {
   if (id === 'faq') loadFaq()
   if (id === 'score-match') loadScoreMatch()
   if (id === 'mon-profil') loadMonProfil()
+  if (id === 'vitrine') loadVitrine()
 }
 
 function showPrivacyPage() {
@@ -3339,48 +3726,6 @@ function toggleArticle(el) {
   }
 }
 
-/* ── Visionneuse PDF de la charte ──
-   Le but est d'afficher le PDF en lecture seule et de limiter le téléchargement.
-   On ouvre le PDF dans une fenêtre plein écran sans barre d'outils (#toolbar=0),
-   et on intercepte les tentatives de clic-droit / raccourcis de sauvegarde. */
-const CHARTE_PDF = 'reglement-choc-des-renards.pdf'
-
-function openCharteFullscreen() {
-  // Le plein écran est désactivé car il permettrait de télécharger le PDF.
-  // On recharge simplement la visionneuse intégrée.
-  reloadCharteViewer()
-}
-
-function reloadCharteViewer() {
-  const frame = document.getElementById('charte-viewer-frame')
-  if (frame) {
-    // Force le rechargement en ajoutant un cache-buster (toolbar désactivée)
-    frame.src = CHARTE_PDF + '#toolbar=0&navpanes=0&view=FitH&t=' + Date.now()
-  }
-}
-
-// Détection de fallback : si l'iframe ne peut pas afficher le PDF
-// (certains navigateurs mobiles proposent directement le téléchargement),
-// on affiche un message d'information après un court délai.
-function initCharteViewerFallback() {
-  const frame = document.getElementById('charte-viewer-frame')
-  const fallback = document.getElementById('charte-viewer-fallback')
-  if (!frame || !fallback) return
-  // On ne peut pas détecter fiablement le contenu cross-origin d'une iframe,
-  // mais on peut au moins bloquer le clic-droit et les raccourcis de téléchargement.
-  frame.addEventListener('load', () => { fallback.style.display = 'none' })
-  frame.addEventListener('error', () => { fallback.style.display = 'flex' })
-}
-window.addEventListener('DOMContentLoaded', initCharteViewerFallback)
-// Bloque les raccourcis clavier de sauvegarde quand la visionneuse est visible
-document.addEventListener('keydown', (e) => {
-  const wrap = document.getElementById('charte-viewer-wrap')
-  if (!wrap || !wrap.offsetParent) return // visionneuse non visible
-  if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
-    e.preventDefault(); e.stopPropagation()
-  }
-}, true)
-
 // Ferme tous les articles quand la page est affichée
 // (y compris après un retour navigateur avec le cache bfcache)
 window.addEventListener('pageshow', () => {
@@ -3391,6 +3736,34 @@ window.addEventListener('pageshow', () => {
 window.addEventListener('pagehide', () => {
   document.querySelectorAll('.article.open').forEach(closeArticle);
 });
+
+/* ===== PDF VIEWER (Charte) - blocks download, blocks scroll-leak ===== */
+const CHARTE_PDF = 'reglement-choc-des-renards.pdf'
+
+function openCharteFullscreen() {
+  const w = window.open(CHARTE_PDF + '#toolbar=0&navpanes=0&view=FitH', '_blank', 'noopener,noreferrer')
+  if (!w) { reloadCharteViewer() }
+}
+
+function reloadCharteViewer() {
+  const frame = document.getElementById('charte-viewer-frame')
+  if (frame) { frame.src = CHARTE_PDF + '#toolbar=0&navpanes=0&view=FitH&t=' + Date.now() }
+}
+
+function initCharteViewerFallback() {
+  const frame = document.getElementById('charte-viewer-frame')
+  const fallback = document.getElementById('charte-viewer-fallback')
+  if (!frame || !fallback) return
+  frame.addEventListener('load', () => { fallback.style.display = 'none' })
+  frame.addEventListener('error', () => { fallback.style.display = 'flex' })
+}
+window.addEventListener('DOMContentLoaded', initCharteViewerFallback)
+document.addEventListener('keydown', (e) => {
+  const wrap = document.getElementById('charte-viewer-wrap')
+  if (!wrap || !wrap.offsetParent) return
+  if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); e.stopPropagation() }
+}, true)
+/* ===== /PDF VIEWER ===== */
 
 /* ══════════════ AUTH ══════════════ */
 let currentUser = null
@@ -3426,32 +3799,6 @@ function initAuth() {
   showAuthOverlay()
 }
 
-// Vérification côté serveur de l'état de la session (forceLogout, bannissement).
-// Appelée après le rendu initial de l'app : si l'admin a déclenché une
-// déconnexion forcée, on déconnecte l'utilisateur ici (le token JWT reste
-// valide 30 jours, donc la déconnexion forcée DOIT être vérifiée serveur).
-async function verifySession() {
-  const token = localStorage.getItem('cdr_token')
-  if (!token) return
-  try {
-    const res = await fetch('/api/login?action=me', { headers: authHeaders() })
-    if (res.status === 401 || res.status === 403) {
-      const data = await res.json().catch(() => ({}))
-      // Déconnexion forcée ou compte désactivé : on purge la session locale
-      logout(data.forceLogout ? 'forced' : 'manual')
-      return
-    }
-    if (res.ok) {
-      const data = await res.json()
-      if (data.user) {
-        // Mettre à jour currentUser avec l'état serveur (active, etc.)
-        currentUser = data.user
-        localStorage.setItem('cdr_user', JSON.stringify(data.user))
-      }
-    }
-  } catch (e) { console.warn('[verifySession] failed:', e) }
-}
-
 function showApp() {
   const overlay = document.getElementById('auth-overlay')
   overlay.classList.add('fade-out')
@@ -3485,6 +3832,7 @@ function showApp() {
     document.querySelectorAll('.nav-btn').forEach(b => b.style.display = 'none')
     if (dock) dock.style.display = 'none'
     startInactivityTimer()
+    startSessionHeartbeat()
     loadAllAdminDataWithProgress().then(() => {
       if (typeof initKingdomHub === 'function') initKingdomHub()
     })
@@ -3498,11 +3846,9 @@ function showApp() {
     // même s'il avait quitté le site depuis une autre page (ex. FAQ) lors d'une session précédente.
     showPage('accueil', document.getElementById('nav-accueil-btn'))
     applyHiddenTabs()
-    // Charger les onglets caches des le depart pour les utilisateurs non-admin.
-    // Sans cela, _hiddenTabs reste vide jusqu'au premier appel a loadClassement/
-    // loadPerformances, et les onglets caches seraient visibles temporairement.
     loadHiddenTabsForUser()
     startInactivityTimer()
+    startSessionHeartbeat()
     loadHomeStats()
     loadConvocationsBadge()
     if (pendingNotifications.length > 0) { currentNotifIndex = 0; showNotifOverlay() }
@@ -3553,10 +3899,11 @@ function showAuthOverlay() {
   document.getElementById('nav-user').style.display = 'none'
   document.getElementById('admin-panel').classList.remove('active')
   document.querySelectorAll('.nav-btn').forEach(b => b.style.display = '')
-  stopInactivityTimer(); switchAuthTab('login')
+  stopInactivityTimer(); stopSessionHeartbeat(); switchAuthTab('login')
 }
 
 function logout(reason) {
+  stopSessionHeartbeat()
   // Logger la déconnexion si on a un loginEventId
   const eid = localStorage.getItem('cdr_login_event_id')
   if (eid) {
@@ -3850,9 +4197,6 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin() })
   document.getElementById('reg-confirm').addEventListener('keydown', e => { if (e.key === 'Enter') handleRegister() })
   initAuth()
-  // Vérifier l'état de la session côté serveur (forceLogout / bannissement)
-  // après le rendu initial, de façon non bloquante.
-  if (localStorage.getItem('cdr_token')) verifySession()
 })
 
 /* ══════════════ STATS ACCUEIL DYNAMIQUES ══════════════ */
@@ -4285,7 +4629,6 @@ function openScoreModal(conv) {
   document.getElementById('sc-sets').innerHTML = ''
   scSetCount = 0
   addScSetRow()
-  clearPendingPhotos('sc-photo')
   document.getElementById('score-modal').classList.add('open')
 }
 
@@ -4330,17 +4673,6 @@ async function submitScoreMatch() {
     })
     const data = await res.json()
     if (!res.ok) { errorEl.textContent = data.error || 'Erreur.'; return }
-    // Upload photos et association aux matchs créés (match1 = joueur, match2 = miroir)
-    const uploadedPhotos = await uploadPhotosToCloudinary('sc-photo')
-    if (uploadedPhotos.length > 0 && (data.match1 || data.match2)) {
-      await fetch('/api/public?resource=convocations', { method:'POST', headers: authHeaders(), body: JSON.stringify({
-        action: 'add_photos',
-        matchId: data.match1 ? data.match1.id : null,
-        mirrorMatchId: data.match2 ? data.match2.id : null,
-        photos: uploadedPhotos,
-      })})
-    }
-    clearPendingPhotos('sc-photo')
     closeModal('score-modal')
     await loadScoreMatch()
   } catch(e) { errorEl.textContent = 'Erreur réseau.' }
@@ -4363,7 +4695,6 @@ function resetInactivityTimer() {
   clearTimeout(inactivityTimer); clearTimeout(warnTimer); clearInterval(warnCountdown)
   document.getElementById('inactivity-toast').style.display = 'none'
   if (isInactivityExempt()) return // jamais déconnecté pour inactivité
-  persistLastActivity()
   warnTimer = setTimeout(() => {
     const toast = document.getElementById('inactivity-toast')
     const span = document.getElementById('inactivity-countdown')
@@ -4378,19 +4709,6 @@ function startInactivityTimer() {
   resetInactivityTimer()
   // Déconnexion auto sur mobile (page en arrière-plan)
   document.addEventListener('visibilitychange', handleMobileVisibility)
-  // pagehide est plus fiable que beforeunload sur iOS / mobile : il se déclenche
-  // quand l'onglet est réellement fermé ou swipé. On en profite pour enregistrer
-  // l'heure de dernière activité afin qu'au prochain chargement on puisse
-  // détecter une session expirée pendant l'absence.
-  window.addEventListener('pagehide', persistLastActivity)
-  document.addEventListener('visibilitychange', persistLastActivity)
-  // Heartbeat : prolonge la session côté serveur toutes les 5 min tant que
-  // l'utilisateur est actif. Sert aussi de filet de sécurité : si le heartbeat
-  // ne peut plus partir (réseau coupé, onglet tué), le cron serveur clôturera
-  // la session automatiquement.
-  startSessionHeartbeat()
-  // Au chargement, vérifier si la session a expiré pendant l'absence
-  checkStaleSessionOnLoad()
 }
 function stopInactivityTimer() {
   clearTimeout(inactivityTimer); clearTimeout(warnTimer); clearInterval(warnCountdown)
@@ -4398,65 +4716,57 @@ function stopInactivityTimer() {
   document.getElementById('inactivity-toast').style.display = 'none'
   ;['mousemove','keydown','click','scroll','touchstart'].forEach(e => document.removeEventListener(e, resetInactivityTimer))
   document.removeEventListener('visibilitychange', handleMobileVisibility)
-  window.removeEventListener('pagehide', persistLastActivity)
-  document.removeEventListener('visibilitychange', persistLastActivity)
-  stopSessionHeartbeat()
 }
-// Enregistre l'heure de dernière activité en localStorage (clé par utilisateur)
-function persistLastActivity() {
-  if (!currentUser) return
-  try { localStorage.setItem('cdr_last_activity', String(Date.now())) } catch {}
-}
-// Au chargement de l'app : si la dernière activité remonte à plus de 15 min,
-// la session a expiré pendant l'absence (onglet fermé sur mobile) → déconnecter.
-function checkStaleSessionOnLoad() {
-  if (isInactivityExempt()) return
-  try {
-    const last = parseInt(localStorage.getItem('cdr_last_activity') || '0', 10)
-    if (last && Date.now() - last >= INACTIVITY_MS) {
-      // Session expirée pendant l'absence : déconnecter et nettoyer
-      localStorage.removeItem('cdr_last_activity')
-      logout('inactivity')
-    } else if (last) {
-      // Mettre à jour le timer pour tenir compte du temps écoulé
-      resetInactivityTimer()
-    }
-  } catch {}
-}
-// Heartbeat de session : confirme au serveur que l'utilisateur est toujours
-// actif. S'appuie sur l'endpoint /api/login?action=me qui vérifie aussi le
-// forceLogout. Toutes les 5 min tant que la page est visible.
+
+/* ============================================================
+   Bug 2 : Heartbeat session (deconnexion forcee)
+   Le serveur peut marquer un utilisateur avec forceLogout=true.
+   Le heartbeat verifie regulierement le endpoint /api/login (me)
+   et detecte ce flag pour deconnecter immediatement le joueur.
+   ============================================================ */
 let heartbeatTimer = null
+
 async function checkSessionServer() {
-  if (!localStorage.getItem('cdr_token')) return
+  const token = localStorage.getItem('cdr_token')
+  if (!token) return
   try {
-    const res = await fetch('/api/login?action=me', { headers: authHeaders() })
-    if (res.status === 401 || res.status === 403) {
+    const res = await fetch('/api/login', { headers: authHeaders() })
+    if (res.status === 401) {
       const data = await res.json().catch(() => ({}))
-      logout(data.forceLogout ? 'forced' : 'inactivity')
+      if (data.forceLogout) {
+        console.warn('[heartbeat] Deconnexion forcee par l admin')
+        stopSessionHeartbeat()
+        logout('forced')
+        return
+      }
+      // Token expire ou invalide
+      stopSessionHeartbeat()
+      logout('expired')
+      return
     }
   } catch (e) {
-    console.warn('[heartbeat] session check failed:', e)
+    // Erreur reseau : on ne deconnecte pas, on reessaiera au prochain tick
+    console.error('[heartbeat] Erreur reseau:', e)
   }
 }
+
 function startSessionHeartbeat() {
-  if (isInactivityExempt()) return
   stopSessionHeartbeat()
-  const beat = async () => {
-    if (document.hidden) return
-    if (!localStorage.getItem('cdr_token')) return
-    persistLastActivity()
-    await checkSessionServer()
-  }
-  // Intervalle court (60 s) pour detecter rapidement un forceLogout admin
-  heartbeatTimer = setInterval(beat, 60 * 1000)
+  const beat = () => checkSessionServer()
+  heartbeatTimer = setInterval(beat, 60 * 1000) // toutes les 60 secondes
   document.addEventListener('visibilitychange', onHeartbeatVisibilityChange)
+  // Verification immediate au demarrage
+  setTimeout(beat, 2000)
 }
+
 function onHeartbeatVisibilityChange() {
+  // Quand l onglet redevient visible, on verifie immediatement
+  // (utile si l admin a force la deconnexion pendant que l onglet etait en arriere-plan)
   if (!document.hidden && localStorage.getItem('cdr_token')) {
     checkSessionServer()
   }
 }
+
 function stopSessionHeartbeat() {
   if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null }
   document.removeEventListener('visibilitychange', onHeartbeatVisibilityChange)
@@ -4465,7 +4775,6 @@ function handleMobileVisibility() {
   if (isInactivityExempt()) return
   if (document.hidden) {
     mobileBgHiddenAt = Date.now()
-    persistLastActivity()
     mobileBgTimer = setTimeout(() => {
       // L'utilisateur n'est pas revenu après MOBILE_BG_TIMEOUT_MS → déconnecter dès le retour
       mobileBgHiddenAt = -1 // marquer comme expiré
@@ -4479,7 +4788,6 @@ function handleMobileVisibility() {
       logout('inactivity')
     } else {
       mobileBgHiddenAt = null
-      persistLastActivity()
       resetInactivityTimer() // réinitialiser le timer normal au retour
     }
   }
@@ -4511,15 +4819,15 @@ async function loadClassement() {
   try {
     const res = await fetch('/api/matches', { headers: authHeaders() })
     if (!res.ok) { container.innerHTML = '<div class="admin-empty">Impossible de charger le classement.</div>'; return }
-    const { phase, round, players, poules, phase2Groups, hiddenTabs } = await res.json()
-    // Charger les onglets caches pour les utilisateurs non-admin (ils n'ont
-    // pas acces a /api/admin/match qui fournit hiddenTabs normalement)
-    if (Array.isArray(hiddenTabs) && hiddenTabs.length >= 0) {
-      _hiddenTabs = hiddenTabs
-      applyHiddenTabs()
+    const { phase, round, players, poules, phase2Groups } = await res.json()
+    // Bug 4 : filtrer les bots cote client (filtrage de secours si le serveur
+    // n a pas encore filtre, ou si le snapshot contient encore des bots).
+    const isBotUsername = (u) => {
+      if (!u || !u.username) return false
+      return /^bot_\d+$/i.test(u.username)
     }
-    // Filtre de securite cote client : exclure les bots (pseudo bot_[nombre])
-    classementPlayers = (players || []).filter(p => p && p.username && !/^bot_\d+$/i.test(p.username))
+    const filteredPlayers = (players || []).filter(p => !isBotUsername(p))
+    classementPlayers = filteredPlayers
 
     document.getElementById('classement-subtitle').textContent = 'Phase en cours : ' + phaseLabel(phase, round)
 
@@ -4565,9 +4873,9 @@ async function loadClassement() {
       html += `<div id="class-groups" class="phase-content${defaultTab === 'groups' ? ' active' : ''}">`
       for (const g of phase2Groups) {
         const gMembers = (g.members || []).map(m => {
-          const pl = players.find(p => p.id === (m.userId || m.id))
+          const pl = filteredPlayers.find(p => p.id === (m.userId || m.id))
           return pl || { ...m.user, points: 0, wins: 0, losses: 0, played: 0, setDiff: 0 }
-        })
+        }).filter(m => !isBotUsername(m))
         html += `<div class="poule-title">🦊 ${esc(g.name)}</div>`
         html += renderGroupList(gMembers)
       }
@@ -4687,15 +4995,14 @@ async function loadPerformances() {
   try {
     const res = await fetch('/api/matches', { headers: authHeaders() })
     if (!res.ok) { container.innerHTML = '<div class="admin-empty">Impossible de charger les performances.</div>'; return }
-    const { phase, players, hiddenTabs } = await res.json()
-    // Charger les onglets caches pour les utilisateurs non-admin
-    if (Array.isArray(hiddenTabs) && hiddenTabs.length >= 0) {
-      _hiddenTabs = hiddenTabs
-      applyHiddenTabs()
+    const { phase, players } = await res.json()
+    // Bug 4 : filtrer les bots cote client (les bots supprimes ne doivent
+    // plus apparaitre dans les performances).
+    const isBotUsername = (u) => {
+      if (!u || !u.username) return false
+      return /^bot_\d+$/i.test(u.username)
     }
-    // Filtre de securite cote client : exclure les bots (pseudo bot_[nombre])
-    // meme si l'API en renvoie encore (snapshot stale non nettoye)
-    perfPlayers = (players || []).filter(p => p && p.username && !/^bot_\d+$/i.test(p.username))
+    perfPlayers = (players || []).filter(p => !isBotUsername(p))
     classementPlayers = perfPlayers // réutilise la modale de détail joueur (showPlayerDetail / bindPlayerRows)
     perfBestProgressionId = computeBestProgressionId(perfPlayers)
 
@@ -5444,6 +5751,7 @@ function adminTab(name, btn) {
   if (name === 'faq') loadFaqAdmin()
   if (name === 'contact') loadContactAdmin()
   if (name === 'other-actions') { loadDataVersions(); loadOtherActionsConfig() }
+  if (name === 'vitrine') loadAdminVitrine()
   if (name === 'alerts') loadAlerts()
   if (name === 'whatsapp') loadWhatsappTab()
 }
@@ -5660,16 +5968,12 @@ function renderHistory(events) {
   if (events.length === 0) { tbl.innerHTML = ''; document.getElementById('history-empty').style.display = 'block'; return }
   document.getElementById('history-empty').style.display = 'none'
   tbl.innerHTML = events.map(e => {
-    // Déconnexion : utiliser logoutReason pour savoir si inactivité, forcée ou manuelle
+    // Déconnexion : utiliser logoutReason pour savoir si inactivité ou manuelle
     let logoutDisplay = '—'
     if (e.logoutAt) {
       if (e.logoutReason === 'inactivity') {
         const adjusted = new Date(new Date(e.logoutAt).getTime() - 15 * 60 * 1000)
         logoutDisplay = `<span style="color:var(--gray)" title="Déconnexion par inactivité — heure réelle estimée">~${fmtDate(adjusted)} <small>(inactivité)</small></span>`
-      } else if (e.logoutReason === 'forced') {
-        logoutDisplay = `<span style="color:var(--orange)" title="Déconnexion forcée par l'administrateur">${fmtDate(e.logoutAt)} <small>(forcée)</small></span>`
-      } else if (e.logoutReason === 'page_closed') {
-        logoutDisplay = `<span style="color:var(--gray)" title="Onglet fermé / page quittée">${fmtDate(e.logoutAt)} <small>(onglet fermé)</small></span>`
       } else {
         logoutDisplay = `<span style="color:var(--gray-light)" title="Déconnexion manuelle">${fmtDate(e.logoutAt)}</span>`
       }
@@ -7172,68 +7476,38 @@ async function toggleContactTreated(contactId, treated) {
 }
 
 async function replyToContact(userId, contactId, subject) {
-  // Marque directement la demande comme traitée puisqu'on y répond
+  // Marque directement la demande comme traitee puisqu on y repond
   toggleContactTreated(contactId, true)
 
-  // IMPORTANT : on ne passe PAS par adminTab('notify') qui déclencherait
-  // loadPlayersForNotify() en parallèle (sans await). Cette tâche en arrière-plan
-  // reconstruit le HTML des checkboxes (renderNotifyPlayerList) APRÈS que
-  // selectNotifyRecipient les ait cochées, dÃ©truisant l'Ã©tat cochÃ©.
-  // On affiche donc l'onglet notify manuellement SANS déclencher le rechargement,
-  // puis on charge les joueurs en sÃ©quence avec await, puis on coche.
+  // IMPORTANT : on ne passe PAS par adminTab('notify') qui declencherait
+  // un nouveau loadPlayersForNotify() asynchrone et creerait une race condition
+  // (les checkboxes seraient reinitialisees apres notre selection).
+  // A la place, on affiche manuellement l onglet notify, puis on attend
+  // que la liste des joueurs soit chargee avant de cocher la bonne case.
   document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'))
   document.querySelectorAll('.admin-tabs > .admin-tab').forEach(b => b.classList.remove('active'))
   const notifySection = document.getElementById('admin-notify')
   if (notifySection) notifySection.classList.add('active')
-  const notifyBtn = document.querySelector('[onclick*="notify"]')
-  if (notifyBtn) notifyBtn.classList.add('active')
+  const notifyTabBtn = document.querySelector('[onclick*="notify"]')
+  if (notifyTabBtn) notifyTabBtn.classList.add('active')
   const hub = document.getElementById('kingdom-hub')
   const wrap = document.getElementById('admin-content-wrap')
   if (hub) hub.classList.add('hide')
   if (wrap) wrap.style.display = 'block'
-  closeMobileNav()
   window.scrollTo(0, 0)
 
-  // Charger les joueurs en séquence (await) et attendre le rendu complet
-  try { await loadPlayersForNotify() } catch(e) { console.error('[replyToContact] loadPlayersForNotify failed', e) }
-  // Laisser un tick au navigateur pour finaliser le rendu du DOM
-  await new Promise(r => setTimeout(r, 30))
+  // Attendre que la liste des joueurs soit chargee
+  await loadPlayersForNotify()
 
-  // Maintenant que les checkboxes existent, cocher le destinataire
-  let found = false
-  document.querySelectorAll('.notify-player-cb').forEach(cb => {
-    const match = parseInt(cb.value) === userId
-    cb.checked = match
-    if (match) found = true
-  })
-  updateNotifyDropdownLabel()
-  const titleEl = document.getElementById('notify-title')
-  if (titleEl) titleEl.value = `Réponse à ${subject}`
-  const msgEl = document.getElementById('notify-message')
-  if (msgEl) {
-    msgEl.value = ''
-    msgEl.focus()
-  }
-  if (!found) console.warn('[replyToContact] destinataire non trouvé dans la liste, userId=', userId)
-}
-
-// Coche un unique destinataire dans le dropdown de notification, en attendant
-// que la liste des joueurs soit chargée si nécessaire.
-async function selectNotifyRecipient(userId, subject) {
-  // S'assurer que la liste des joueurs est chargée
-  if (allPlayersForNotify.length === 0) {
-    try { await loadPlayersForNotify() } catch(e) {}
-  }
-  // Petit délai pour laisser le DOM se mettre à jour après le rendu
-  await new Promise(r => setTimeout(r, 50))
+  // Maintenant que les checkboxes existent, on peut cocher la bonne
   document.querySelectorAll('.notify-player-cb').forEach(cb => {
     cb.checked = parseInt(cb.value) === userId
   })
   updateNotifyDropdownLabel()
-  const titleEl = document.getElementById('notify-title')
-  if (titleEl) titleEl.value = `Réponse à ${subject}`
-  const msgEl = document.getElementById('notify-message')
-  if (msgEl) msgEl.focus()
+  const titleInput = document.getElementById('notify-title')
+  const msgInput = document.getElementById('notify-message')
+  if (titleInput) titleInput.value = `Réponse à ${subject}`
+  if (msgInput) msgInput.focus()
 }
 
 /* ── Publication matchs ── */
@@ -7917,6 +8191,7 @@ const PLAYER_TABS = [
   { key: 'faq', label: 'FAQ' },
   { key: 'contact', label: 'Contact' },
   { key: 'profil', label: 'Mon profil' },
+  { key: 'vitrine', label: 'Vitrine' },
 ]
 let _hiddenTabs = []
 function renderTabsVisibility() {
@@ -7941,8 +8216,8 @@ async function saveHiddenTabs() {
 }
 
 // Charge les onglets caches pour les utilisateurs non-admin.
-// L'endpoint /api/matches renvoie hiddenTabs (accessible a tous les comptes
-// connectes). On l'appelle ici specifiquement pour recuperer la config des
+// L endpoint /api/matches renvoie hiddenTabs (accessible a tous les comptes
+// connectes). On l appelle ici specifiquement pour recuperer la config des
 // onglets caches le plus tot possible apres la connexion.
 async function loadHiddenTabsForUser() {
   try {
@@ -7982,31 +8257,24 @@ function applyHiddenTabs() {
 }
 
 /* ── Gestion des malus ── */
-let _malusList = [] // [{text, enabled, maxConcurrent}]
+let _malusList = [] // [{text, enabled}]
 function renderMalusConfig() {
   const container = document.getElementById('malus-config-list')
   if (!container) return
   container.innerHTML = _malusList.map((m, i) => {
     const enabled = m.enabled !== false
-    const mc = m.maxConcurrent || ''
     return `
-    <div style="display:flex;gap:0.5rem;align-items:center;opacity:${enabled ? '1' : '0.5'};flex-wrap:wrap">
+    <div style="display:flex;gap:0.5rem;align-items:center;opacity:${enabled ? '1' : '0.5'}">
       <input type="text" value="${esc(m.text)}" data-malus-idx="${i}"
-        style="flex:1;min-width:200px;background:var(--dark2);border:1px solid ${enabled ? 'var(--dark4)' : '#555'};border-radius:6px;color:${enabled ? 'var(--white)' : 'var(--gray)'};padding:0.4rem 0.75rem;font-family:var(--font-body);font-size:0.88rem;text-decoration:${enabled ? 'none' : 'line-through'}"
+        style="flex:1;background:var(--dark2);border:1px solid ${enabled ? 'var(--dark4)' : '#555'};border-radius:6px;color:${enabled ? 'var(--white)' : 'var(--gray)'};padding:0.4rem 0.75rem;font-family:var(--font-body);font-size:0.88rem;text-decoration:${enabled ? 'none' : 'line-through'}"
         oninput="_malusList[${i}].text=this.value">
-      <div style="display:flex;align-items:center;gap:0.3rem;min-width:150px" title="Nombre maximum d'utilisation simultanée de ce malus (vide = illimité)">
-        <label style="font-size:0.75rem;color:var(--gray);white-space:nowrap">Max simultané:</label>
-        <input type="number" value="${mc}" min="1" max="99" placeholder="∞" data-malus-idx="${i}"
-          style="width:55px;background:var(--dark2);border:1px solid var(--dark4);border-radius:6px;color:var(--white);padding:0.3rem 0.4rem;font-family:var(--font-body);font-size:0.82rem;text-align:center"
-          oninput="_malusList[${i}].maxConcurrent=this.value ? parseInt(this.value,10) : null">
-      </div>
       <button class="btn-sm ${enabled ? 'btn-edit' : 'btn-add'}" onclick="toggleMalusItem(${i})" title="${enabled ? 'Désactiver ce malus' : 'Réactiver ce malus'}" style="min-width:90px">${enabled ? '⏸ Désactiver' : '▶ Réactiver'}</button>
       <button class="btn-sm btn-danger" onclick="removeMalusItem(${i})" title="Supprimer définitivement ce malus">✕</button>
     </div>`
   }).join('')
 }
 function addMalusItem() {
-  _malusList.push({ text: '', enabled: true, maxConcurrent: null })
+  _malusList.push({ text: '', enabled: true })
   renderMalusConfig()
   const inputs = document.querySelectorAll('#malus-config-list input[type=text]')
   if (inputs.length) inputs[inputs.length - 1].focus()
@@ -8026,18 +8294,11 @@ async function saveMalusConfig() {
     const idx = parseInt(inp.dataset.malusIdx, 10)
     if (!isNaN(idx) && _malusList[idx]) _malusList[idx].text = inp.value.trim()
   })
-  // Relire aussi les valeurs maxConcurrent
-  const mcInputs = document.querySelectorAll('#malus-config-list input[type=number]')
-  mcInputs.forEach(inp => {
-    const idx = parseInt(inp.dataset.malusIdx, 10)
-    if (!isNaN(idx) && _malusList[idx]) _malusList[idx].maxConcurrent = inp.value ? parseInt(inp.value, 10) : null
-  })
   const malusList = _malusList.filter(m => m.text.length > 0)
   const activeCount = malusList.filter(m => m.enabled !== false).length
   if (malusList.length === 0) return alert('La liste de malus ne peut pas être vide.')
   if (activeCount === 0) return alert('Au moins un malus doit être actif.')
-  const limitedCount = malusList.filter(m => m.maxConcurrent && m.maxConcurrent > 0).length
-  if (!confirm(`Enregistrer la liste de malus (${malusList.length} entrée(s), dont ${activeCount} actif(s)${limitedCount > 0 ? `, ${limitedCount} avec limite d'utilisation simultanée` : ''}) ?`)) return
+  if (!confirm(`Enregistrer la liste de malus (${malusList.length} entrée(s), dont ${activeCount} actif(s)) ?`)) return
   try {
     const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'update_malus_config', malusList }) })
     const data = await res.json()
@@ -8051,7 +8312,7 @@ async function resetMalusConfig() {
     const res = await fetch('/api/admin/match', { headers: authHeaders() })
     if (!res.ok) return
     const data = await res.json()
-    const defaultList = (data.defaultMalusList || []).map(t => ({ text: t, enabled: true, maxConcurrent: null }))
+    const defaultList = (data.defaultMalusList || []).map(t => ({ text: t, enabled: true }))
     const saveRes = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'update_malus_config', malusList: defaultList }) })
     const saveData = await saveRes.json()
     if (saveRes.ok) {
@@ -8708,6 +8969,305 @@ function placeAdminTabs() {}
 
   window.addEventListener('scroll', requestTick, { passive: true })
 })()
+
+/* ============================================================
+   VITRINE — Médailles nominatives (côté joueur)
+   ============================================================ */
+let _vitrineMedals = []
+const VITRINE_RARITY_ORDER = { 'Commune': 0, 'Rare': 1, 'Épique': 2, 'Légendaire': 3, 'Mythique': 4 }
+
+async function loadVitrine() {
+  const container = document.getElementById('vitrine-content')
+  if (!container) return
+  try {
+    const res = await fetch('/api/matches?vitrine=1', { headers: authHeaders() })
+    if (!res.ok) { container.innerHTML = '<div class="vitrine-empty"><span>🏅</span>Impossible de charger la vitrine.</div>'; return }
+    const data = await res.json()
+    _vitrineMedals = data.medals || []
+    // Remplir le filtre des années
+    const yearFilter = document.getElementById('vitrine-year-filter')
+    if (yearFilter) {
+      const years = [...new Set(_vitrineMedals.map(m => m.seasonYear))].sort((a, b) => b - a)
+      const currentVal = yearFilter.value
+      yearFilter.innerHTML = '<option value="">Toutes les années</option>' +
+        years.map(y => `<option value="${y}" ${String(y) === currentVal ? 'selected' : ''}>Saison ${y}</option>`).join('')
+    }
+    renderVitrine()
+  } catch (e) {
+    console.error('[loadVitrine]', e)
+    container.innerHTML = '<div class="vitrine-empty"><span>🏅</span>Erreur de chargement.</div>'
+  }
+}
+
+function renderVitrine() {
+  const container = document.getElementById('vitrine-content')
+  if (!container) return
+  if (!_vitrineMedals || _vitrineMedals.length === 0) {
+    container.innerHTML = '<div class="vitrine-empty"><span>🏆</span>Aucune médaille n’a été décernée pour le moment.</div>'
+    return
+  }
+
+  const sortVal = document.getElementById('vitrine-sort-select')?.value || 'year-desc'
+  const yearFilter = document.getElementById('vitrine-year-filter')?.value || ''
+  const rarityFilter = document.getElementById('vitrine-rarity-filter')?.value || ''
+
+  let medals = [..._vitrineMedals]
+  if (yearFilter) medals = medals.filter(m => String(m.seasonYear) === yearFilter)
+  if (rarityFilter) medals = medals.filter(m => m.rarity === rarityFilter)
+
+  medals.sort((a, b) => {
+    if (sortVal === 'year-desc') return b.seasonYear - a.seasonYear || (VITRINE_RARITY_ORDER[b.rarity] ?? 0) - (VITRINE_RARITY_ORDER[a.rarity] ?? 0)
+    if (sortVal === 'year-asc')  return a.seasonYear - b.seasonYear || (VITRINE_RARITY_ORDER[b.rarity] ?? 0) - (VITRINE_RARITY_ORDER[a.rarity] ?? 0)
+    if (sortVal === 'rarity-desc') return (VITRINE_RARITY_ORDER[b.rarity] ?? 0) - (VITRINE_RARITY_ORDER[a.rarity] ?? 0) || b.seasonYear - a.seasonYear
+    if (sortVal === 'rarity-asc')  return (VITRINE_RARITY_ORDER[a.rarity] ?? 0) - (VITRINE_RARITY_ORDER[b.rarity] ?? 0) || b.seasonYear - a.seasonYear
+    return 0
+  })
+
+  if (medals.length === 0) {
+    container.innerHTML = '<div class="vitrine-empty"><span>🔍</span>Aucune médaille ne correspond à ces filtres.</div>'
+    return
+  }
+
+  container.innerHTML = medals.map(m => {
+    const mineTag = m.isMine ? '<div class="medal-mine-tag">À TOI !</div>' : ''
+    const mineClass = m.isMine ? ' is-mine' : ''
+    return `<div class="medal-card${mineClass}" data-rarity="${esc(m.rarity)}">
+      ${mineTag}
+      <div class="medal-visual">
+        <div class="medal-shape medal-shape--${esc(m.shape)}" style="background:${esc(m.color)}">
+          <span class="medal-symbol">${esc(m.symbol)}</span>
+        </div>
+      </div>
+      <div class="medal-rarity-badge" data-rarity="${esc(m.rarity)}">${esc(m.rarity)}</div>
+      <div class="medal-title">${esc(m.title)}</div>
+      <div class="medal-recipient"><strong>${esc(m.username)}</strong></div>
+      <div class="medal-year">Saison ${esc(m.seasonYear)}</div>
+    </div>`
+  }).join('')
+}
+
+/* ============================================================
+   VITRINE — Admin CRUD
+   ============================================================ */
+let _adminMedals = []
+let _editingMedalId = null
+let _selectedSymbol = '🏆'
+let _selectedColor = '#FFD700'
+
+const MEDAL_SYMBOLS = ['🏆','👑','⚔️','🛡️','🔥','⭐','🎯','💎','🐉','🦊','⚡','🏅','☠️','🎖️','💥','🌟','💀','🏁','🔍','📜']
+const MEDAL_COLORS = ['#FFD700','#FF6D00','#C0C0C0','#409CFF','#A855F7','#FF5C55','#10B981','#3B82F6','#EC4899','#F59E0B','#8B5CF6','#EF4444','#14B8A6','#6366F1','#F97316']
+
+function initVitrineSymbolPicker() {
+  const picker = document.getElementById('vitrine-symbol-picker')
+  if (!picker) return
+  picker.innerHTML = MEDAL_SYMBOLS.map(s =>
+    `<button type="button" class="vitrine-symbol-btn${s === _selectedSymbol ? ' selected' : ''}" onclick="selectVitrineSymbol('${s}', this)">${s}</button>`
+  ).join('')
+}
+
+function selectVitrineSymbol(symbol, btn) {
+  _selectedSymbol = symbol
+  document.querySelectorAll('#vitrine-symbol-picker .vitrine-symbol-btn').forEach(b => b.classList.remove('selected'))
+  if (btn) btn.classList.add('selected')
+  updateVitrinePreview()
+}
+
+function initVitrineColorPicker() {
+  const picker = document.getElementById('vitrine-color-picker')
+  if (!picker) return
+  picker.innerHTML = MEDAL_COLORS.map(c =>
+    `<div class="vitrine-color-swatch${c === _selectedColor ? ' selected' : ''}" style="background:${c}" onclick="selectVitrineColor('${c}', this)"></div>`
+  ).join('')
+}
+
+function selectVitrineColor(color, el) {
+  _selectedColor = color
+  document.getElementById('vitrine-color-input').value = color
+  document.querySelectorAll('#vitrine-color-picker .vitrine-color-swatch').forEach(s => s.classList.remove('selected'))
+  if (el) el.classList.add('selected')
+  updateVitrinePreview()
+}
+
+function updateVitrinePreview() {
+  const shape = document.getElementById('vitrine-shape-select')?.value || 'ronde'
+  const rarity = document.getElementById('vitrine-rarity-select')?.value || 'Commune'
+  const shapeEl = document.getElementById('vitrine-preview-shape')
+  const symbolEl = document.getElementById('vitrine-preview-symbol')
+  const rarityEl = document.getElementById('vitrine-preview-rarity')
+  if (shapeEl) {
+    shapeEl.className = 'medal-shape medal-shape--' + shape
+    shapeEl.style.background = _selectedColor
+  }
+  if (symbolEl) symbolEl.textContent = _selectedSymbol
+  if (rarityEl) {
+    rarityEl.textContent = rarity
+    rarityEl.setAttribute('data-rarity', rarity)
+  }
+}
+
+async function loadAdminVitrine() {
+  const list = document.getElementById('vitrine-admin-list')
+  if (!list) return
+  // Initialiser les pickers si pas encore fait
+  if (!document.getElementById('vitrine-symbol-picker').innerHTML) {
+    initVitrineSymbolPicker()
+    initVitrineColorPicker()
+    updateVitrinePreview()
+    // Bind les changements de select pour l apercu live
+    document.getElementById('vitrine-shape-select').addEventListener('change', updateVitrinePreview)
+    document.getElementById('vitrine-rarity-select').addEventListener('change', updateVitrinePreview)
+  }
+  try {
+    const res = await fetch('/api/admin/medals', { headers: authHeaders() })
+    if (!res.ok) { list.innerHTML = '<div class="admin-empty">Impossible de charger les médailles.</div>'; return }
+    const data = await res.json()
+    _adminMedals = data.medals || []
+    renderAdminVitrine()
+  } catch (e) {
+    console.error('[loadAdminVitrine]', e)
+    list.innerHTML = '<div class="admin-empty">Erreur de chargement.</div>'
+  }
+}
+
+function renderAdminVitrine() {
+  const list = document.getElementById('vitrine-admin-list')
+  if (!list) return
+  if (!_adminMedals || _adminMedals.length === 0) {
+    list.innerHTML = '<div class="admin-empty">Aucune médaille. Créez-en une avec le formulaire ci-dessus !</div>'
+    return
+  }
+
+  const sortVal = document.getElementById('vitrine-admin-sort-select')?.value || 'year-desc'
+  const search = (document.getElementById('vitrine-admin-search')?.value || '').toLowerCase()
+
+  let medals = [..._adminMedals]
+  if (search) {
+    medals = medals.filter(m =>
+      (m.username || '').toLowerCase().includes(search) ||
+      (m.title || '').toLowerCase().includes(search)
+    )
+  }
+
+  medals.sort((a, b) => {
+    if (sortVal === 'year-desc') return b.seasonYear - a.seasonYear || (VITRINE_RARITY_ORDER[b.rarity] ?? 0) - (VITRINE_RARITY_ORDER[a.rarity] ?? 0)
+    if (sortVal === 'year-asc')  return a.seasonYear - b.seasonYear || (VITRINE_RARITY_ORDER[b.rarity] ?? 0) - (VITRINE_RARITY_ORDER[a.rarity] ?? 0)
+    if (sortVal === 'rarity-desc') return (VITRINE_RARITY_ORDER[b.rarity] ?? 0) - (VITRINE_RARITY_ORDER[a.rarity] ?? 0) || b.seasonYear - a.seasonYear
+    if (sortVal === 'rarity-asc')  return (VITRINE_RARITY_ORDER[a.rarity] ?? 0) - (VITRINE_RARITY_ORDER[b.rarity] ?? 0) || b.seasonYear - a.seasonYear
+    return 0
+  })
+
+  list.innerHTML = medals.map(m => `
+    <div class="vitrine-admin-item">
+      <div class="medal-visual">
+        <div class="medal-shape medal-shape--${esc(m.shape)}" style="background:${esc(m.color)}">
+          <span class="medal-symbol">${esc(m.symbol)}</span>
+        </div>
+      </div>
+      <div class="vitrine-admin-item-info">
+        <div class="vitrine-admin-item-title">${esc(m.title)}</div>
+        <div class="vitrine-admin-item-meta">
+          <strong>${esc(m.username)}</strong> · ${esc(m.rarity)} · Saison ${esc(m.seasonYear)} · ${esc(m.shape)}
+        </div>
+      </div>
+      <div class="vitrine-admin-item-actions">
+        <button class="btn-sm btn-edit" onclick="editMedal(${m.id})">Modifier</button>
+        <button class="btn-sm btn-danger" onclick="deleteMedal(${m.id})">Supprimer</button>
+      </div>
+    </div>
+  `).join('')
+}
+
+async function saveMedal() {
+  const symbol = _selectedSymbol
+  const color = _selectedColor
+  const shape = document.getElementById('vitrine-shape-select').value
+  const rarity = document.getElementById('vitrine-rarity-select').value
+  const username = document.getElementById('vitrine-username-input').value.trim()
+  const seasonYear = parseInt(document.getElementById('vitrine-year-input').value, 10)
+  const title = document.getElementById('vitrine-title-input').value.trim()
+  const feedback = document.getElementById('vitrine-form-feedback')
+
+  if (!username) { showFeedback('vitrine-form-feedback', '✗ Le pseudo du joueur est requis.', false); return }
+  if (!title) { showFeedback('vitrine-form-feedback', '✗ Le nom de la médaille est requis.', false); return }
+  if (isNaN(seasonYear)) { showFeedback('vitrine-form-feedback', '✗ L’année de la saison est invalide.', false); return }
+
+  const body = { symbol, color, shape, rarity, username, seasonYear, title }
+  try {
+    let res, data
+    if (_editingMedalId) {
+      body.id = _editingMedalId
+      res = await fetch('/api/admin/medals', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'update_medal', ...body }) })
+    } else {
+      res = await fetch('/api/admin/medals', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'create_medal', ...body }) })
+    }
+    data = await res.json()
+    if (res.ok) {
+      showFeedback('vitrine-form-feedback', '✓ ' + data.message, true)
+      cancelMedalEdit()
+      await loadAdminVitrine()
+    } else {
+      showFeedback('vitrine-form-feedback', '✗ ' + (data.error || 'Erreur.'), false)
+    }
+  } catch (e) {
+    console.error('[saveMedal]', e)
+    showFeedback('vitrine-form-feedback', '✗ Erreur réseau.', false)
+  }
+}
+
+function editMedal(id) {
+  const m = _adminMedals.find(x => x.id === id)
+  if (!m) return
+  _editingMedalId = id
+  _selectedSymbol = m.symbol
+  _selectedColor = m.color
+  document.getElementById('vitrine-shape-select').value = m.shape
+  document.getElementById('vitrine-rarity-select').value = m.rarity
+  document.getElementById('vitrine-username-input').value = m.username
+  document.getElementById('vitrine-year-input').value = m.seasonYear
+  document.getElementById('vitrine-title-input').value = m.title
+  document.getElementById('vitrine-color-input').value = m.color
+  initVitrineSymbolPicker()
+  initVitrineColorPicker()
+  updateVitrinePreview()
+  document.getElementById('vitrine-form-title').textContent = '✎ Modifier la médaille'
+  document.getElementById('vitrine-save-btn').textContent = 'Enregistrer'
+  document.getElementById('vitrine-cancel-btn').style.display = ''
+  document.getElementById('vitrine-medal-form').scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function cancelMedalEdit() {
+  _editingMedalId = null
+  _selectedSymbol = '🏆'
+  _selectedColor = '#FFD700'
+  document.getElementById('vitrine-shape-select').value = 'ronde'
+  document.getElementById('vitrine-rarity-select').value = 'Commune'
+  document.getElementById('vitrine-username-input').value = ''
+  document.getElementById('vitrine-year-input').value = ''
+  document.getElementById('vitrine-title-input').value = ''
+  document.getElementById('vitrine-color-input').value = '#FFD700'
+  initVitrineSymbolPicker()
+  initVitrineColorPicker()
+  updateVitrinePreview()
+  document.getElementById('vitrine-form-title').textContent = '+ Créer une nouvelle médaille'
+  document.getElementById('vitrine-save-btn').textContent = 'Créer la médaille'
+  document.getElementById('vitrine-cancel-btn').style.display = 'none'
+}
+
+async function deleteMedal(id) {
+  if (!confirm('Supprimer cette médaille ? Cette action est irréversible.')) return
+  try {
+    const res = await fetch('/api/admin/medals', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'delete_medal', id }) })
+    const data = await res.json()
+    if (res.ok) {
+      await loadAdminVitrine()
+    } else {
+      alert(data.error || 'Erreur lors de la suppression.')
+    }
+  } catch (e) {
+    console.error('[deleteMedal]', e)
+    alert('Erreur réseau.')
+  }
+}
 </script>
 <!-- LIGHTBOX -->
 <div id="lightbox" class="lightbox-bg" onclick="lbClickOutside(event)">
