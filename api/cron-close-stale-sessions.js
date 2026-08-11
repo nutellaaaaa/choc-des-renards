@@ -6,26 +6,23 @@
 // ni le fetch keepalive du logout ne sont envoyés de façon fiable. Résultat :
 // des LoginEvent restent ouverts (logoutAt = null) indéfiniment.
 //
-// Ce cron passe toutes les 5 minutes et clôture automatiquement les sessions
-// ouvertes dont la dernière activité remonte à plus de STALE_THRESHOLD_MS.
-// Comme le schéma LoginEvent n'a pas de champ « dernière activité », on
-// utilise createdAt + une marge conservatrice : une session qui n'a pas été
-// clôturée après 30 minutes est considérée comme morte (15 min d'inactivité
-// appliquées côté client + 15 min de marge de sécurité pour les connexions
-// admin exemptes et les éventuels décalages).
+// Ce cron s'exécute UNE FOIS PAR JOUR (à 3h du matin) — Vercel Hobby limite
+// les cron jobs à une exécution quotidienne. À cette heure, toute session
+// encore ouverte (logoutAt = null) est nécessairement morte : on les clôture
+// toutes avec la raison 'inactivity'.
 //
-// La raison 'inactivity' est utilisée pour les sessions clôturées
-// automatiquement (l'heure réelle de déconnexion est estimée à createdAt + 15 min
-// dans l'affichage de l'historique côté client).
+// NOTE : La déconnexion en temps réel (15 min d'inactivité) est gérée côté
+// client (timer JS, heartbeat toutes les 5 min vers /api/login?action=me,
+// pagehide, checkStaleSessionOnLoad). Ce cron est un filet de sécurité qui
+// nettoie les sessions "fantômes" restées ouvertes (notamment sur mobile).
+//
+// L'heure de déconnexion est estimée à createdAt + 15 min (durée d'inactivité
+// côté client) pour que l'historique reste cohérent.
 const { PrismaClient } = require('@prisma/client')
 
 if (!global._prisma) global._prisma = new PrismaClient()
 const prisma = global._prisma
 
-// Une session ouverte depuis plus longtemps que ce seuil est considérée
-// comme inactive / morte et est clôturée automatiquement.
-// 15 min d'inactivité (INACTIVITY_MS) + 15 min de marge = 30 min.
-const STALE_THRESHOLD_MS = 30 * 60 * 1000
 // Heure de déconnexion estimée = createdAt + 15 min (durée d'inactivité).
 const ESTIMATED_INACTIVITY_MS = 15 * 60 * 1000
 
@@ -36,13 +33,11 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const cutoff = new Date(Date.now() - STALE_THRESHOLD_MS)
-
-    // Clôturer toutes les sessions ouvertes (logoutAt = null) plus anciennes
-    // que le seuil. On estime l'heure de déconnexion à createdAt + 15 min
-    // (durée d'inactivité côté client) pour que l'historique reste cohérent.
+    // Clôturer TOUTES les sessions encore ouvertes (logoutAt = null).
+    // À 3h du matin, n'importe quelle session sans logoutAt est forcément
+    // inactive / morte — on les ferme toutes.
     const staleEvents = await prisma.loginEvent.findMany({
-      where: { logoutAt: null, createdAt: { lt: cutoff } },
+      where: { logoutAt: null },
       select: { id: true, createdAt: true },
     })
 
@@ -61,7 +56,6 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       closed,
-      thresholdMs: STALE_THRESHOLD_MS,
       message: `${closed} session(s) inactive(s) clôturée(s).`,
     })
   } catch (err) {
