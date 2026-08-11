@@ -3,6 +3,10 @@
 - Limite nb utilisations malus
 - Pouvoir ajouter une photo au moment de rentrer les résultats d'un match
 - Dans les matchs à publier, retirer les doublons, ie un match publié implique que l'autre le soit aussi (seul le match avec le premier joueur gagnant apparaît à l'admin dans les matchs à publier)
+- Utiliser une visionneuse pour le pdf de la charte 
+- Pseudo admin --> Lordy
+- Médaille en ligne 
+
 - Analyse complète de la logique du site 
 
 ---------- Bugs en cours de réparation ----------

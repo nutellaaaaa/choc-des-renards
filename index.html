@@ -25,10 +25,7 @@
 
   /* NAV */
   nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(12,12,12,0.92); border-bottom: 1px solid var(--dark4); display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; height: var(--nav-h); transition: transform 0.28s ease; }
-  /* Masquage de la navbar au scroll vers le bas (téléphone uniquement, voir JS initNavAutoHide) */
-  @media (max-width: 1100px) {
-    nav#site-nav.nav-hidden { transform: translateY(-100%); }
-  }
+  @media (max-width: 1100px) { nav#site-nav.nav-hidden { transform: translateY(-100%); } }
   /* Le flou est posé sur un pseudo-élément plutôt que directement sur <nav> :
      backdrop-filter/filter sur un ancêtre transforme celui-ci en containing block
      pour tous ses descendants position:fixed (dont le tiroir mobile), ce qui les
@@ -104,8 +101,7 @@
     45.5%    { opacity: 1; }
     53%      { opacity: 1; transform: translate(0%,0%) rotate(8deg) scale(1.05); }
     54.2%    { transform: translate(80%,-60%) rotate(-18deg) scale(.95); }
-    60.5%    { opacity: 1; transform: translate(1800%,-980%) rotate(-25deg) scale(.55); }
-    100%     { opacity: 1; transform: translate(1800%,-980%) rotate(-25deg) scale(.55); }
+    60.5%,100% { opacity: 1; transform: translate(1800%,-980%) rotate(-25deg) scale(.55); }
   }
 
   @keyframes nlaTrailGrow {
@@ -1325,20 +1321,14 @@
   }
 
   /* ═══════════════════════════════════════════════════════════
-     DOCK — navigation flottante "trajectoire de volant"
-     Desktop (>1100px) : rail vertical flottant à gauche, centré.
-     Mobile/tablette (≤1100px) : capsule flottante horizontale en bas,
-     défilable si le contenu déborde (comme .nav-links auparavant).
-     La barre du haut (#site-nav) ne garde que le logo + le compte ;
-     le dock devient l'unique moyen de changer de page.
+     DOCK — navigation flottante
+     Par défaut (tous écrans) : capsule horizontale en bas, style téléphone.
+     Sur desktop uniquement : un bouton discret (#dock-layout-toggle) permet
+     de passer en mode "carte" (rail vertical à gauche) via body.dock-card.
+     La barre du haut (#site-nav) ne garde que le logo + le compte.
      ═══════════════════════════════════════════════════════════ */
-  /* Le sélecteur générique "nav {...}" (barre du haut) s'applique à TOUT élément
-     <nav>, y compris ce dock — right/height/justify-content/padding doivent donc
-     être explicitement réinitialisés ici pour ne pas hériter de la barre du haut. */
-  /* Style par défaut = disposition "téléphone" (barre flottante horizontale en bas),
-     y compris sur ordinateur. Le mode "carte" (rail vertical à gauche) devient une
-     disposition optionnelle, activée sur desktop via .dock-card (voir plus bas et
-     toggleDockLayout() en JS). */
+  /* Le sélecteur générique "nav {...}" s'applique à tout <nav>, y compris le dock —
+     right/height/justify-content/padding doivent être réinitialisés explicitement. */
   nav.dock {
     position: fixed; left: 50%; right: auto; top: auto; bottom: 0.9rem; transform: translateX(-50%);
     z-index: 150; display: flex; flex-direction: row; justify-content: flex-start; align-items: center; gap: 0.15rem;
@@ -1354,7 +1344,7 @@
   }
   .dock-item {
     position: relative; width: 42px; height: 42px; border-radius: 13px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
+    display: flex; align-items: center; justify-content: center; scroll-snap-align: center;
     background: none; border: none; cursor: pointer; color: var(--gray);
     transition: color 0.2s, background 0.2s; padding: 0;
   }
@@ -1363,8 +1353,10 @@
   .dock-item.active { color: var(--orange); background: none; }
   .dock-item.active svg { transform: scale(1.08); }
 
+  /* Tooltip : au-dessus par défaut (style téléphone) */
   .dock-label {
-    position: absolute; left: 50%; top: auto; bottom: calc(100% + 10px); transform: translateX(-50%) translateY(4px);
+    position: absolute; left: 50%; top: auto; bottom: calc(100% + 10px);
+    transform: translateX(-50%) translateY(4px);
     font-family: var(--font-heading); font-size: 0.76rem; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase;
     background: var(--dark3); border: 1px solid var(--dark4); color: var(--white);
     padding: 0.4rem 0.75rem; border-radius: 8px; white-space: nowrap;
@@ -1395,40 +1387,36 @@
 
   .dock-item:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
 
-  /* Bouton discret (desktop uniquement) permettant de basculer entre la disposition
-     "carte" (rail vertical) et la disposition "téléphone" (barre basse), qui est la
-     disposition par défaut même sur ordinateur. */
+  /* Bouton bascule carte/téléphone — visible uniquement sur desktop */
   .dock-layout-toggle {
-    display: none; position: fixed; right: 1.1rem; bottom: 1.1rem; z-index: 150;
-    width: 34px; height: 34px; align-items: center; justify-content: center;
-    background: rgba(21,21,21,0.72); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-    border: 1px solid var(--dark4); border-radius: 10px; color: var(--gray); cursor: pointer; padding: 0;
-    opacity: 0.55; transition: opacity 0.2s, color 0.2s, background 0.2s;
+    display: none; position: fixed; right: 1rem; bottom: 1rem; z-index: 200;
+    width: 30px; height: 30px; align-items: center; justify-content: center;
+    background: rgba(21,21,21,0.75); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--dark4); border-radius: 8px; color: var(--gray);
+    cursor: pointer; padding: 0; opacity: 0.5; transition: opacity 0.2s, color 0.2s;
   }
-  .dock-layout-toggle svg { width: 16px; height: 16px; }
-  .dock-layout-toggle:hover, .dock-layout-toggle:focus-visible { opacity: 1; color: var(--gray-light); background: var(--dark4); }
-  .dock-layout-toggle[aria-pressed="true"] { color: var(--orange); }
-  .dock-layout-toggle:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+  .dock-layout-toggle svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.7; }
+  .dock-layout-toggle:hover { opacity: 1; color: var(--gray-light); }
+  .dock-layout-toggle:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; opacity: 1; }
+  body.dock-card .dock-layout-toggle { color: var(--orange); opacity: 0.7; }
+  body.dock-card .dock-layout-toggle:hover { opacity: 1; }
 
+  /* Mode carte — desktop uniquement, opt-in via body.dock-card */
   @media (min-width: 1101px) {
     .dock-layout-toggle { display: flex; }
 
-    /* Mode "carte" — opt-in, réservé au desktop : rail vertical flottant à gauche */
     body.dock-card nav.dock {
       left: 1.5rem; right: auto; top: 50%; bottom: auto; transform: translateY(-50%);
-      flex-direction: column; justify-content: flex-start; gap: 0.3rem; border-radius: 20px; padding: 0.55rem;
-      max-width: none; overflow: visible;
+      flex-direction: column; justify-content: flex-start; gap: 0.3rem;
+      border-radius: 20px; padding: 0.55rem; max-width: none; overflow: visible;
     }
     body.dock-card .dock-brand { display: flex; }
     body.dock-card .dock-label {
-      left: calc(100% + 12px); top: 50%; bottom: auto; transform: translateY(-50%) translateX(-6px);
+      left: calc(100% + 12px); top: 50%; bottom: auto;
+      transform: translateY(-50%) translateX(-6px);
     }
     body.dock-card .dock-item:hover .dock-label { transform: translateY(-50%) translateX(0); }
     body.dock-card .dock-item::after { bottom: 2px; }
-  }
-
-  @media (max-width: 1100px), (max-height: 560px) {
-    .dock-item { width: 42px; height: 42px; scroll-snap-align: center; }
   }
 
   @media (max-width: 480px) {
@@ -2737,9 +2725,6 @@
     <button class="nav-switch-btn" id="nav-switch-btn" onclick="switchAccount()" style="display:none"></button>
     <button class="nav-logout-btn" onclick="logout()">Déconnexion</button>
   </div>
-  <button class="dock-layout-toggle" id="dock-layout-toggle" onclick="toggleDockLayout()" aria-pressed="false" aria-label="Basculer la disposition du menu (carte / barre)" title="Basculer la disposition du menu">
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="4" width="15" height="3.2" rx="1.4"/><rect x="2.5" y="8.4" width="15" height="3.2" rx="1.4"/><rect x="2.5" y="12.8" width="15" height="3.2" rx="1.4"/></svg>
-  </button>
 </nav>
 
 <!-- ══════════ DOCK DE NAVIGATION ══════════ -->
@@ -3672,57 +3657,7 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin() })
   document.getElementById('reg-confirm').addEventListener('keydown', e => { if (e.key === 'Enter') handleRegister() })
   initAuth()
-  initNavAutoHide()
-  initDockLayoutToggle()
 })
-
-/* ══════════════ DOCK : bascule carte / téléphone (desktop) ══════════════
-   Par défaut (aucune préférence enregistrée), la disposition est celle du
-   téléphone, même sur ordinateur. Le bouton discret #dock-layout-toggle
-   permet de repasser en mode "carte" (rail vertical) ; le choix est mémorisé. */
-function initDockLayoutToggle() {
-  const btn = document.getElementById('dock-layout-toggle')
-  const isCard = localStorage.getItem('dockLayout') === 'card'
-  document.body.classList.toggle('dock-card', isCard)
-  if (btn) btn.setAttribute('aria-pressed', isCard ? 'true' : 'false')
-}
-function toggleDockLayout() {
-  const isCard = document.body.classList.toggle('dock-card')
-  localStorage.setItem('dockLayout', isCard ? 'card' : 'phone')
-  const btn = document.getElementById('dock-layout-toggle')
-  if (btn) btn.setAttribute('aria-pressed', isCard ? 'true' : 'false')
-}
-
-/* ══════════════ NAVBAR : masquage auto au scroll (téléphone) ══════════════
-   Visible à l'ouverture (aucune classe appliquée) tant qu'aucun scroll n'a eu
-   lieu. Se masque dès qu'on scrolle vers le bas, réapparaît dès qu'on scrolle
-   vers le haut. Ne s'applique qu'en dessous de 1100px (cf. media query CSS
-   associée à .nav-hidden) — inutile de désactiver le listener au-dessus, la
-   classe est simplement ignorée par le CSS sur grand écran. */
-function initNavAutoHide() {
-  const nav = document.getElementById('site-nav')
-  if (!nav) return
-  let lastY = window.scrollY
-  let ticking = false
-
-  window.addEventListener('scroll', () => {
-    if (ticking) return
-    ticking = true
-    requestAnimationFrame(() => {
-      const y = window.scrollY
-      const delta = y - lastY
-      if (Math.abs(delta) > 4) {
-        if (delta > 0 && y > nav.offsetHeight) {
-          nav.classList.add('nav-hidden')
-        } else if (delta < 0) {
-          nav.classList.remove('nav-hidden')
-        }
-        lastY = y
-      }
-      ticking = false
-    })
-  }, { passive: true })
-}
 
 /* ══════════════ STATS ACCUEIL DYNAMIQUES ══════════════ */
 async function loadHomeStats() {
