@@ -4730,7 +4730,7 @@ async function checkSessionServer() {
   const token = localStorage.getItem('cdr_token')
   if (!token) return
   try {
-    const res = await fetch('/api/login', { headers: authHeaders() })
+    const res = await fetch('/api/login?action=me', { headers: authHeaders() })
     if (res.status === 401) {
       const data = await res.json().catch(() => ({}))
       if (data.forceLogout) {

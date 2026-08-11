@@ -12,6 +12,7 @@
     { "source": "/api/admin/bots",          "destination": "/api/admin?resource=bots" },
     { "source": "/api/admin/alerts",        "destination": "/api/admin?resource=alerts" },
     { "source": "/api/admin/whatsapp",      "destination": "/api/admin?resource=whatsapp" },
+    { "source": "/api/admin/medals",        "destination": "/api/admin?resource=medals" },
 
     { "source": "/api/contact",             "destination": "/api/public?resource=contact" },
     { "source": "/api/faq",                 "destination": "/api/public?resource=faq" },
