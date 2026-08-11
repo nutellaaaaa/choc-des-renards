@@ -3,7 +3,6 @@ Voici une liste de modifications à apporter à mon site. 1)Sur téléphone, ass
 
 
 
-
 ---------- Fonctionnalités en cours d'implémentation ----------
 - Sur téléphone, assure-toi que la personne soit bien déconnectée automatiquement 
 - Limite nb utilisations malus
