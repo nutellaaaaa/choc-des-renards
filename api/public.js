@@ -333,6 +333,54 @@ async function handleConvocations(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' })
 
   const { action } = req.body || {}
+
+  // ── Action: add_photos ──
+  // Permet à un joueur d'ajouter des photos à un match qu'il a lui-même créé
+  // (et au match miroir de l'adversaire). Sécurité : le joueur doit être le
+  // propriétaire (userId) d'au moins un des deux matchs.
+  if (action === 'add_photos') {
+    const { matchId, mirrorMatchId, photos } = req.body || {}
+    const mid = parseInt(matchId, 10)
+    if (isNaN(mid)) return res.status(400).json({ error: 'matchId invalide.' })
+    if (!Array.isArray(photos) || photos.length === 0)
+      return res.status(400).json({ error: 'photos requis (array).' })
+    try {
+      // Vérifier que le joueur est propriétaire du match
+      const match = await prisma.match.findUnique({ where: { id: mid } })
+      if (!match) return res.status(404).json({ error: 'Match introuvable.' })
+      if (match.userId !== uid)
+        return res.status(403).json({ error: 'Vous ne pouvez ajouter des photos qu\'à vos propres matchs.' })
+
+      const created = await prisma.matchPhoto.createMany({
+        data: photos.map(p => ({
+          matchId: mid,
+          url: p.url,
+          publicId: p.publicId || null,
+          caption: p.caption || null,
+        })),
+      })
+
+      // Ajouter aussi au match miroir (si fourni et valide)
+      if (mirrorMatchId) {
+        const mmid = parseInt(mirrorMatchId, 10)
+        if (!isNaN(mmid)) {
+          await prisma.matchPhoto.createMany({
+            data: photos.map(p => ({
+              matchId: mmid,
+              url: p.url,
+              publicId: p.publicId || null,
+              caption: p.caption || null,
+            })),
+          })
+        }
+      }
+      return res.status(201).json({ ok: true, count: created.count })
+    } catch (err) {
+      console.error('[convocations add_photos]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
   if (action !== 'submit') return res.status(400).json({ error: 'Action invalide.' })
 
   const { convType, convId, matchDate, sets, note } = req.body || {}

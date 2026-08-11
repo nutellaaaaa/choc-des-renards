@@ -57,7 +57,7 @@ const DEFAULT_MALUS_LIST = [
 let MALUS_LIST = [...DEFAULT_MALUS_LIST]
 
 /** Charge la liste des malus depuis la DB (malusConfig). Retourne DEFAULT_MALUS_LIST si vide.
- *  Le format stocké peut être un tableau de strings (ancien) ou d'objets {text, enabled}.
+ *  Le format stocké peut être un tableau de strings (ancien) ou d'objets {text, enabled, maxConcurrent}.
  *  Cette fonction retourne uniquement les malus actifs (enabled !== false), sous forme de strings. */
 async function loadMalusList() {
   try {
@@ -65,7 +65,7 @@ async function loadMalusList() {
     if (state?.malusConfig) {
       const cfg = JSON.parse(state.malusConfig)
       if (Array.isArray(cfg) && cfg.length > 0) {
-        // Nouveau format : [{text, enabled}]
+        // Nouveau format : [{text, enabled, maxConcurrent}]
         if (cfg[0] && typeof cfg[0] === 'object' && 'text' in cfg[0]) {
           return cfg.filter(m => m.enabled !== false).map(m => m.text)
         }
@@ -75,6 +75,144 @@ async function loadMalusList() {
     }
   } catch {}
   return DEFAULT_MALUS_LIST
+}
+
+/** Charge la liste complète des malus (avec enabled et maxConcurrent) depuis la DB.
+ *  Retourne DEFAULT_MALUS_LIST.map(t => ({text, enabled, maxConcurrent: null})) si vide. */
+async function loadMalusConfigFull() {
+  try {
+    const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
+    if (state?.malusConfig) {
+      const cfg = JSON.parse(state.malusConfig)
+      if (Array.isArray(cfg) && cfg.length > 0) {
+        if (cfg[0] && typeof cfg[0] === 'object' && 'text' in cfg[0]) {
+          return cfg.map(m => ({ text: m.text, enabled: m.enabled !== false, maxConcurrent: m.maxConcurrent || null }))
+        }
+        return cfg.map(t => ({ text: t, enabled: true, maxConcurrent: null }))
+      }
+    }
+  } catch {}
+  return DEFAULT_MALUS_LIST.map(t => ({ text: t, enabled: true, maxConcurrent: null }))
+}
+
+/**
+ * Applique les limites d'utilisation simultanée des malus (maxConcurrent).
+ * Pour chaque malus ayant une limite > 0, compte combien de matchs planifiés
+ * actifs (non forfeited) l'utilisent. Si le nombre dépasse la limite, réassigne
+ * le surplus vers d'autres malus actifs sans limite (ou dont la limite n'est pas atteinte).
+ * Retourne le nombre de matchs réassignés.
+ */
+async function enforceMalusConcurrency(malusConfig) {
+  if (!Array.isArray(malusConfig)) return 0
+  const limited = malusConfig.filter(m => m.enabled !== false && m.maxConcurrent && m.maxConcurrent > 0)
+  if (limited.length === 0) return 0
+
+  const activeTexts = malusConfig.filter(m => m.enabled !== false).map(m => m.text)
+  if (activeTexts.length === 0) return 0
+
+  // Récupérer tous les matchs planifiés actifs qui ont un malus
+  const activeMatches = await prisma.plannedMatch.findMany({
+    where: { forfeited: false, malus: { not: null } },
+    include: { player1: { select: { firstName: true, lastName: true } }, player2: { select: { firstName: true, lastName: true } } },
+    orderBy: { createdAt: 'asc' }, // les plus anciens gardent leur malus
+  })
+
+  let reassigned = 0
+
+  for (const malus of limited) {
+    // Matchs utilisant ce malus, triés par date de création (les plus anciens en premier)
+    const usingThis = activeMatches.filter(m => m.malus === malus.text)
+    if (usingThis.length <= malus.maxConcurrent) continue
+
+    // Le surplus : les matchs les plus récents qui dépassent la limite
+    const surplus = usingThis.slice(malus.maxConcurrent)
+
+    // Malus de remplacement : malus actifs différents, sans limite ou dont la limite n'est pas atteinte
+    const replacementPool = activeTexts.filter(t => {
+      if (t === malus.text) return false
+      const cfg = malusConfig.find(m => m.text === t)
+      if (!cfg || cfg.enabled === false) return false
+      if (cfg.maxConcurrent && cfg.maxConcurrent > 0) {
+        const currentCount = activeMatches.filter(m => m.malus === t).length
+        return currentCount < cfg.maxConcurrent
+      }
+      return true // pas de limite = toujours disponible
+    })
+
+    if (replacementPool.length === 0) {
+      // Aucun malus de remplacement disponible — logger un avertissement
+      for (const pm of surplus) {
+        await prisma.schedulingLog.create({
+          data: {
+            phase: pm.phase,
+            type: 'avertissement',
+            message: `Limite de concurrence atteinte pour le malus « ${malus.text} » (${malus.maxConcurrent} max) — impossible de réassigner le match #${pm.id} (${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}) : aucun malus de remplacement disponible.`,
+          },
+        })
+      }
+      continue
+    }
+
+    for (const pm of surplus) {
+      // Choisir un malus de remplacement (celui le moins utilisé)
+      const counts = replacementPool.map(t => ({
+        text: t,
+        count: activeMatches.filter(m => m.malus === t).length,
+      }))
+      counts.sort((a, b) => a.count - b.count)
+      const newMalus = counts[0].text
+
+      await prisma.plannedMatch.update({ where: { id: pm.id }, data: { malus: newMalus } })
+      // Mettre à jour le cache local
+      pm.malus = newMalus
+
+      await prisma.schedulingLog.create({
+        data: {
+          phase: pm.phase,
+          type: 'avertissement',
+          message: `Malus réassigné pour le match #${pm.id} (${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}) : limite d'utilisation simultanée du malus « ${malus.text} » atteinte (${malus.maxConcurrent} max). Nouveau malus attribué : « ${newMalus} ».`,
+        },
+      })
+      reassigned++
+    }
+  }
+
+  return reassigned
+}
+
+/**
+ * Vérifie si un malus donné peut être assigné à un nouveau match sans dépasser
+ * sa limite de concurrence. Retourne true si l'assignation est possible.
+ */
+async function canAssignMalus(malusText) {
+  if (!malusText) return true
+  try {
+    const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
+    if (!state?.malusConfig) return true
+    const cfg = JSON.parse(state.malusConfig)
+    if (!Array.isArray(cfg)) return true
+    const entry = cfg.find(m => m.text === malusText)
+    if (!entry || entry.enabled === false) return true // malus non limité ou désactivé = pas de restriction
+    if (!entry.maxConcurrent || entry.maxConcurrent <= 0) return true
+    // Compter les matchs actifs utilisant ce malus
+    const count = await prisma.plannedMatch.count({
+      where: { forfeited: false, malus: malusText },
+    })
+    return count < entry.maxConcurrent
+  } catch { return true }
+}
+
+/**
+ * Choisit un malus aléatoire en respectant les limites de concurrence.
+ * Si aucun malus avec limite disponible, tombe sur un malus sans limite.
+ */
+async function pickRandomMalusWithConcurrency(malusList) {
+  const available = []
+  for (const malus of malusList) {
+    if (await canAssignMalus(malus)) available.push(malus)
+  }
+  if (available.length === 0) return malusList[Math.floor(Math.random() * malusList.length)]
+  return available[Math.floor(Math.random() * available.length)]
 }
 
 // Rang de classement, du plus faible au plus fort (FFBad) — utilisé pour le malus automatique
@@ -1513,13 +1651,18 @@ async function handleAction(req, res) {
         case 'update_malus_config': {
           const { malusList: newList } = req.body || {}
           if (!Array.isArray(newList)) return res.status(400).json({ error: 'malusList (array) requis.' })
-          // Accepte le nouveau format [{text, enabled}] ou l'ancien [strings]
+          // Accepte le nouveau format [{text, enabled, maxConcurrent}] ou l'ancien [strings]
           const normalized = newList.map(item => {
-            if (typeof item === 'string') return { text: item.trim(), enabled: true }
-            return { text: String(item.text || '').trim(), enabled: item.enabled !== false }
+            if (typeof item === 'string') return { text: item.trim(), enabled: true, maxConcurrent: null }
+            const mc = parseInt(item.maxConcurrent, 10)
+            return {
+              text: String(item.text || '').trim(),
+              enabled: item.enabled !== false,
+              maxConcurrent: (!isNaN(mc) && mc > 0) ? mc : null,
+            }
           }).filter(m => m.text.length > 0)
           if (normalized.length === 0) return res.status(400).json({ error: 'La liste de malus ne peut pas être vide.' })
-          const cleaned = normalized // objets {text, enabled}
+          const cleaned = normalized // objets {text, enabled, maxConcurrent}
           const activeTexts = cleaned.filter(m => m.enabled).map(m => m.text)
           if (activeTexts.length === 0) return res.status(400).json({ error: 'Au moins un malus doit être actif.' })
 
@@ -1547,6 +1690,12 @@ async function handleAction(req, res) {
             }
           }
 
+          // Appliquer les limites de concurrence (maxConcurrent) :
+          // pour chaque malus ayant une limite, si trop de matchs actifs l'utilisent,
+          // réassigner le surplus vers d'autres malus actifs.
+          const concurrencyReassigned = await enforceMalusConcurrency(cleaned)
+          reassigned += concurrencyReassigned
+
           await prisma.tournamentState.upsert({
             where: { id: 1 },
             update: { malusConfig: JSON.stringify(cleaned) },
@@ -1555,7 +1704,7 @@ async function handleAction(req, res) {
 
           return res.status(200).json({
             ok: true,
-            malusList: cleaned, // objets {text, enabled}
+            malusList: cleaned, // objets {text, enabled, maxConcurrent}
             reassigned,
             message: `Liste de malus mise à jour (${cleaned.length} entrée(s))${reassigned > 0 ? `. ${reassigned} match(s) planifié(s) réassigné(s) — voir la console de planification.` : '.'}`,
           })
@@ -1727,6 +1876,117 @@ async function handleAction(req, res) {
 /* ============================================================
  * MATCH — gestion des matchs, planifications, photos (ex admin/match.js)
  * ============================================================ */
+
+// Normalise un nom (prénom+nom) pour comparer sans tenir compte des
+// accents / casses / espaces superflus.
+function normName(s) {
+  return (s || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+// Renvoie true si le match A et le match B sont des miroirs (même
+// confrontation vue des deux côtés). Critères : même date (au jour près),
+// même phase, même round, et l'userId de l'un correspond à un joueur dont le
+// nom matche l'opponent de l'autre (et inversement).
+function areMirrorMatches(a, b, userById) {
+  if (a.id === b.id) return false
+  // Même date (comparaison au jour près)
+  const da = a.matchDate ? new Date(a.matchDate).toISOString().slice(0, 10) : null
+  const db = b.matchDate ? new Date(b.matchDate).toISOString().slice(0, 10) : null
+  if (da !== db) return false
+  // Même phase et round
+  if ((a.phase || null) !== (b.phase || null)) return false
+  if ((a.roundNumber ?? null) !== (b.roundNumber ?? null)) return false
+  // A.userId ↔ B.opponent et B.userId ↔ A.opponent
+  const ua = userById.get(a.userId)
+  const ub = userById.get(b.userId)
+  if (!ua || !ub) return false
+  const aUserMatchBOpp = normName(ua.firstName + ' ' + ua.lastName) === normName(b.opponentFirstName + ' ' + b.opponentLastName)
+  const bUserMatchAOpp = normName(ub.firstName + ' ' + ub.lastName) === normName(a.opponentFirstName + ' ' + a.opponentLastName)
+  return aUserMatchBOpp && bUserMatchAOpp
+}
+
+// Détermine si le joueur du match a gagné (plus de sets gagnants que l'adversaire).
+function didPlayerWin(m) {
+  if (!m.sets || m.sets.length === 0) return null
+  const pw = m.sets.filter(s => s.playerScore > s.opponentScore).length
+  const ow = m.sets.filter(s => s.opponentScore > s.playerScore).length
+  if (pw === ow) return null // ex aequo / pas de sets décisifs
+  return pw > ow
+}
+
+// Dédoublonne la liste des matchs en attente : pour chaque paire de miroirs,
+// on ne garde QUE le match dont le joueur a gagné (premier joueur gagnant).
+// Les matchs sans miroir (adversaire non inscrit) sont conservés tels quels.
+// On attache aussi mirrorMatchId au match conservé pour pouvoir publier les
+// deux en même temps.
+function dedupePendingMatches(pending) {
+  if (!pending || pending.length === 0) return []
+  // Index des users pour résoudre userId → firstName/lastName
+  const userById = new Map()
+  for (const m of pending) {
+    if (m.user && !userById.has(m.userId)) {
+      userById.set(m.userId, { firstName: m.user.firstName, lastName: m.user.lastName })
+    }
+  }
+  const used = new Set()
+  const result = []
+  for (const m of pending) {
+    if (used.has(m.id)) continue
+    // Chercher un miroir non encore utilisé
+    const mirror = pending.find(o => !used.has(o.id) && o.id !== m.id && areMirrorMatches(m, o, userById))
+    if (!mirror) {
+      // Pas de miroir : on garde ce match tel quel
+      result.push(m)
+      used.add(m.id)
+    } else {
+      // Miroir trouvé : on garde celui dont le joueur a gagné. Si aucun des
+      // deux n'a gagné (ex aequo), on garde le premier (m) par stabilité.
+      const mWon = didPlayerWin(m)
+      const mirrorWon = didPlayerWin(mirror)
+      let keeper, other
+      if (mWon === true) { keeper = m; other = mirror }
+      else if (mirrorWon === true) { keeper = mirror; other = m }
+      else { keeper = m; other = mirror }
+      // Attacher l'ID du miroir pour publication simultanée
+      keeper = { ...keeper, mirrorMatchId: other.id }
+      result.push(keeper)
+      used.add(m.id)
+      used.add(mirror.id)
+    }
+  }
+  return result
+}
+
+// Récupère l'ID du match miroir d'un match donné (pour publication simultanée).
+// Recherche par confrontations (date, phase, round, noms croisés).
+async function findMirrorMatchId(match) {
+  if (!match) return null
+  const candidates = await prisma.match.findMany({
+    where: {
+      id: { not: match.id },
+      // Même date (au jour près) — Prisma ne supporte pas directement la
+      // comparaison de date tronquée, on filtre ensuite en JS.
+      phase: match.phase || null,
+      roundNumber: match.roundNumber ?? null,
+    },
+    include: { sets: true, user: { select: { firstName: true, lastName: true } } },
+  })
+  const dMatch = match.matchDate ? new Date(match.matchDate).toISOString().slice(0, 10) : null
+  const userById = new Map()
+  userById.set(match.userId, { firstName: match.user?.firstName, lastName: match.user?.lastName })
+  for (const c of candidates) {
+    if (c.user) userById.set(c.userId, { firstName: c.user.firstName, lastName: c.user.lastName })
+  }
+  for (const c of candidates) {
+    const dc = c.matchDate ? new Date(c.matchDate).toISOString().slice(0, 10) : null
+    if (dc !== dMatch) continue
+    if (areMirrorMatches({ ...match, user: match.user || userById.get(match.userId) }, c, userById)) {
+      return c.id
+    }
+  }
+  return null
+}
+
 async function handleMatch(req, res) {
   const payload = requireAdmin(req, res)
   if (!payload) return
@@ -1775,7 +2035,14 @@ async function handleMatch(req, res) {
         }),
       ])
       const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
-      // malusListFull : objets {text, enabled} pour l'UI admin
+      // ── Dédoublonnage des matchs en attente (pending) ──
+      // Les matchs entre deux joueurs inscrits créent un match « miroir » (un par
+      // joueur). On ne veut présenter à l'admin qu'un seul représentant par
+      // confrontation : celui dont le joueur a GAGNÉ (premier joueur gagnant).
+      // On regroupe les matchs miroir par (matchDate, phase, roundNumber) et par
+      // paire de joueurs (userId de l'un ↔ opponent de l'autre).
+      const dedupedPending = dedupePendingMatches(pending)
+      // malusListFull : objets {text, enabled, maxConcurrent} pour l'UI admin
       // malusList : strings actifs pour la planification (rétrocompatibilité)
       let malusListFull = []
       if (state?.malusConfig) {
@@ -1783,17 +2050,17 @@ async function handleMatch(req, res) {
           const cfg = JSON.parse(state.malusConfig)
           if (Array.isArray(cfg) && cfg.length > 0) {
             if (typeof cfg[0] === 'object' && 'text' in cfg[0]) {
-              malusListFull = cfg
+              malusListFull = cfg.map(m => ({ text: m.text, enabled: m.enabled !== false, maxConcurrent: m.maxConcurrent || null }))
             } else {
-              malusListFull = cfg.map(t => ({ text: t, enabled: true }))
+              malusListFull = cfg.map(t => ({ text: t, enabled: true, maxConcurrent: null }))
             }
           }
         } catch {}
       }
-      if (malusListFull.length === 0) malusListFull = DEFAULT_MALUS_LIST.map(t => ({ text: t, enabled: true }))
+      if (malusListFull.length === 0) malusListFull = DEFAULT_MALUS_LIST.map(t => ({ text: t, enabled: true, maxConcurrent: null }))
       const dynamicMalusList = malusListFull.filter(m => m.enabled !== false).map(m => m.text)
       return res.status(200).json({
-        pending, published, activeUsers, openSpecials, planned,
+        pending: dedupedPending, published, activeUsers, openSpecials, planned,
         malusList: malusListFull,
         defaultMalusList: DEFAULT_MALUS_LIST,
         autoRemindersEnabled: state?.autoRemindersEnabled ?? true,
@@ -1813,8 +2080,22 @@ async function handleMatch(req, res) {
     const mid = parseInt(req.body.matchId, 10)
     if (isNaN(mid)) return res.status(400).json({ error: 'matchId invalide.' })
     try {
+      // Récupérer le match pour trouver son miroir
+      const match = await prisma.match.findUnique({
+        where: { id: mid },
+        include: { sets: true, user: { select: { firstName: true, lastName: true } } },
+      })
+      if (!match) return res.status(404).json({ error: 'Match introuvable.' })
+
+      // Publier le match principal
       await prisma.match.update({ where: { id: mid }, data: { published: true } })
-      return res.status(200).json({ ok: true })
+
+      // Trouver et publier le match miroir (l'autre perspective du même match)
+      const mirrorId = await findMirrorMatchId(match)
+      if (mirrorId) {
+        await prisma.match.update({ where: { id: mirrorId }, data: { published: true } })
+      }
+      return res.status(200).json({ ok: true, mirrorPublished: !!mirrorId })
     } catch (err) {
       return res.status(500).json({ error: 'Erreur serveur ou match introuvable.' })
     }
@@ -2185,7 +2466,8 @@ async function handleMatch(req, res) {
       const malusList = await loadMalusList()
       if (finalMalus === '__RANDOM__') {
         // Malus "Aléatoire" choisi par l'admin : on tire un malus concret dès l'enregistrement
-        finalMalus = pickRandomMalus(malusList)
+        // en respectant les limites de concurrence
+        finalMalus = await pickRandomMalusWithConcurrency(malusList)
         if (!finalMalusTarget) finalMalusTarget = Math.random() < 0.5 ? 1 : 2
       } else if (!finalMalus) {
         // Aucun malus fourni : vérifier si l'écart de classement déclenche un malus automatique
@@ -2194,7 +2476,24 @@ async function handleMatch(req, res) {
           prisma.user.findUnique({ where: { id: p2id }, select: { category: true } }),
         ])
         const auto = computeAutoMalus(p1?.category, p2?.category, malusList)
-        if (auto) { finalMalus = auto.malus; finalMalusTarget = auto.malusTarget }
+        if (auto) {
+          // Vérifier la limite de concurrence pour le malus auto
+          if (await canAssignMalus(auto.malus)) {
+            finalMalus = auto.malus; finalMalusTarget = auto.malusTarget
+          } else {
+            // Limite atteinte, choisir un autre malus disponible
+            finalMalus = await pickRandomMalusWithConcurrency(malusList)
+            finalMalusTarget = auto.malusTarget
+          }
+        }
+      } else {
+        // Malus spécifique choisi par l'admin : vérifier la limite de concurrence
+        if (!(await canAssignMalus(finalMalus))) {
+          // Limite atteinte pour ce malus — trouver un remplaçant
+          const replacement = await pickRandomMalusWithConcurrency(malusList.filter(m => m !== finalMalus))
+          if (replacement) finalMalus = replacement
+          // Si pas de remplacement, on garde le malus choisi (l'admin a explicitement demandé)
+        }
       }
 
       const pm = await prisma.plannedMatch.create({
@@ -2229,8 +2528,16 @@ async function handleMatch(req, res) {
       let finalMalusTarget = malusTarget ? parseInt(malusTarget, 10) : null
       if (finalMalus === '__RANDOM__') {
         const malusList = await loadMalusList()
-        finalMalus = pickRandomMalus(malusList)
+        finalMalus = await pickRandomMalusWithConcurrency(malusList)
         if (!finalMalusTarget) finalMalusTarget = Math.random() < 0.5 ? 1 : 2
+      } else if (finalMalus) {
+        // Malus spécifique : vérifier la limite de concurrence (en excluant le match courant)
+        const currentPm = await prisma.plannedMatch.findUnique({ where: { id: pmid }, select: { malus: true } })
+        if (currentPm?.malus !== finalMalus && !(await canAssignMalus(finalMalus))) {
+          const malusList = await loadMalusList()
+          const replacement = await pickRandomMalusWithConcurrency(malusList.filter(m => m !== finalMalus))
+          if (replacement) finalMalus = replacement
+        }
       }
       const pm = await prisma.plannedMatch.update({
         where: { id: pmid },
@@ -2806,8 +3113,26 @@ async function computePhase1(req, res, answers) {
     }
 
     await prisma.plannedMatch.createMany({ data: toCreate })
+
+    // Appliquer les limites de concurrence des malus après la création groupée
+    let malusReassigned = 0
+    try {
+      const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
+      if (state?.malusConfig) {
+        const cfg = JSON.parse(state.malusConfig)
+        if (Array.isArray(cfg)) {
+          malusReassigned = await enforceMalusConcurrency(cfg)
+          if (malusReassigned > 0) {
+            log('info', `${malusReassigned} match(s) réassigné(s) pour respecter les limites d'utilisation simultanée des malus.`)
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[computePhase1 enforceMalusConcurrency]', e)
+    }
+
     await prisma.schedulingSettings.update({ where: { phase }, data: { locked: true } })
-    log('action', `${toCreate.length} match(s) planifié(s) créé(s) pour la Phase 1. Paramètres verrouillés.`)
+    log('action', `${toCreate.length} match(s) planifié(s) créé(s) pour la Phase 1. Paramètres verrouillés.${malusReassigned > 0 ? ` ${malusReassigned} match(s) réassigné(s) pour les limites de malus.` : ''}`)
 
     await flushLogs(phase, logEntries)
     return res.status(201).json({ ok: true, count: toCreate.length, logs: logEntries })
@@ -3412,7 +3737,25 @@ async function computePhase2Round(req, res, answers, roundOverride) {
       if (auto) log('info', `Malus automatique appliqué : ${p1.firstName} ${p1.lastName} vs ${p2.firstName} ${p2.lastName} (écart de classement ${p1.category}/${p2.category}).`)
       return { player1Id: p.player1Id, player2Id: p.player2Id, phase, roundNumber: round, scheduledDate, deadlineAt, malus: auto?.malus || null, malusTarget: auto?.malusTarget || null }
     })
-    if (toCreate.length > 0) await prisma.plannedMatch.createMany({ data: toCreate })
+    if (toCreate.length > 0) {
+      await prisma.plannedMatch.createMany({ data: toCreate })
+
+      // Appliquer les limites de concurrence des malus après la création groupée
+      try {
+        const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
+        if (state?.malusConfig) {
+          const cfg = JSON.parse(state.malusConfig)
+          if (Array.isArray(cfg)) {
+            const malusReassigned = await enforceMalusConcurrency(cfg)
+            if (malusReassigned > 0) {
+              log('info', `${malusReassigned} match(s) réassigné(s) pour respecter les limites d'utilisation simultanée des malus.`)
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[computePhase2Round enforceMalusConcurrency]', e)
+      }
+    }
 
     for (const b of byeMatchesToCreate) {
       const win = b.convention === 'gratuit'

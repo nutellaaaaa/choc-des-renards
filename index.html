@@ -180,6 +180,17 @@
   .reglement-tools-text strong { color: var(--white); }
   .pdf-btn { background: var(--orange); color: #000; border: none; cursor: pointer; font-family: var(--font-heading); font-size: 1rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.9rem 2.5rem; border-radius: 8px; transition: all 0.2s; text-decoration: none; display: inline-flex; align-items: center; gap: 0.6rem; }
   .pdf-btn:hover { background: var(--orange-light); transform: translateY(-2px); }
+  /* Visionneuse PDF de la charte — empêche le téléchargement facile */
+  .pdf-viewer-wrap { position: relative; width: 100%; height: clamp(420px, 70vh, 820px); background: var(--dark2); border: 1px solid var(--dark4); border-left: 3px solid var(--orange); border-radius: 12px; overflow: hidden; margin-bottom: 2rem; }
+  .pdf-viewer-frame { width: 100%; height: 100%; border: 0; display: block; background: #525659; }
+  /* Overlay transparent au-dessus du PDF : bloque le clic-droit / sélection / menu de téléchargement du lecteur intégré du navigateur */
+  .pdf-viewer-shield { position: absolute; inset: 0; z-index: 2; background: transparent; cursor: default; }
+  .pdf-viewer-fallback { position: absolute; inset: 0; z-index: 3; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; text-align: center; padding: 1.5rem; color: var(--gray-light); font-size: 0.95rem; background: var(--dark2); }
+  .pdf-viewer-fallback .fv-icon { font-size: 2.4rem; }
+  .pdf-viewer-toolbar { position: absolute; top: 0.6rem; right: 0.6rem; z-index: 4; display: flex; gap: 0.4rem; }
+  .pdf-viewer-toolbar button { background: var(--dark3); border: 1px solid var(--dark4); color: var(--gray-light); font-family: var(--font-heading); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; padding: 0.4rem 0.7rem; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+  .pdf-viewer-toolbar button:hover { border-color: var(--orange); color: var(--orange); }
+  @media (max-width: 640px) { .pdf-viewer-wrap { height: 60vh; } }
 
   /* RÈGLEMENT */
   .article { background: var(--dark2); border: 1px solid var(--dark4); border-radius: 12px; padding: 1.75rem 2rem; margin-bottom: 1.25rem; transition: border-color 0.2s; }
@@ -2214,7 +2225,7 @@
         </div>
         <div class="other-action-card" style="grid-column:1/-1">
           <h4>⚡ Liste des malus</h4>
-          <p>Gérez la liste des malus utilisés lors de la planification des matchs. Si vous supprimez un malus, les matchs planifiés qui l'utilisaient seront automatiquement réassignés (un log apparaîtra dans la console de planification).</p>
+          <p>Gérez la liste des malus utilisés lors de la planification des matchs. Si vous supprimez un malus, les matchs planifiés qui l'utilisaient seront automatiquement réassignés (un log apparaîtra dans la console de planification). <strong>Max simultané</strong> : définissez une limite d'utilisation simultanée (ex: 1 si vous n'avez qu'un seul cache-œil). Les matchs dépassant la limite seront automatiquement réassignés vers d'autres malus.</p>
           <div id="malus-config-list" style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.8rem"></div>
           <button class="btn-sm btn-add" style="margin-top:0.7rem" onclick="addMalusItem()">+ Ajouter un malus</button>
           <button class="btn-sm btn-accept" style="margin-top:0.7rem;margin-left:0.5rem" onclick="saveMalusConfig()">Enregistrer</button>
@@ -2624,6 +2635,19 @@
       <label>Note (optionnelle)</label>
       <textarea id="sc-note" rows="2" placeholder="Contexte, remarques…"></textarea>
     </div>
+    <div class="form-group">
+      <label>Photos (optionnelles)</label>
+      <div class="photo-upload-zone" id="sc-photo-zone"
+           onclick="document.getElementById('sc-photo-input').click()"
+           ondragover="photoDragOver(event,'sc-photo-zone')"
+           ondragleave="photoDragLeave('sc-photo-zone')"
+           ondrop="photoDrop(event,'sc-photo')">
+        <input type="file" id="sc-photo-input" multiple accept="image/*" onchange="handlePhotoSelect(event,'sc-photo')">
+        <div class="photo-upload-label">Glissez des photos ici ou <span>cliquez pour s\u00e9lectionner</span></div>
+      </div>
+      <div class="photo-previews" id="sc-photo-previews"></div>
+      <div class="photo-upload-progress" id="sc-photo-progress"></div>
+    </div>
     <div id="sc-error" class="modal-error"></div>
     <div class="modal-actions">
       <button class="btn-modal-cancel" onclick="closeModal('score-modal')">Annuler</button>
@@ -2847,8 +2871,32 @@
     <h1 class="section-title">Char<span>te</span></h1>
     <p class="section-subtitle">Charte officielle du Choc des Renards</p>
     <div class="reglement-tools">
-      <div class="reglement-tools-text"><strong>Version PDF disponible</strong><br>Téléchargez la charte complète du Choc des Renards au format PDF.</div>
-      <a class="pdf-btn" href="reglement-choc-des-renards.pdf" target="_blank" rel="noopener">Télécharger le PDF</a>
+      <div class="reglement-tools-text"><strong>Lire la charte en ligne</strong><br>Consultez la charte complète du Choc des Renards directement dans la visionneuse ci-dessous (le téléchargement est désactivé).</div>
+      <button class="pdf-btn" type="button" onclick="openCharteFullscreen()">⛶ Plein écran</button>
+    </div>
+
+    <!-- Visionneuse PDF de la charte : le PDF est affiché en lecture seule.
+         L'overlay (shield) recouvre le lecteur pour bloquer clic-droit,
+         sélection et le bouton « Télécharger » de la barre d'outils du lecteur
+         intégré du navigateur. On force aussi le paramètre #toolbar=0 (Chrome)
+         et embed=true pour limiter l'affichage des contrôles. -->
+    <div class="pdf-viewer-wrap" id="charte-viewer-wrap">
+      <div class="pdf-viewer-toolbar">
+        <button type="button" onclick="openCharteFullscreen()" title="Plein écran">⛶</button>
+        <button type="button" onclick="reloadCharteViewer()" title="Recharger">↻</button>
+      </div>
+      <iframe class="pdf-viewer-frame" id="charte-viewer-frame"
+              src="reglement-choc-des-renards.pdf#toolbar=0&amp;navpanes=0&amp;view=FitH"
+              title="Charte du Choc des Renards" referrerpolicy="no-referrer"></iframe>
+      <div class="pdf-viewer-shield" id="charte-viewer-shield"
+           oncontextmenu="return false" ondragstart="return false"
+           oncopy="return false" oncut="return false"
+           title="Téléchargement désactivé"></div>
+      <div class="pdf-viewer-fallback" id="charte-viewer-fallback">
+        <div class="fv-icon">📄</div>
+        <div>Votre navigateur ne peut pas afficher le PDF dans la visionneuse.</div>
+        <div style="color:var(--gray);font-size:0.85rem">Vous pouvez consulter la charte ci-dessous (texte intégral) ou demander la version PDF à l'administrateur.</div>
+      </div>
     </div>
 
     <div class="article open" onclick="toggleArticle(this)">
@@ -3259,6 +3307,51 @@ function toggleArticle(el) {
   }
 }
 
+/* ── Visionneuse PDF de la charte ──
+   Le but est d'afficher le PDF en lecture seule et de limiter le téléchargement.
+   On ouvre le PDF dans une fenêtre plein écran sans barre d'outils (#toolbar=0),
+   et on intercepte les tentatives de clic-droit / raccourcis de sauvegarde. */
+const CHARTE_PDF = 'reglement-choc-des-renards.pdf'
+
+function openCharteFullscreen() {
+  // Ouvre le PDF plein écran avec la barre d'outils du lecteur désactivée
+  const w = window.open(CHARTE_PDF + '#toolbar=0&navpanes=0&view=FitH', '_blank', 'noopener,noreferrer')
+  if (!w) {
+    // Pop-up bloqué : on recharge la visionneuse intégrée
+    reloadCharteViewer()
+  }
+}
+
+function reloadCharteViewer() {
+  const frame = document.getElementById('charte-viewer-frame')
+  if (frame) {
+    // Force le rechargement en ajoutant un cache-buster (toolbar désactivée)
+    frame.src = CHARTE_PDF + '#toolbar=0&navpanes=0&view=FitH&t=' + Date.now()
+  }
+}
+
+// Détection de fallback : si l'iframe ne peut pas afficher le PDF
+// (certains navigateurs mobiles proposent directement le téléchargement),
+// on affiche un message d'information après un court délai.
+function initCharteViewerFallback() {
+  const frame = document.getElementById('charte-viewer-frame')
+  const fallback = document.getElementById('charte-viewer-fallback')
+  if (!frame || !fallback) return
+  // On ne peut pas détecter fiablement le contenu cross-origin d'une iframe,
+  // mais on peut au moins bloquer le clic-droit et les raccourcis de téléchargement.
+  frame.addEventListener('load', () => { fallback.style.display = 'none' })
+  frame.addEventListener('error', () => { fallback.style.display = 'flex' })
+}
+window.addEventListener('DOMContentLoaded', initCharteViewerFallback)
+// Bloque les raccourcis clavier de sauvegarde quand la visionneuse est visible
+document.addEventListener('keydown', (e) => {
+  const wrap = document.getElementById('charte-viewer-wrap')
+  if (!wrap || !wrap.offsetParent) return // visionneuse non visible
+  if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+    e.preventDefault(); e.stopPropagation()
+  }
+}, true)
+
 // Ferme tous les articles quand la page est affichée
 // (y compris après un retour navigateur avec le cache bfcache)
 window.addEventListener('pageshow', () => {
@@ -3302,6 +3395,32 @@ function initAuth() {
   localStorage.removeItem('cdr_token')
   localStorage.removeItem('cdr_user')
   showAuthOverlay()
+}
+
+// Vérification côté serveur de l'état de la session (forceLogout, bannissement).
+// Appelée après le rendu initial de l'app : si l'admin a déclenché une
+// déconnexion forcée, on déconnecte l'utilisateur ici (le token JWT reste
+// valide 30 jours, donc la déconnexion forcée DOIT être vérifiée serveur).
+async function verifySession() {
+  const token = localStorage.getItem('cdr_token')
+  if (!token) return
+  try {
+    const res = await fetch('/api/login?action=me', { headers: authHeaders() })
+    if (res.status === 401 || res.status === 403) {
+      const data = await res.json().catch(() => ({}))
+      // Déconnexion forcée ou compte désactivé : on purge la session locale
+      logout(data.forceLogout ? 'forced' : 'manual')
+      return
+    }
+    if (res.ok) {
+      const data = await res.json()
+      if (data.user) {
+        // Mettre à jour currentUser avec l'état serveur (active, etc.)
+        currentUser = data.user
+        localStorage.setItem('cdr_user', JSON.stringify(data.user))
+      }
+    }
+  } catch (e) { /* erreur réseau : on ne déconnecte pas (hors-ligne) */ }
 }
 
 function showApp() {
@@ -3698,6 +3817,9 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin() })
   document.getElementById('reg-confirm').addEventListener('keydown', e => { if (e.key === 'Enter') handleRegister() })
   initAuth()
+  // Vérifier l'état de la session côté serveur (forceLogout / bannissement)
+  // après le rendu initial, de façon non bloquante.
+  if (localStorage.getItem('cdr_token')) verifySession()
 })
 
 /* ══════════════ STATS ACCUEIL DYNAMIQUES ══════════════ */
@@ -4130,6 +4252,7 @@ function openScoreModal(conv) {
   document.getElementById('sc-sets').innerHTML = ''
   scSetCount = 0
   addScSetRow()
+  clearPendingPhotos('sc-photo')
   document.getElementById('score-modal').classList.add('open')
 }
 
@@ -4174,6 +4297,17 @@ async function submitScoreMatch() {
     })
     const data = await res.json()
     if (!res.ok) { errorEl.textContent = data.error || 'Erreur.'; return }
+    // Upload photos et association aux matchs créés (match1 = joueur, match2 = miroir)
+    const uploadedPhotos = await uploadPhotosToCloudinary('sc-photo')
+    if (uploadedPhotos.length > 0 && (data.match1 || data.match2)) {
+      await fetch('/api/public?resource=convocations', { method:'POST', headers: authHeaders(), body: JSON.stringify({
+        action: 'add_photos',
+        matchId: data.match1 ? data.match1.id : null,
+        mirrorMatchId: data.match2 ? data.match2.id : null,
+        photos: uploadedPhotos,
+      })})
+    }
+    clearPendingPhotos('sc-photo')
     closeModal('score-modal')
     await loadScoreMatch()
   } catch(e) { errorEl.textContent = 'Erreur réseau.' }
@@ -4196,6 +4330,7 @@ function resetInactivityTimer() {
   clearTimeout(inactivityTimer); clearTimeout(warnTimer); clearInterval(warnCountdown)
   document.getElementById('inactivity-toast').style.display = 'none'
   if (isInactivityExempt()) return // jamais déconnecté pour inactivité
+  persistLastActivity()
   warnTimer = setTimeout(() => {
     const toast = document.getElementById('inactivity-toast')
     const span = document.getElementById('inactivity-countdown')
@@ -4210,6 +4345,19 @@ function startInactivityTimer() {
   resetInactivityTimer()
   // Déconnexion auto sur mobile (page en arrière-plan)
   document.addEventListener('visibilitychange', handleMobileVisibility)
+  // pagehide est plus fiable que beforeunload sur iOS / mobile : il se déclenche
+  // quand l'onglet est réellement fermé ou swipé. On en profite pour enregistrer
+  // l'heure de dernière activité afin qu'au prochain chargement on puisse
+  // détecter une session expirée pendant l'absence.
+  window.addEventListener('pagehide', persistLastActivity)
+  document.addEventListener('visibilitychange', persistLastActivity)
+  // Heartbeat : prolonge la session côté serveur toutes les 5 min tant que
+  // l'utilisateur est actif. Sert aussi de filet de sécurité : si le heartbeat
+  // ne peut plus partir (réseau coupé, onglet tué), le cron serveur clôturera
+  // la session automatiquement.
+  startSessionHeartbeat()
+  // Au chargement, vérifier si la session a expiré pendant l'absence
+  checkStaleSessionOnLoad()
 }
 function stopInactivityTimer() {
   clearTimeout(inactivityTimer); clearTimeout(warnTimer); clearInterval(warnCountdown)
@@ -4217,11 +4365,60 @@ function stopInactivityTimer() {
   document.getElementById('inactivity-toast').style.display = 'none'
   ;['mousemove','keydown','click','scroll','touchstart'].forEach(e => document.removeEventListener(e, resetInactivityTimer))
   document.removeEventListener('visibilitychange', handleMobileVisibility)
+  window.removeEventListener('pagehide', persistLastActivity)
+  document.removeEventListener('visibilitychange', persistLastActivity)
+  stopSessionHeartbeat()
+}
+// Enregistre l'heure de dernière activité en localStorage (clé par utilisateur)
+function persistLastActivity() {
+  if (!currentUser) return
+  try { localStorage.setItem('cdr_last_activity', String(Date.now())) } catch {}
+}
+// Au chargement de l'app : si la dernière activité remonte à plus de 15 min,
+// la session a expiré pendant l'absence (onglet fermé sur mobile) → déconnecter.
+function checkStaleSessionOnLoad() {
+  if (isInactivityExempt()) return
+  try {
+    const last = parseInt(localStorage.getItem('cdr_last_activity') || '0', 10)
+    if (last && Date.now() - last >= INACTIVITY_MS) {
+      // Session expirée pendant l'absence : déconnecter et nettoyer
+      localStorage.removeItem('cdr_last_activity')
+      logout('inactivity')
+    } else if (last) {
+      // Mettre à jour le timer pour tenir compte du temps écoulé
+      resetInactivityTimer()
+    }
+  } catch {}
+}
+// Heartbeat de session : confirme au serveur que l'utilisateur est toujours
+// actif. S'appuie sur l'endpoint /api/login?action=me qui vérifie aussi le
+// forceLogout. Toutes les 5 min tant que la page est visible.
+let heartbeatTimer = null
+function startSessionHeartbeat() {
+  if (isInactivityExempt()) return
+  stopSessionHeartbeat()
+  const beat = async () => {
+    if (document.hidden) return // pas de heartbeat en arrière-plan
+    if (!localStorage.getItem('cdr_token')) return
+    persistLastActivity()
+    try {
+      const res = await fetch('/api/login?action=me', { headers: authHeaders() })
+      if (res.status === 401 || res.status === 403) {
+        const data = await res.json().catch(() => ({}))
+        logout(data.forceLogout ? 'forced' : 'inactivity')
+      }
+    } catch {}
+  }
+  heartbeatTimer = setInterval(beat, 5 * 60 * 1000)
+}
+function stopSessionHeartbeat() {
+  if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null }
 }
 function handleMobileVisibility() {
   if (isInactivityExempt()) return
   if (document.hidden) {
     mobileBgHiddenAt = Date.now()
+    persistLastActivity()
     mobileBgTimer = setTimeout(() => {
       // L'utilisateur n'est pas revenu après MOBILE_BG_TIMEOUT_MS → déconnecter dès le retour
       mobileBgHiddenAt = -1 // marquer comme expiré
@@ -4235,6 +4432,7 @@ function handleMobileVisibility() {
       logout('inactivity')
     } else {
       mobileBgHiddenAt = null
+      persistLastActivity()
       resetInactivityTimer() // réinitialiser le timer normal au retour
     }
   }
@@ -5401,12 +5599,16 @@ function renderHistory(events) {
   if (events.length === 0) { tbl.innerHTML = ''; document.getElementById('history-empty').style.display = 'block'; return }
   document.getElementById('history-empty').style.display = 'none'
   tbl.innerHTML = events.map(e => {
-    // Déconnexion : utiliser logoutReason pour savoir si inactivité ou manuelle
+    // Déconnexion : utiliser logoutReason pour savoir si inactivité, forcée ou manuelle
     let logoutDisplay = '—'
     if (e.logoutAt) {
       if (e.logoutReason === 'inactivity') {
         const adjusted = new Date(new Date(e.logoutAt).getTime() - 15 * 60 * 1000)
         logoutDisplay = `<span style="color:var(--gray)" title="Déconnexion par inactivité — heure réelle estimée">~${fmtDate(adjusted)} <small>(inactivité)</small></span>`
+      } else if (e.logoutReason === 'forced') {
+        logoutDisplay = `<span style="color:var(--orange)" title="Déconnexion forcée par l'administrateur">${fmtDate(e.logoutAt)} <small>(forcée)</small></span>`
+      } else if (e.logoutReason === 'page_closed') {
+        logoutDisplay = `<span style="color:var(--gray)" title="Onglet fermé / page quittée">${fmtDate(e.logoutAt)} <small>(onglet fermé)</small></span>`
       } else {
         logoutDisplay = `<span style="color:var(--gray-light)" title="Déconnexion manuelle">${fmtDate(e.logoutAt)}</span>`
       }
@@ -6914,14 +7116,30 @@ function replyToContact(userId, contactId, subject) {
 
   const notifyBtn = document.querySelector('[onclick*="notify"]')
   adminTab('notify', notifyBtn)
-  setTimeout(() => {
-    document.querySelectorAll('.notify-player-cb').forEach(cb => {
-      cb.checked = parseInt(cb.value) === userId
-    })
-    updateNotifyDropdownLabel()
-    document.getElementById('notify-title').value = `Réponse à ${subject}`
-    document.getElementById('notify-message').focus()
-  }, 150)
+  // On doit attendre que loadPlayersForNotify() (asynchrone, déclenchée par
+  // adminTab) ait peuplé allPlayersForNotify et rendu les checkboxes avant de
+  // pouvoir cocher le destinataire. Sinon aucune case n'est cochée et l'envoi
+  // échoue avec « Sélectionnez au moins un joueur ».
+  selectNotifyRecipient(userId, subject)
+}
+
+// Coche un unique destinataire dans le dropdown de notification, en attendant
+// que la liste des joueurs soit chargée si nécessaire.
+async function selectNotifyRecipient(userId, subject) {
+  // S'assurer que la liste des joueurs est chargée
+  if (allPlayersForNotify.length === 0) {
+    try { await loadPlayersForNotify() } catch(e) {}
+  }
+  // Petit délai pour laisser le DOM se mettre à jour après le rendu
+  await new Promise(r => setTimeout(r, 50))
+  document.querySelectorAll('.notify-player-cb').forEach(cb => {
+    cb.checked = parseInt(cb.value) === userId
+  })
+  updateNotifyDropdownLabel()
+  const titleEl = document.getElementById('notify-title')
+  if (titleEl) titleEl.value = `Réponse à ${subject}`
+  const msgEl = document.getElementById('notify-message')
+  if (msgEl) msgEl.focus()
 }
 
 /* ── Publication matchs ── */
@@ -7654,24 +7872,31 @@ function applyHiddenTabs() {
 }
 
 /* ── Gestion des malus ── */
-let _malusList = [] // [{text, enabled}]
+let _malusList = [] // [{text, enabled, maxConcurrent}]
 function renderMalusConfig() {
   const container = document.getElementById('malus-config-list')
   if (!container) return
   container.innerHTML = _malusList.map((m, i) => {
     const enabled = m.enabled !== false
+    const mc = m.maxConcurrent || ''
     return `
-    <div style="display:flex;gap:0.5rem;align-items:center;opacity:${enabled ? '1' : '0.5'}">
+    <div style="display:flex;gap:0.5rem;align-items:center;opacity:${enabled ? '1' : '0.5'};flex-wrap:wrap">
       <input type="text" value="${esc(m.text)}" data-malus-idx="${i}"
-        style="flex:1;background:var(--dark2);border:1px solid ${enabled ? 'var(--dark4)' : '#555'};border-radius:6px;color:${enabled ? 'var(--white)' : 'var(--gray)'};padding:0.4rem 0.75rem;font-family:var(--font-body);font-size:0.88rem;text-decoration:${enabled ? 'none' : 'line-through'}"
+        style="flex:1;min-width:200px;background:var(--dark2);border:1px solid ${enabled ? 'var(--dark4)' : '#555'};border-radius:6px;color:${enabled ? 'var(--white)' : 'var(--gray)'};padding:0.4rem 0.75rem;font-family:var(--font-body);font-size:0.88rem;text-decoration:${enabled ? 'none' : 'line-through'}"
         oninput="_malusList[${i}].text=this.value">
+      <div style="display:flex;align-items:center;gap:0.3rem;min-width:150px" title="Nombre maximum d'utilisation simultanée de ce malus (vide = illimité)">
+        <label style="font-size:0.75rem;color:var(--gray);white-space:nowrap">Max simultané:</label>
+        <input type="number" value="${mc}" min="1" max="99" placeholder="∞" data-malus-idx="${i}"
+          style="width:55px;background:var(--dark2);border:1px solid var(--dark4);border-radius:6px;color:var(--white);padding:0.3rem 0.4rem;font-family:var(--font-body);font-size:0.82rem;text-align:center"
+          oninput="_malusList[${i}].maxConcurrent=this.value ? parseInt(this.value,10) : null">
+      </div>
       <button class="btn-sm ${enabled ? 'btn-edit' : 'btn-add'}" onclick="toggleMalusItem(${i})" title="${enabled ? 'Désactiver ce malus' : 'Réactiver ce malus'}" style="min-width:90px">${enabled ? '⏸ Désactiver' : '▶ Réactiver'}</button>
       <button class="btn-sm btn-danger" onclick="removeMalusItem(${i})" title="Supprimer définitivement ce malus">✕</button>
     </div>`
   }).join('')
 }
 function addMalusItem() {
-  _malusList.push({ text: '', enabled: true })
+  _malusList.push({ text: '', enabled: true, maxConcurrent: null })
   renderMalusConfig()
   const inputs = document.querySelectorAll('#malus-config-list input[type=text]')
   if (inputs.length) inputs[inputs.length - 1].focus()
@@ -7691,11 +7916,18 @@ async function saveMalusConfig() {
     const idx = parseInt(inp.dataset.malusIdx, 10)
     if (!isNaN(idx) && _malusList[idx]) _malusList[idx].text = inp.value.trim()
   })
+  // Relire aussi les valeurs maxConcurrent
+  const mcInputs = document.querySelectorAll('#malus-config-list input[type=number]')
+  mcInputs.forEach(inp => {
+    const idx = parseInt(inp.dataset.malusIdx, 10)
+    if (!isNaN(idx) && _malusList[idx]) _malusList[idx].maxConcurrent = inp.value ? parseInt(inp.value, 10) : null
+  })
   const malusList = _malusList.filter(m => m.text.length > 0)
   const activeCount = malusList.filter(m => m.enabled !== false).length
   if (malusList.length === 0) return alert('La liste de malus ne peut pas être vide.')
   if (activeCount === 0) return alert('Au moins un malus doit être actif.')
-  if (!confirm(`Enregistrer la liste de malus (${malusList.length} entrée(s), dont ${activeCount} actif(s)) ?`)) return
+  const limitedCount = malusList.filter(m => m.maxConcurrent && m.maxConcurrent > 0).length
+  if (!confirm(`Enregistrer la liste de malus (${malusList.length} entrée(s), dont ${activeCount} actif(s)${limitedCount > 0 ? `, ${limitedCount} avec limite d'utilisation simultanée` : ''}) ?`)) return
   try {
     const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'update_malus_config', malusList }) })
     const data = await res.json()
@@ -7709,7 +7941,7 @@ async function resetMalusConfig() {
     const res = await fetch('/api/admin/match', { headers: authHeaders() })
     if (!res.ok) return
     const data = await res.json()
-    const defaultList = (data.defaultMalusList || []).map(t => ({ text: t, enabled: true }))
+    const defaultList = (data.defaultMalusList || []).map(t => ({ text: t, enabled: true, maxConcurrent: null }))
     const saveRes = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'update_malus_config', malusList: defaultList }) })
     const saveData = await saveRes.json()
     if (saveRes.ok) {

@@ -36,9 +36,60 @@ async function logLogin(userId, req, success, message) {
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS, GET')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
   if (req.method === 'OPTIONS') return res.status(200).end()
+
+  // ── GET /api/login?action=me — vérifier l'état de la session en cours ──────
+  // Permet de détecter un forceLogout déclenché par l'admin pendant que
+  // l'utilisateur est déjà connecté (le token JWT reste valide 30 jours,
+  // donc la déconnexion forcée doit être vérifiée côté serveur à chaque
+  // chargement de l'app).
+  if (req.method === 'GET' && req.query?.action === 'me') {
+    const authHeader = req.headers['authorization'] || ''
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
+    if (!token) return res.status(401).json({ error: 'Non authentifié.' })
+    let payload
+    try {
+      payload = jwt.verify(token, process.env.JWT_SECRET)
+    } catch {
+      return res.status(401).json({ error: 'Session expirée ou invalide.' })
+    }
+    try {
+      const user = await prisma.user.findUnique({ where: { id: payload.userId } })
+      if (!user) return res.status(401).json({ error: 'Compte introuvable.', forceLogout: true })
+      const isAdmin = ['admin', 'root'].includes(user.username.toLowerCase()) || user.role === 'ADMIN'
+      // L'admin n'est jamais soumis au forceLogout (sinon il se déconnecterait lui-même)
+      if (!isAdmin && user.forceLogout) {
+        // Réinitialiser le flag pour ne pas bloquer la prochaine connexion
+        await prisma.user.update({ where: { id: user.id }, data: { forceLogout: false } })
+        // Clôturer l'événement de connexion en cours
+        try {
+          await prisma.loginEvent.updateMany({
+            where: { userId: user.id, logoutAt: null },
+            data: { logoutAt: new Date(), logoutReason: 'forced' },
+          })
+        } catch {}
+        return res.status(401).json({ error: "Déconnexion forcée par l'administrateur.", forceLogout: true })
+      }
+      // Renvoyer l'état à jour (au cas où l'utilisateur a été banni/désactivé)
+      if (user.banned || (!isAdmin && !user.accepted)) {
+        return res.status(403).json({ error: 'Compte désactivé.', forceLogout: true })
+      }
+      return res.status(200).json({
+        ok: true,
+        user: {
+          id: user.id, username: user.username,
+          firstName: user.firstName, lastName: user.lastName,
+          role: isAdmin ? 'ADMIN' : user.role,
+          category: user.category, active: user.active,
+        },
+      })
+    } catch (err) {
+      console.error('[login me]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
 
   // ── POST /api/login?action=resume — annuler un faux logout "page_closed" ────
   // (déclenché par un rafraîchissement de page : la session est en fait restée active)
@@ -65,7 +116,7 @@ module.exports = async function handler(req, res) {
       try {
         const eid = parseInt(loginEventId, 10)
         if (!isNaN(eid)) {
-          const validReasons = ['manual', 'inactivity', 'page_closed']
+          const validReasons = ['manual', 'inactivity', 'page_closed', 'forced']
           await prisma.loginEvent.update({
             where: { id: eid },
             data: {

@@ -156,6 +156,7 @@ module.exports = async function handler(req, res) {
         accepted: true,
         banned: false,
         active: true,
+        isBot: false,
         username: { notIn: ADMIN_USERNAMES },
       },
       orderBy: { createdAt: 'asc' },
