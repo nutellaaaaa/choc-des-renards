@@ -149,6 +149,11 @@ async function enforceMalusConcurrency(malusConfig) {
             message: `Limite de concurrence atteinte pour le malus « ${malus.text} » (${malus.maxConcurrent} max) — impossible de réassigner le match #${pm.id} (${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}) : aucun malus de remplacement disponible.`,
           },
         })
+        await createAdminAlert(
+          'malus_reassign_failed',
+          `Limite atteinte pour le malus « ${malus.text} » (${malus.maxConcurrent} max) — impossible de réassigner le match #${pm.id} (${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}) : aucun malus de remplacement disponible.`,
+          { plannedMatchId: pm.id, malus: malus.text }
+        )
       }
       continue
     }
@@ -173,6 +178,11 @@ async function enforceMalusConcurrency(malusConfig) {
           message: `Malus réassigné pour le match #${pm.id} (${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}) : limite d'utilisation simultanée du malus « ${malus.text} » atteinte (${malus.maxConcurrent} max). Nouveau malus attribué : « ${newMalus} ».`,
         },
       })
+      await createAdminAlert(
+        'malus_reassigned',
+        `Malus réassigné pour le match #${pm.id} (${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}) : limite « ${malus.text} » (${malus.maxConcurrent} max) atteinte. Nouveau malus : « ${newMalus} ».`,
+        { plannedMatchId: pm.id, oldMalus: malus.text, newMalus }
+      )
       reassigned++
     }
   }
@@ -255,6 +265,19 @@ function capName(str) {
   return str.toString().trim().split(/(\s|-)/).map(part =>
     /^[\s-]$/.test(part) ? part : (part.charAt(0).toLocaleUpperCase('fr-FR') + part.slice(1).toLocaleLowerCase('fr-FR'))
   ).join('')
+}
+
+// Garde-fou serveur : les sets se jouent en 11 points secs (charte, article 3),
+// donc un score de set ne doit jamais dépasser 11. Retourne un message
+// d'erreur si un set est invalide, ou null si tout est correct.
+function validateSetScores(sets) {
+  for (const s of sets) {
+    const ps = Number(s.playerScore), os = Number(s.opponentScore)
+    if (!Number.isFinite(ps) || !Number.isFinite(os) || ps < 0 || os < 0 || ps > 11 || os > 11) {
+      return 'Chaque score de set doit être compris entre 0 et 11 points.'
+    }
+  }
+  return null
 }
 
 function computeStats(matches) {
@@ -1147,7 +1170,7 @@ async function handlePoules(req, res) {
           },
         }),
         prisma.user.findMany({
-          where: { accepted: true, banned: false, active: true, username: { notIn: ADMIN_USERNAMES } },
+          where: { accepted: true, banned: false, active: true, isBot: false, username: { notIn: ADMIN_USERNAMES } },
           select: { id: true, firstName: true, lastName: true, username: true, category: true },
           orderBy: { lastName: 'asc' },
         }),
@@ -1253,7 +1276,7 @@ async function handlePoules(req, res) {
       const allAssigned = await prisma.pouleMember.findMany({ select: { userId: true } })
       const assignedIds = new Set(allAssigned.map(m => m.userId))
       const eligible = await prisma.user.findMany({
-        where: { accepted: true, banned: false, active: true, username: { notIn: ADMIN_USERNAMES } },
+        where: { accepted: true, banned: false, active: true, isBot: false, username: { notIn: ADMIN_USERNAMES } },
         select: { id: true },
       })
       const pool = eligible.filter(u => !assignedIds.has(u.id))
@@ -1364,6 +1387,7 @@ async function handleAction(req, res) {
       }
 
       const users = await prisma.user.findMany({
+        where: { isBot: false },
         orderBy: { createdAt: 'desc' },
         select: {
           id: true, username: true, firstName: true, lastName: true,
@@ -1486,7 +1510,7 @@ async function handleAction(req, res) {
           logs.push({ ok: true, message: `── Total récupéré sur MYFFBAD : ${scraped.length} joueur(s). ──` })
 
           const users = await prisma.user.findMany({
-            where: { username: { notIn: ADMIN_USERNAMES } },
+            where: { username: { notIn: ADMIN_USERNAMES }, isBot: false },
             select: { id: true, firstName: true, lastName: true, category: true, username: true },
           })
 
@@ -1640,14 +1664,16 @@ async function handleAction(req, res) {
         }
 
         case 'update_hidden_tabs': {
-          const { hiddenTabs } = req.body || {}
+          const { hiddenTabs, tabOrder } = req.body || {}
           if (!Array.isArray(hiddenTabs)) return res.status(400).json({ error: 'hiddenTabs (array) requis.' })
+          const data = { hiddenTabs: JSON.stringify(hiddenTabs) }
+          if (Array.isArray(tabOrder)) data.tabOrder = JSON.stringify(tabOrder)
           await prisma.tournamentState.upsert({
             where: { id: 1 },
-            update: { hiddenTabs: JSON.stringify(hiddenTabs) },
-            create: { id: 1, currentPhase: 'PHASE0', hiddenTabs: JSON.stringify(hiddenTabs) },
+            update: data,
+            create: { id: 1, currentPhase: 'PHASE0', ...data },
           })
-          return res.status(200).json({ ok: true, hiddenTabs, message: 'Onglets mis à jour.' })
+          return res.status(200).json({ ok: true, hiddenTabs, tabOrder: tabOrder || [], message: 'Onglets mis à jour.' })
         }
 
         case 'update_malus_config': {
@@ -2016,7 +2042,7 @@ async function handleMatch(req, res) {
           },
         }),
         prisma.user.findMany({
-          where: { accepted: true, banned: false, active: true, username: { notIn: ADMIN_USERNAMES } },
+          where: { accepted: true, banned: false, active: true, isBot: false, username: { notIn: ADMIN_USERNAMES } },
           select: { id: true, firstName: true, lastName: true, username: true, category: true },
           orderBy: { lastName: 'asc' },
         }),
@@ -2067,6 +2093,7 @@ async function handleMatch(req, res) {
         defaultMalusList: DEFAULT_MALUS_LIST,
         autoRemindersEnabled: state?.autoRemindersEnabled ?? true,
         hiddenTabs: JSON.parse(state?.hiddenTabs || '[]'),
+        tabOrder: JSON.parse(state?.tabOrder || '[]'),
       })
     } catch (err) {
       console.error('[admin/match GET]', err)
@@ -2118,6 +2145,7 @@ async function handleMatch(req, res) {
     if (isNaN(mid)) return res.status(400).json({ error: 'matchId invalide.' })
     if (!sets || !Array.isArray(sets) || sets.length === 0 || sets.length > 5)
       return res.status(400).json({ error: 'Entre 1 et 5 sets requis.' })
+    { const setsErr = validateSetScores(sets); if (setsErr) return res.status(400).json({ error: setsErr }) }
     try {
       await prisma.matchSet.deleteMany({ where: { matchId: mid } })
       const updated = await prisma.match.update({
@@ -2153,7 +2181,7 @@ async function handleMatch(req, res) {
       }
 
       const users = await prisma.user.findMany({
-        where: { accepted: true, banned: false, active: true, username: { notIn: ADMIN_USERNAMES } },
+        where: { accepted: true, banned: false, active: true, isBot: false, username: { notIn: ADMIN_USERNAMES } },
         select: {
           id: true, username: true, firstName: true, lastName: true, category: true, createdAt: true,
           matches: { where: { published: true }, include: { sets: true } },
@@ -2219,6 +2247,7 @@ async function handleMatch(req, res) {
 
     if (!Array.isArray(sets) || sets.length === 0 || sets.length > 5)
       return res.status(400).json({ error: 'Entre 1 et 5 sets requis.' })
+    { const setsErr = validateSetScores(sets); if (setsErr) return res.status(400).json({ error: setsErr }) }
 
     const uid = parseInt(userId, 10)
     if (isNaN(uid)) return res.status(400).json({ error: 'userId invalide.' })
@@ -2318,6 +2347,7 @@ async function handleMatch(req, res) {
     if (!matchDate) return res.status(400).json({ error: 'Date du match requise.' })
     if (!Array.isArray(sets) || sets.length === 0 || sets.length > 5)
       return res.status(400).json({ error: 'Entre 1 et 5 sets requis.' })
+    { const setsErr = validateSetScores(sets); if (setsErr) return res.status(400).json({ error: setsErr }) }
 
     try {
       const sm = await prisma.specialMatch.findUnique({ where: { id: smid } })
@@ -2595,6 +2625,7 @@ async function handleMatch(req, res) {
     if (!matchDate) return res.status(400).json({ error: 'Date du match requise.' })
     if (!Array.isArray(sets) || sets.length === 0 || sets.length > 5)
       return res.status(400).json({ error: 'Entre 1 et 5 sets requis.' })
+    { const setsErr = validateSetScores(sets); if (setsErr) return res.status(400).json({ error: setsErr }) }
 
     try {
       const pm = await prisma.plannedMatch.findUnique({
@@ -4541,7 +4572,7 @@ async function handleMedals(req, res) {
       const animJson = normalizeAnimations(animations)
       // Récupérer tous les utilisateurs acceptés et non bannis (hors admin/root)
       const users = await prisma.user.findMany({
-        where: { accepted: true, banned: false, NOT: { username: { in: ['admin', 'root'] } } },
+        where: { accepted: true, banned: false, isBot: false, NOT: { username: { in: ['admin', 'root'] } } },
         select: { username: true },
       })
       const activeUsers = users.filter(u => u.username && !['admin', 'root'].includes(u.username.toLowerCase()))

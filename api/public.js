@@ -396,6 +396,9 @@ async function handleConvocations(req, res) {
     if (typeof s.setNumber !== 'number' || typeof s.playerScore !== 'number' || typeof s.opponentScore !== 'number') {
       return res.status(400).json({ error: 'Scores de sets invalides.' })
     }
+    if (s.playerScore < 0 || s.opponentScore < 0 || s.playerScore > 11 || s.opponentScore > 11) {
+      return res.status(400).json({ error: 'Chaque score de set doit être compris entre 0 et 11 points.' })
+    }
   }
 
   try {

@@ -288,6 +288,8 @@ module.exports = async function handler(req, res) {
     // pour que le client puisse masquer les onglets et bloquer l'acces aux pages.
     let hiddenTabsArr = []
     try { hiddenTabsArr = JSON.parse(state.hiddenTabs || '[]') } catch {}
+    let tabOrderArr = []
+    try { tabOrderArr = JSON.parse(state.tabOrder || '[]') } catch {}
 
     const response = {
       phase: state.currentPhase,
@@ -297,6 +299,7 @@ module.exports = async function handler(req, res) {
       phase2Groups,
       rankingFrozen: !!state.rankingSnapshot,
       hiddenTabs: hiddenTabsArr,
+      tabOrder: tabOrderArr,
     }
     if (isAdmin) response.fromSnapshot = !!state.rankingSnapshot
 

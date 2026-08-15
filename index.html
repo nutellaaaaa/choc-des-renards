@@ -183,8 +183,6 @@
   /* Visionneuse PDF de la charte — empêche le téléchargement facile */
   .pdf-viewer-wrap { position: relative; width: 100%; height: clamp(420px, 70vh, 820px); background: var(--dark2); border: 1px solid var(--dark4); border-left: 3px solid var(--orange); border-radius: 12px; overflow: hidden; margin-bottom: 2rem; }
   .pdf-viewer-frame { width: 100%; height: 100%; border: 0; display: block; background: #525659; }
-  /* Overlay transparent au-dessus du PDF : bloque le clic-droit / sélection / menu de téléchargement du lecteur intégré du navigateur */
-  .pdf-viewer-shield { position: absolute; inset: 0; z-index: 2; background: transparent; cursor: default; }
   .pdf-viewer-fallback { position: absolute; inset: 0; z-index: 3; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; text-align: center; padding: 1.5rem; color: var(--gray-light); font-size: 0.95rem; background: var(--dark2); }
   .pdf-viewer-fallback .fv-icon { font-size: 2.4rem; }
   .pdf-viewer-toolbar { position: absolute; top: 0.6rem; right: 0.6rem; z-index: 4; display: flex; gap: 0.4rem; }
@@ -2092,10 +2090,7 @@
         <input type="checkbox" id="reg-rgpd">
         <label for="reg-rgpd">Je consens à ce que mes données soient collectées et utilisées pour l'organisation du Choc Des Renards (promis, pas de fouille sauvage). Pour plus d'informations, nous vous encourageons à vous renseigner sur <a href="#" onclick="showPrivacyPage(); return false;">Vos données et vos droits</a>.</label>
       </div>
-      <div class="checkbox-group">
-        <input type="checkbox" id="reg-ack">
-        <label for="reg-ack"><strong>J'ai bien pris connaissance de toutes les informations</strong> relatives à mon inscription au Choc des Renards, notamment le règlement, le format des matchs, les bonus &amp; malus, et les conditions de participation.</label>
-      </div>
+      
       <div id="reg-error" class="auth-error"></div>
       <button class="auth-submit" id="reg-btn" onclick="handleRegister()">Créer mon compte</button>
     </div>
@@ -2127,9 +2122,7 @@
 <div id="intro-overlay" class="intro-overlay hidden">
 
   <!-- Étape 1 : clic pour démarrer (déclenche aussi l'autorisation du son) -->
-  <div id="intro-gate" class="intro-stage intro-click-gate" onclick="introStartVideo(event)">
-    <div class="intro-click-label">Cliquez pour commencer</div>
-  </div>
+  <div id="intro-gate" class="intro-stage intro-click-gate"></div>
 
   <!-- Étape 2 : animation volant -->
   <div id="intro-anim-wrap" class="intro-stage intro-anim-wrap">
@@ -2191,10 +2184,7 @@
   <div id="intro-welcome" class="intro-stage intro-welcome">
     <div class="intro-welcome-sub">Choc des Renards</div>
     <div class="intro-welcome-title">Bienvenue <em id="intro-welcome-name"></em></div>
-    <button class="btn-continue-fancy" onclick="introFinish()">Continuer</button>
   </div>
-
-  <button id="intro-skip" class="intro-skip" onclick="introSkip()">Passer l'intro</button>
 </div>
 
 <!-- TOAST INACTIVITÉ -->
@@ -2749,8 +2739,11 @@
         </div>
         <div class="other-action-card" style="grid-column:1/-1">
           <h4>⚡ Liste des malus</h4>
-          <p>Gérez la liste des malus utilisés lors de la planification des matchs. Si vous supprimez un malus, les matchs planifiés qui l'utilisaient seront automatiquement réassignés (un log apparaîtra dans la console de planification).</p>
-          <div id="malus-config-list" style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.8rem"></div>
+          <p>Gérez la liste des malus utilisés lors de la planification des matchs. Vous pouvez aussi fixer, pour chaque malus, un nombre maximum d'utilisations simultanées (matchs à venir en même temps) : au-delà, le surplus est automatiquement réassigné à un autre malus disponible. Si vous supprimez un malus ou que sa limite est dépassée, les matchs planifiés concernés sont réassignés automatiquement (un log apparaît dans la console de planification, et une alerte dans l'onglet Alertes).</p>
+          <div style="display:flex;gap:0.5rem;align-items:center;margin-top:0.9rem;font-size:0.76rem;color:var(--gray);font-family:var(--font-heading);letter-spacing:0.06em;text-transform:uppercase">
+            <span style="flex:1">Malus</span><span style="width:70px;text-align:center">Max simult.</span><span style="min-width:196px"></span>
+          </div>
+          <div id="malus-config-list" style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.4rem"></div>
           <button class="btn-sm btn-add" style="margin-top:0.7rem" onclick="addMalusItem()">+ Ajouter un malus</button>
           <button class="btn-sm btn-accept" style="margin-top:0.7rem;margin-left:0.5rem" onclick="saveMalusConfig()">Enregistrer</button>
           <button class="btn-sm btn-edit" style="margin-top:0.7rem;margin-left:0.5rem" onclick="resetMalusConfig()">Réinitialiser par défaut</button>
@@ -2935,6 +2928,8 @@
         <button class="btn-sm btn-edit alert-filter-btn" data-filter="score_missing" onclick="filterAlerts('score_missing',this)">⏱ Score oublié</button>
         <button class="btn-sm btn-edit alert-filter-btn" data-filter="login_failed_admin" onclick="filterAlerts('login_failed_admin',this)">🔐 Connexion échouée</button>
         <button class="btn-sm btn-edit alert-filter-btn" data-filter="duplicate_username" onclick="filterAlerts('duplicate_username',this)">👤 Pseudo dupliqué</button>
+        <button class="btn-sm btn-edit alert-filter-btn" data-filter="malus_reassigned" onclick="filterAlerts('malus_reassigned',this)">⚡ Malus réassigné</button>
+        <button class="btn-sm btn-edit alert-filter-btn" data-filter="malus_reassign_failed" onclick="filterAlerts('malus_reassign_failed',this)">⚠️ Réassignation échouée</button>
       </div>
       <div id="alerts-list"></div>
       <div id="alerts-empty" class="admin-empty" style="display:none">Aucune alerte pour l'instant.</div>
@@ -3429,7 +3424,7 @@
     <span class="nav-logo-label">Le Choc des <em>Renards</em></span>
   </a>
   <div class="nav-user-info" id="nav-user">
-    <span class="nav-user-greeting">Salut, <strong id="nav-user-name"></strong> <span id="nav-user-badge" class="player-level"></span></span>
+    <span class="nav-user-greeting">Salut, <strong id="nav-user-name"></strong> </span>
     <button class="nav-switch-btn" id="nav-switch-btn" onclick="switchAccount()" style="display:none"></button>
     <button class="nav-logout-btn" onclick="logout()">Déconnexion</button>
   </div>
@@ -3504,7 +3499,7 @@
   <div class="hero">
     <img class="hero-logo" src="bondy-badminton-club.png" alt="Logo Bondy Badminton Club">
     <p class="hero-tagline" id="hero-tagline">Saison — —</p>
-    <p class="hero-desc">Le tournoi interne au club de Bondy, de Septembre à Juin. </p>
+    <p class="hero-desc">Le Choc Des Renards (CDR) - Le tournoi interne au club de Bondy, de Septembre à Juin. </p>
     <div class="hero-stats">
       <div class="stat-card"><div class="stat-num" id="stat-joueurs">–</div><div class="stat-label">Joueurs actifs</div></div>
       <div class="stat-card"><div class="stat-num" id="stat-poules">–</div><div class="stat-label">Poules</div></div>
@@ -3520,26 +3515,20 @@
     <p class="section-subtitle">Charte officielle du Choc des Renards</p>
     <div class="reglement-tools">
       <div class="reglement-tools-text"><strong>Lire la charte en ligne</strong><br>Consultez la charte complète du Choc des Renards directement dans la visionneuse ci-dessous (le téléchargement est désactivé).</div>
-      <button class="pdf-btn" type="button" onclick="openCharteFullscreen()">⛶ Plein écran</button>
     </div>
 
-    <!-- Visionneuse PDF de la charte : le PDF est affiché en lecture seule.
-         L'overlay (shield) recouvre le lecteur pour bloquer clic-droit,
-         sélection et le bouton « Télécharger » de la barre d'outils du lecteur
-         intégré du navigateur. On force aussi le paramètre #toolbar=0 (Chrome)
-         et embed=true pour limiter l'affichage des contrôles. -->
+    <!-- Visionneuse PDF de la charte : le PDF est affiché en lecture seule,
+         avec la scrollbar native du lecteur intégré du navigateur (pas de
+         shield par-dessus, pour ne pas bloquer le défilement). On force le
+         paramètre #toolbar=0 (Chrome) pour limiter l'affichage des contrôles
+         (dont le bouton de téléchargement de la barre d'outils). -->
     <div class="pdf-viewer-wrap" id="charte-viewer-wrap">
       <div class="pdf-viewer-toolbar">
-        <button type="button" onclick="openCharteFullscreen()" title="Plein écran">⛶</button>
         <button type="button" onclick="reloadCharteViewer()" title="Recharger">↻</button>
       </div>
       <iframe class="pdf-viewer-frame" id="charte-viewer-frame"
               src="reglement-choc-des-renards.pdf#toolbar=0&navpanes=0&view=FitH"
               title="Charte du Choc des Renards" referrerpolicy="no-referrer"></iframe>
-      <div class="pdf-viewer-shield" id="charte-viewer-shield"
-           oncontextmenu="return false" ondragstart="return false"
-           oncopy="return false" oncut="return false"
-           title="Téléchargement désactivé"></div>
       <div class="pdf-viewer-fallback" id="charte-viewer-fallback">
         <div class="fv-icon">📄</div>
         <div>Votre navigateur ne peut pas afficher le PDF dans la visionneuse.</div>
@@ -3548,7 +3537,7 @@
     </div>
 
     <div class="article open" onclick="toggleArticle(this)">
-      <div class="article-header"><div class="article-num">01</div><div class="article-title">Participation</div><div class="article-chevron">▾</div></div>
+      <div class="article-header"><div class="article-num">1</div><div class="article-title">Participation</div><div class="article-chevron">▾</div></div>
       <div class="article-body">
         <p>Tout adhérent·e au club de Bondy est libre de s'inscrire gratuitement au Choc des Renards auprès de Yanis.</p>
         <p>Chaque joueur participant au choc est réputé accepter les termes de cette charte.</p>
@@ -3556,7 +3545,7 @@
     </div>
 
     <div class="article" onclick="toggleArticle(this)">
-      <div class="article-header"><div class="article-num">02</div><div class="article-title">Déroulement</div><div class="article-chevron">▾</div></div>
+      <div class="article-header"><div class="article-num">2</div><div class="article-title">Déroulement</div><div class="article-chevron">▾</div></div>
       <div class="article-body">
         <p>Le Choc des Renards s'organise en deux phases :</p>
         <ul>
@@ -3567,7 +3556,7 @@
     </div>
 
     <div class="article" onclick="toggleArticle(this)">
-      <div class="article-header"><div class="article-num">03</div><div class="article-title">Format des affrontements</div><div class="article-chevron">▾</div></div>
+      <div class="article-header"><div class="article-num">3</div><div class="article-title">Format des affrontements</div><div class="article-chevron">▾</div></div>
       <div class="article-body">
         <ul>
           <li><span>Les joueurs reçoivent par message le numéro de téléphone et le nom de leur adversaire <strong>un dimanche</strong>.</span></li>
@@ -3580,7 +3569,7 @@
     </div>
 
     <div class="article" onclick="toggleArticle(this)">
-      <div class="article-header"><div class="article-num">04</div><div class="article-title">Bonus &amp; Malus</div><div class="article-chevron">▾</div></div>
+      <div class="article-header"><div class="article-num">4</div><div class="article-title">Bonus &amp; Malus</div><div class="article-chevron">▾</div></div>
       <div class="article-body">
         <p>Afin d'équilibrer certains affrontements, des <strong>désavantages</strong> seront attribués au joueur le mieux classé dans les cas suivants : <strong>P contre R</strong>, <strong>P contre N</strong> ou <strong>D contre N</strong>.</p>
         <p>Le malus est tiré au sort parmi la liste suivante :</p>
@@ -3606,7 +3595,7 @@
     </div>
 
     <div class="article" onclick="toggleArticle(this)">
-      <div class="article-header"><div class="article-num">05</div><div class="article-title">Exemptions</div><div class="article-chevron">▾</div></div>
+      <div class="article-header"><div class="article-num">5</div><div class="article-title">Exemptions</div><div class="article-chevron">▾</div></div>
       <div class="article-body">
         <p>Dans des cas rares (voyage, blessure, maladie, décès…), un affrontement peut être annulé. L'organisation sera très reconnaissante d'être prévenue le plus tôt possible.</p>
         <p><strong>Aucun affrontement</strong> ne sera réalisé durant les <strong>vacances scolaires</strong>.</p>
@@ -4032,13 +4021,8 @@ window.addEventListener('pagehide', () => {
   document.querySelectorAll('.article.open').forEach(closeArticle);
 });
 
-/* ===== PDF VIEWER (Charte) - blocks download, blocks scroll-leak ===== */
+/* ===== PDF VIEWER (Charte) - blocks download, plein écran retiré (défilement natif conservé) ===== */
 const CHARTE_PDF = 'reglement-choc-des-renards.pdf'
-
-function openCharteFullscreen() {
-  const w = window.open(CHARTE_PDF + '#toolbar=0&navpanes=0&view=FitH', '_blank', 'noopener,noreferrer')
-  if (!w) { reloadCharteViewer() }
-}
 
 function reloadCharteViewer() {
   const frame = document.getElementById('charte-viewer-frame')
@@ -4292,9 +4276,8 @@ async function handleLogin() {
     if (data.loginEventId) localStorage.setItem('cdr_login_event_id', data.loginEventId)
     currentUser = data.user; pendingNotifications = data.pendingNotifications || []
     showApp()
-    // Intro cinématique réservée aux joueurs (jamais aux admins), uniquement
-    // sur une connexion explicite — pas au rafraîchissement de session.
-    if (currentUser.role !== 'ADMIN') playLoginIntro()
+    // Intro cinématique désactivée (ses 3 boutons ont été retirés) : on ne
+    // déclenche plus jamais cet overlay, le joueur arrive directement sur le site.
   } catch { errorEl.textContent = 'Erreur réseau. Réessayez.' }
   finally { btn.disabled = false; btn.textContent = 'Se connecter' }
 }
@@ -4933,9 +4916,9 @@ function addScSetRow() {
   const row = document.createElement('div')
   row.className = 'set-row'; row.id = 'sc-set-row-' + num
   row.innerHTML = `<label>Set ${num}</label>
-    <input type="number" id="sc-set-p-${num}" min="0" max="99" value="0">
+    <input type="number" id="sc-set-p-${num}" min="0" max="11" value="0">
     <span class="set-sep">–</span>
-    <input type="number" id="sc-set-o-${num}" min="0" max="99" value="0">
+    <input type="number" id="sc-set-o-${num}" min="0" max="11" value="0">
     <button class="btn-remove-set" onclick="removeScSetRow(${num})">✕</button>`
   document.getElementById('sc-sets').appendChild(row)
 }
@@ -5200,17 +5183,18 @@ function bindPlayerRows() {
 }
 
 function renderRankingTable(sorted) {
-  let html = `<table><thead><tr><th>#</th><th>Pseudo</th><th>Cat.</th><th>J</th><th>V</th><th>D</th><th>Sets</th><th>Pts</th></tr></thead><tbody>`
+  let html = `<table><thead><tr><th>#</th><th>Pseudo</th><th>Cat.</th><th>Matches</th><th>Sets</th><th>Points</th></tr></thead><tbody>`
   sorted.forEach((p, i) => {
     const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : ''
     const winnerClass = i < 2 ? 'winner' : ''
-    const diff = p.setDiff
+    const netMatches = p.wins - p.losses
     html += `<tr class="clickable-row ${winnerClass}" data-player-id="${p.id}">
       <td class="rank ${rankClass}">${i+1}</td>
       <td class="player-name">${esc(p.username)}</td>
       <td><span class="player-level level-${p.category || 'NC'}">${p.category || 'NC'}</span></td>
-      <td>${p.played}</td><td>${p.wins}</td><td>${p.losses}</td>
-      <td>${diff}</td><td class="pts">${p.points}</td>
+      <td>${netMatches > 0 ? '+' : ''}${netMatches}</td>
+      <td>${p.setDiff > 0 ? '+' : ''}${p.setDiff}</td>
+      <td class="pts">${p.points}</td>
     </tr>`
   })
   html += '</tbody></table>'
@@ -5345,17 +5329,19 @@ function renderPerformancesList(list) {
 }
 
 function renderPerformancesTable(sorted) {
-  let html = `<table><thead><tr><th>#</th><th>Pseudo</th><th>Cat.</th><th>J</th><th>V</th><th>D</th><th>Sets</th><th>Pts</th></tr></thead><tbody>`
+  let html = `<table><thead><tr><th>#</th><th>Pseudo</th><th>Cat.</th><th>Matches</th><th>Sets</th><th>Points</th></tr></thead><tbody>`
   sorted.forEach((p, i) => {
     const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : ''
     const winnerClass = i < 2 ? 'winner' : ''
     const badges = playerBadgesHtml(p)
+    const netMatches = p.wins - p.losses
     html += `<tr class="clickable-row ${winnerClass}" data-player-id="${p.id}">
       <td class="rank ${rankClass}">${i+1}</td>
       <td class="player-name">${esc(p.username)}${badges}</td>
       <td><span class="player-level level-${p.category || 'NC'}">${p.category || 'NC'}</span></td>
-      <td>${p.played}</td><td>${p.wins}</td><td>${p.losses}</td>
-      <td>${p.setDiff}</td><td class="pts">${p.points}</td>
+      <td>${netMatches > 0 ? '+' : ''}${netMatches}</td>
+      <td>${p.setDiff > 0 ? '+' : ''}${p.setDiff}</td>
+      <td class="pts">${p.points}</td>
     </tr>`
   })
   html += '</tbody></table>'
@@ -5453,7 +5439,7 @@ async function loadFaq() {
     container.innerHTML = faqTopicsCache.map((t, i) => `
       <div class="article" data-topic-id="${t.id}" onclick="toggleFaqArticle(this, ${t.id})">
         <div class="article-header">
-          <div class="article-num">${String(i + 1).padStart(2, '0')}</div>
+          <div class="article-num">${i + 1}</div>
           <div class="article-title">${esc(t.question)}${t.published === false ? ' <span style="font-size:0.7rem;font-weight:600;padding:0.15rem 0.45rem;border-radius:12px;background:#2a2a1a;color:#bbb;border:1px solid #444;vertical-align:middle">⬤ Brouillon</span>' : ''}</div>
           <div class="article-chevron">▾</div>
         </div>
@@ -6430,9 +6416,9 @@ function addSetRow() {
   const row = document.createElement('div')
   row.className = 'set-row'; row.id = 'set-row-' + num
   row.innerHTML = `<label>Set ${num}</label>
-    <input type="number" id="set-player-${num}" min="0" max="99" value="0">
+    <input type="number" id="set-player-${num}" min="0" max="11" value="0">
     <span class="set-sep">–</span>
-    <input type="number" id="set-opp-${num}" min="0" max="99" value="0">
+    <input type="number" id="set-opp-${num}" min="0" max="11" value="0">
     <button class="btn-remove-set" onclick="removeSetRow(${num})">✕</button>`
   document.getElementById('sets-container').appendChild(row)
   if (setCount >= 5) document.getElementById('btn-add-set').style.display = 'none'
@@ -8088,9 +8074,9 @@ function addPlannedSetRow() {
   const row = document.createElement('div')
   row.className = 'set-row'; row.id = 'pset-row-' + num
   row.innerHTML = `<label>Set ${num}</label>
-    <input type="number" id="pset-p-${num}" min="0" max="99" value="0">
+    <input type="number" id="pset-p-${num}" min="0" max="11" value="0">
     <span class="set-sep">–</span>
-    <input type="number" id="pset-o-${num}" min="0" max="99" value="0">
+    <input type="number" id="pset-o-${num}" min="0" max="11" value="0">
     <button class="btn-remove-set" onclick="removePSetRow(${num})">✕</button>`
   document.getElementById('planned-score-sets').appendChild(row)
 }
@@ -8160,9 +8146,9 @@ function addSpecialSetRow() {
   const row = document.createElement('div')
   row.className = 'set-row'; row.id = 'sset-row-' + num
   row.innerHTML = `<label>Set ${num}</label>
-    <input type="number" id="sset-p-${num}" min="0" max="99" value="0">
+    <input type="number" id="sset-p-${num}" min="0" max="11" value="0">
     <span class="set-sep">–</span>
-    <input type="number" id="sset-o-${num}" min="0" max="99" value="0">
+    <input type="number" id="sset-o-${num}" min="0" max="11" value="0">
     <button class="btn-remove-set" onclick="removeSSRow(${num})">✕</button>`
   document.getElementById('special-score-sets').appendChild(row)
 }
@@ -8489,40 +8475,83 @@ const PLAYER_TABS = [
   { key: 'vitrine', label: 'Vitrine' },
 ]
 let _hiddenTabs = []
+let _tabOrder = [] // ordre des clés PLAYER_TABS choisi par l'admin (drag & drop)
+let _tabOrderDragKey = null
+
+function currentTabOrderKeys() {
+  // Ordre effectif : celui choisi par l'admin (_tabOrder) complété par les
+  // onglets qui n'y figurent pas encore (nouveaux onglets ajoutés au code
+  // après coup), dans leur ordre par défaut.
+  const known = new Set(_tabOrder)
+  const rest = PLAYER_TABS.map(t => t.key).filter(k => !known.has(k))
+  return [..._tabOrder.filter(k => PLAYER_TABS.some(t => t.key === k)), ...rest]
+}
+
 function renderTabsVisibility() {
   const container = document.getElementById('tabs-visibility-list')
   if (!container) return
-  container.innerHTML = PLAYER_TABS.map(t => `
-    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;background:var(--dark3);border:1px solid var(--dark4);border-radius:8px;padding:0.5rem 0.9rem;${!_hiddenTabs.includes(t.key) ? 'border-color:var(--orange)' : ''}">
+  const order = currentTabOrderKeys()
+  const ordered = order.map(k => PLAYER_TABS.find(t => t.key === k)).filter(Boolean)
+  container.innerHTML = ordered.map(t => `
+    <label draggable="true" data-tabkey="${t.key}"
+      ondragstart="tabOrderDragStart(event,'${t.key}')"
+      ondragover="event.preventDefault()"
+      ondrop="tabOrderDrop(event,'${t.key}')"
+      style="display:flex;align-items:center;gap:0.6rem;cursor:grab;background:var(--dark3);border:1px solid var(--dark4);border-radius:8px;padding:0.5rem 0.9rem;${!_hiddenTabs.includes(t.key) ? 'border-color:var(--orange)' : ''}">
+      <span style="opacity:0.5;user-select:none">⠿</span>
       <input type="checkbox" value="${t.key}" ${!_hiddenTabs.includes(t.key) ? 'checked' : ''} style="accent-color:var(--orange)">
       <span style="font-family:var(--font-heading);font-size:0.88rem;font-weight:600;color:${!_hiddenTabs.includes(t.key) ? 'var(--orange)' : 'var(--gray)'}">${t.label}</span>
     </label>
   `).join('')
 }
+
+function tabOrderDragStart(e, key) {
+  _tabOrderDragKey = key
+  e.dataTransfer.effectAllowed = 'move'
+}
+function tabOrderDrop(e, targetKey) {
+  e.preventDefault()
+  if (!_tabOrderDragKey || _tabOrderDragKey === targetKey) return
+  const order = currentTabOrderKeys()
+  const from = order.indexOf(_tabOrderDragKey)
+  const to = order.indexOf(targetKey)
+  if (from === -1 || to === -1) return
+  order.splice(to, 0, order.splice(from, 1)[0])
+  _tabOrder = order
+  _tabOrderDragKey = null
+  renderTabsVisibility()
+}
+
 async function saveHiddenTabs() {
+  const labels = document.querySelectorAll('#tabs-visibility-list label[data-tabkey]')
+  const order = [...labels].map(l => l.dataset.tabkey)
   const checkboxes = document.querySelectorAll('#tabs-visibility-list input[type=checkbox]')
   const hiddenTabs = [...checkboxes].filter(c => !c.checked).map(c => c.value)
   try {
-    const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'update_hidden_tabs', hiddenTabs }) })
+    const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'update_hidden_tabs', hiddenTabs, tabOrder: order }) })
     const data = await res.json()
-    if (res.ok) { _hiddenTabs = hiddenTabs; renderTabsVisibility(); showFeedback('other-actions-feedback', '✓ ' + data.message, true) }
+    if (res.ok) {
+      _hiddenTabs = hiddenTabs; _tabOrder = order
+      renderTabsVisibility(); applyDockOrder()
+      showFeedback('other-actions-feedback', '✓ ' + data.message, true)
+    }
     else showFeedback('other-actions-feedback', '✗ ' + data.error, false)
   } catch { showFeedback('other-actions-feedback', '✗ Erreur réseau.', false) }
 }
 
-// Charge les onglets caches pour les utilisateurs non-admin.
-// L endpoint /api/matches renvoie hiddenTabs (accessible a tous les comptes
-// connectes). On l appelle ici specifiquement pour recuperer la config des
-// onglets caches le plus tot possible apres la connexion.
+// Charge les onglets caches + leur ordre pour les utilisateurs non-admin.
+// L endpoint /api/matches renvoie hiddenTabs et tabOrder (accessible a tous
+// les comptes connectes). On l appelle ici specifiquement pour recuperer la
+// config le plus tot possible apres la connexion.
 async function loadHiddenTabsForUser() {
   try {
     const res = await fetch('/api/matches', { headers: authHeaders() })
     if (!res.ok) return
     const data = await res.json()
-    if (Array.isArray(data.hiddenTabs)) {
-      _hiddenTabs = data.hiddenTabs
-      applyHiddenTabs()
-    }
+    if (Array.isArray(data.hiddenTabs)) _hiddenTabs = data.hiddenTabs
+    if (Array.isArray(data.tabOrder)) _tabOrder = data.tabOrder
+    applyHiddenTabs()
+    applyDockOrder()
   } catch(e) { console.error('[loadHiddenTabsForUser]', e) }
 }
 
@@ -8551,8 +8580,22 @@ function applyHiddenTabs() {
   checkNavOverflow()
 }
 
+// Réordonne les boutons du dock qui correspondent à des onglets
+// configurables (data-tab présent dans PLAYER_TABS), en suivant l'ordre
+// choisi par l'admin. Les items sans data-tab (Accueil, Charte, Messages)
+// ne sont pas concernés par ce réglage et gardent leurs positions relatives.
+function applyDockOrder() {
+  const dock = document.querySelector('nav.dock')
+  if (!dock) return
+  const order = currentTabOrderKeys()
+  order.forEach(key => {
+    const btn = dock.querySelector(`.dock-item[data-tab="${key}"]`)
+    if (btn) dock.appendChild(btn)
+  })
+}
+
 /* ── Gestion des malus ── */
-let _malusList = [] // [{text, enabled}]
+let _malusList = [] // [{text, enabled, maxConcurrent}]
 function renderMalusConfig() {
   const container = document.getElementById('malus-config-list')
   if (!container) return
@@ -8563,13 +8606,17 @@ function renderMalusConfig() {
       <input type="text" value="${esc(m.text)}" data-malus-idx="${i}"
         style="flex:1;background:var(--dark2);border:1px solid ${enabled ? 'var(--dark4)' : '#555'};border-radius:6px;color:${enabled ? 'var(--white)' : 'var(--gray)'};padding:0.4rem 0.75rem;font-family:var(--font-body);font-size:0.88rem;text-decoration:${enabled ? 'none' : 'line-through'}"
         oninput="_malusList[${i}].text=this.value">
+      <input type="number" min="0" step="1" placeholder="∞" value="${m.maxConcurrent || ''}"
+        data-malus-maxconc="${i}" title="Nombre max d'utilisations simultanées (vide = illimité)"
+        style="width:70px;background:var(--dark2);border:1px solid var(--dark4);border-radius:6px;color:var(--white);padding:0.4rem 0.5rem;font-family:var(--font-body);font-size:0.85rem;text-align:center"
+        oninput="_malusList[${i}].maxConcurrent = this.value ? parseInt(this.value,10) : null">
       <button class="btn-sm ${enabled ? 'btn-edit' : 'btn-add'}" onclick="toggleMalusItem(${i})" title="${enabled ? 'Désactiver ce malus' : 'Réactiver ce malus'}" style="min-width:90px">${enabled ? '⏸ Désactiver' : '▶ Réactiver'}</button>
       <button class="btn-sm btn-danger" onclick="removeMalusItem(${i})" title="Supprimer définitivement ce malus">✕</button>
     </div>`
   }).join('')
 }
 function addMalusItem() {
-  _malusList.push({ text: '', enabled: true })
+  _malusList.push({ text: '', enabled: true, maxConcurrent: null })
   renderMalusConfig()
   const inputs = document.querySelectorAll('#malus-config-list input[type=text]')
   if (inputs.length) inputs[inputs.length - 1].focus()
@@ -8583,11 +8630,18 @@ function removeMalusItem(idx) {
   renderMalusConfig()
 }
 async function saveMalusConfig() {
-  // Relire les valeurs actuelles des inputs
+  // Relire les valeurs actuelles des inputs (texte + limite d'utilisation simultanée)
   const inputs = document.querySelectorAll('#malus-config-list input[type=text]')
   inputs.forEach(inp => {
     const idx = parseInt(inp.dataset.malusIdx, 10)
     if (!isNaN(idx) && _malusList[idx]) _malusList[idx].text = inp.value.trim()
+  })
+  document.querySelectorAll('#malus-config-list input[data-malus-maxconc]').forEach(inp => {
+    const idx = parseInt(inp.dataset.malusMaxconc, 10)
+    if (!isNaN(idx) && _malusList[idx]) {
+      const v = parseInt(inp.value, 10)
+      _malusList[idx].maxConcurrent = (!isNaN(v) && v > 0) ? v : null
+    }
   })
   const malusList = _malusList.filter(m => m.text.length > 0)
   const activeCount = malusList.filter(m => m.enabled !== false).length
@@ -8597,7 +8651,12 @@ async function saveMalusConfig() {
   try {
     const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'update_malus_config', malusList }) })
     const data = await res.json()
-    if (res.ok) { _malusList = data.malusList || malusList; renderMalusConfig(); showFeedback('other-actions-feedback', '✓ ' + data.message, true) }
+    if (res.ok) {
+      _malusList = data.malusList || malusList
+      renderMalusConfig()
+      const reassignMsg = data.reassigned > 0 ? ` ${data.reassigned} match(s) ont dû être réassignés à un autre malus pour respecter les limites — voir la console de planification et les Alertes.` : ''
+      showFeedback('other-actions-feedback', '✓ ' + data.message + reassignMsg, true)
+    }
     else showFeedback('other-actions-feedback', '✗ ' + data.error, false)
   } catch { showFeedback('other-actions-feedback', '✗ Erreur réseau.', false) }
 }
@@ -8607,7 +8666,7 @@ async function resetMalusConfig() {
     const res = await fetch('/api/admin/match', { headers: authHeaders() })
     if (!res.ok) return
     const data = await res.json()
-    const defaultList = (data.defaultMalusList || []).map(t => ({ text: t, enabled: true }))
+    const defaultList = (data.defaultMalusList || []).map(t => ({ text: t, enabled: true, maxConcurrent: null }))
     const saveRes = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'update_malus_config', malusList: defaultList }) })
     const saveData = await saveRes.json()
     if (saveRes.ok) {
@@ -8646,8 +8705,8 @@ function renderAlerts() {
   const filtered = _alertFilter === 'all' ? _allAlerts : _allAlerts.filter(a => a.type === _alertFilter)
   if (filtered.length === 0) { container.innerHTML = ''; empty.style.display = ''; return }
   empty.style.display = 'none'
-  const typeLabel = { score_missing:'⏱ Score oublié', login_failed_admin:'🔐 Connexion échouée', duplicate_username:'👤 Pseudo dupliqué' }
-  const typeColor = { score_missing:'#f5a623', login_failed_admin:'#ff7070', duplicate_username:'#b983ff' }
+  const typeLabel = { score_missing:'⏱ Score oublié', login_failed_admin:'🔐 Connexion échouée', duplicate_username:'👤 Pseudo dupliqué', malus_reassigned:'⚡ Malus réassigné', malus_reassign_failed:'⚠️ Réassignation échouée' }
+  const typeColor = { score_missing:'#f5a623', login_failed_admin:'#ff7070', duplicate_username:'#b983ff', malus_reassigned:'#ff9f43', malus_reassign_failed:'#ff5c5c' }
   container.innerHTML = filtered.map(a => `
     <div style="display:flex;align-items:flex-start;gap:0.9rem;background:var(--dark3);border:1px solid ${a.read ? 'var(--dark4)' : typeColor[a.type] || 'var(--orange)'};border-radius:10px;padding:0.85rem 1.1rem;margin-bottom:0.55rem;opacity:${a.read ? '0.6' : '1'}">
       <div style="flex:1;min-width:0">
@@ -8685,10 +8744,12 @@ async function loadOtherActionsConfig() {
     // Malus
     _malusList = data.malusList || []
     renderMalusConfig()
-    // Onglets
+    // Onglets (visibilité + ordre)
     _hiddenTabs = data.hiddenTabs || []
+    _tabOrder = data.tabOrder || []
     renderTabsVisibility()
     applyHiddenTabs()
+    applyDockOrder()
     // Rappels auto
     _autoRemindersEnabled = data.autoRemindersEnabled ?? true
     updateAutoReminderBtn()

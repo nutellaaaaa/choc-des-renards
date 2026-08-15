@@ -104,6 +104,8 @@ model TournamentState {
   autoRemindersEnabled Boolean @default(true)
   // Onglets masqués côté joueur (JSON array de noms d'onglets, ex: ["performances"])
   hiddenTabs           String  @default("[]")
+  // Ordre d'affichage des onglets côté joueur (JSON array de noms d'onglets, ex: ["ranking","matches",...])
+  tabOrder             String  @default("[]")
   // Configuration des malus (JSON array de strings). Vide = utiliser MALUS_LIST hardcodé.
   malusConfig          String  @default("[]")
 }
