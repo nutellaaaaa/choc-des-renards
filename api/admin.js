@@ -4001,8 +4001,9 @@ async function handleBots(req, res) {
 }
 
 async function createBots(req, res) {
-  let { count } = req.body || {}
+  let { count, perfectMode } = req.body || {}
   count = parseInt(count, 10)
+  perfectMode = !!perfectMode
   if (isNaN(count) || count < 1 || count > 100) {
     return res.status(400).json({ error: 'Le nombre de bots doit être entre 1 et 100.' })
   }
@@ -4038,20 +4039,29 @@ async function createBots(req, res) {
           banned: false,
           active: true,
           isBot: true,
+          isPerfectBot: perfectMode,
         },
       })
       created++
-      // Programme la première connexion du bot dans un futur réaliste.
-      await prisma.botTask.create({
-        data: {
-          botId: user.id,
-          kind: 'login',
-          dueAt: new Date(Date.now() + randomExpMinutes(90, 60 * 24) * 60000),
-        },
-      })
+      // "Mode élève parfait" : ce bot ne se connecte jamais, ne lit pas de
+      // notifications, ne consulte pas la FAQ et n'envoie pas de message de
+      // contact — il ne fait QUE saisir ses scores de match, dès qu'un
+      // match planifié le concerne (voir schedulePerfectBotScores(), appelé
+      // à chaque tick). On ne programme donc PAS de tâche 'login' initiale
+      // pour lui : c'est cette tâche qui, normalement, déclenche en cascade
+      // toute l'activité "vie de joueur" (connexion, lecture FAQ, contact…).
+      if (!perfectMode) {
+        await prisma.botTask.create({
+          data: {
+            botId: user.id,
+            kind: 'login',
+            dueAt: new Date(Date.now() + randomExpMinutes(90, 60 * 24) * 60000),
+          },
+        })
+      }
     }
 
-    return res.status(201).json({ ok: true, createdCount: created, message: `${created} bot(s) créé(s).` })
+    return res.status(201).json({ ok: true, createdCount: created, message: `${created} bot(s) créé(s)${perfectMode ? ' en mode élève parfait' : ''}.` })
   } catch (err) {
     console.error('[bots create]', err)
     return res.status(500).json({ error: 'Erreur serveur.' })
@@ -4186,6 +4196,7 @@ async function runBotTickLoop() {
     }
   }
   await scheduleUnreadNotificationsForBots()
+  await schedulePerfectBotScores()
   return actionsDone
 }
 
@@ -4456,6 +4467,52 @@ async function scheduleUnreadNotificationsForBots() {
     const delayMinutes = randomExpMinutes(180, 4 * 1440) // moyenne 3h, plafond 4 jours
     const dueAt = new Date(n.createdAt.getTime() + delayMinutes * 60000)
     toCreate.push({ botId: n.userId, kind: 'read_notification', dueAt, payload: { notificationId: n.id } })
+  }
+  if (toCreate.length > 0) await prisma.botTask.createMany({ data: toCreate })
+}
+
+// "Mode élève parfait" : programme la saisie de score pour chaque match
+// planifié impliquant un bot "élève parfait", sans passer par le cycle
+// connexion → lecture de notification (ces bots ne se connectent jamais).
+// Délai quasi nul (30s à 5min) et 0% de taux d'oubli — contrairement à
+// scheduleBotSubmitScore() (bots normaux), il n'y a ici aucune chance de
+// ne jamais programmer la tâche.
+async function schedulePerfectBotScores() {
+  const perfectBots = await prisma.user.findMany({
+    where: { isBot: true, isPerfectBot: true },
+    select: { id: true },
+  })
+  if (perfectBots.length === 0) return
+  const botIds = perfectBots.map(b => b.id)
+
+  const matches = await prisma.plannedMatch.findMany({
+    where: {
+      forfeited: false,
+      OR: [{ player1Id: { in: botIds } }, { player2Id: { in: botIds } }],
+    },
+    select: { id: true, player1Id: true, player2Id: true },
+  })
+  if (matches.length === 0) return
+
+  const pendingScoreTasks = await prisma.botTask.findMany({
+    where: { kind: 'submit_score', botId: { in: botIds } },
+    select: { botId: true, payload: true },
+  })
+  const alreadyScheduled = new Set(
+    pendingScoreTasks.map(t => `${t.botId}-${t.payload?.plannedMatchId}`)
+  )
+
+  const now = new Date()
+  const toCreate = []
+  for (const pm of matches) {
+    for (const botId of [pm.player1Id, pm.player2Id]) {
+      if (!botIds.includes(botId)) continue
+      const key = `${botId}-${pm.id}`
+      if (alreadyScheduled.has(key)) continue
+      // Délai quasi nul : entre 30 secondes et 5 minutes.
+      const dueAt = new Date(now.getTime() + (30 + Math.random() * 270) * 1000)
+      toCreate.push({ botId, kind: 'submit_score', dueAt, payload: { plannedMatchId: pm.id } })
+    }
   }
   if (toCreate.length > 0) await prisma.botTask.createMany({ data: toCreate })
 }

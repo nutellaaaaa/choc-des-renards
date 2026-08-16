@@ -48,6 +48,9 @@ model User {
   active       Boolean  @default(true)
   forceLogout  Boolean  @default(false)
   isBot        Boolean  @default(false)
+  // "Mode élève parfait" : bot qui ne fait que saisir ses scores de match
+  // (0% d'oubli, délai quasi nul), sans connexion, FAQ ni contact.
+  isPerfectBot Boolean  @default(false)
   createdAt    DateTime @default(now())
 
 

@@ -2090,8 +2090,8 @@
         <input type="checkbox" id="reg-rgpd">
         <label for="reg-rgpd">Je consens à ce que mes données soient collectées et utilisées pour l'organisation du Choc Des Renards (promis, pas de fouille sauvage). Pour plus d'informations, nous vous encourageons à vous renseigner sur <a href="#" onclick="showPrivacyPage(); return false;">Vos données et vos droits</a>.</label>
       </div>
-      <div class="checkbox-group-rgpd">
-        <input type="checkbox" id="reg-ack">
+      <div class="checkbox-group-rgpd" style="display:none">
+        <input type="checkbox" id="reg-ack" checked>
         <label for="reg-ack">J'ai pris connaissance des règles du tournoi et j'accepte de m'y conformer.</label>
       </div>
       
@@ -2736,10 +2736,13 @@
           </div>
         </div>
         <div class="other-action-card" style="grid-column:1/-1">
-          <h4>👁 Onglets visibles par les joueurs</h4>
-          <p>Cochez les onglets que vous souhaitez rendre visibles dans l'interface joueur. Les onglets décochés restent accessibles pour vous en tant qu'admin.</p>
+          <h4>👁 Ordre et visibilité des onglets joueurs</h4>
+          <p>Cochez les onglets que vous souhaitez rendre visibles dans l'interface joueur, et glissez-déposez (⠿) pour changer leur ordre d'affichage dans le dock de navigation. Les onglets décochés restent accessibles pour vous en tant qu'admin.</p>
           <div id="tabs-visibility-list" style="display:flex;flex-wrap:wrap;gap:0.7rem;margin-top:0.8rem"></div>
-          <button class="btn-sm btn-accept" style="margin-top:0.9rem" onclick="saveHiddenTabs()">Enregistrer</button>
+          <div style="display:flex;align-items:center;gap:0.9rem;margin-top:0.9rem;flex-wrap:wrap">
+            <button class="btn-sm btn-accept" id="save-hidden-tabs-btn" onclick="saveHiddenTabs()">Enregistrer</button>
+            <span id="tabs-order-feedback" style="font-size:0.85rem;font-weight:600"></span>
+          </div>
         </div>
         <div class="other-action-card" style="grid-column:1/-1">
           <h4>⚡ Liste des malus</h4>
@@ -2765,6 +2768,10 @@
             <button class="btn-sm btn-accept" onclick="createBots()">Créer les bots</button>
             <button class="btn-sm btn-danger" onclick="deleteAllBots()">Supprimer les bots</button>
           </div>
+          <label style="display:flex;align-items:flex-start;gap:0.5rem;margin-top:0.6rem;cursor:pointer;font-size:0.83rem;color:var(--gray-light);max-width:520px">
+            <input type="checkbox" id="bots-perfect-mode" style="accent-color:var(--orange);margin-top:2px">
+            <span><strong style="color:var(--white)">Mode élève parfait</strong> — ces bots ne font que saisir le score de leurs matchs (jamais d'oubli, délai quasi immédiat). Ils ne se connectent jamais, ne consultent pas la FAQ et n'envoient pas de message de contact.</span>
+          </label>
           <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;margin-top:0.6rem">
             <input type="number" id="bots-ff-hours-input" min="1" max="720" step="1" value="24" style="width:80px;background:var(--dark2);border:1px solid var(--dark4);border-radius:6px;color:var(--white);padding:0.4rem 0.6rem;font-family:var(--font-body)">
             <span style="font-size:0.82rem;color:var(--gray)">heure(s)</span>
@@ -3436,7 +3443,7 @@
 
 <!-- ══════════ DOCK DE NAVIGATION ══════════ -->
 <nav class="dock" id="dock" aria-label="Navigation principale">
-  <button class="nav-btn dock-item active" id="nav-accueil-btn" onclick="showPage('accueil',this)" aria-label="Accueil">
+  <button class="nav-btn dock-item active" id="nav-accueil-btn" data-tab="accueil" onclick="showPage('accueil',this)" aria-label="Accueil">
     <span class="dock-label">Accueil</span>
     <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
   </button>
@@ -3467,7 +3474,7 @@
     <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4z"/><path d="M7 5H4v2a3 3 0 003 3M17 5h3v2a3 3 0 01-3 3"/></svg>
   </button>
 
-  <button class="nav-btn dock-item" onclick="showPage('reglement',this)" aria-label="Charte">
+  <button class="nav-btn dock-item" data-tab="charte" onclick="showPage('reglement',this)" aria-label="Charte">
     <span class="dock-label">Charte</span>
     <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h8l4 4v14H7z"/><path d="M14 3v5h5"/><path d="M9 13h7M9 17h7M9 9h3"/></svg>
   </button>
@@ -3477,7 +3484,7 @@
     <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .5c0 1.5-2 1.8-2 3.3"/><circle cx="12" cy="17" r="0.4" fill="currentColor" stroke="none"/></svg>
   </button>
 
-  <button class="nav-btn dock-item" onclick="showPage('mes-notifs',this)" aria-label="Messages">
+  <button class="nav-btn dock-item" data-tab="messages" onclick="showPage('mes-notifs',this)" aria-label="Messages">
     <span class="dock-label">Messages</span>
     <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
   </button>
@@ -3526,13 +3533,13 @@
          shield par-dessus, pour ne pas bloquer le défilement). On force le
          paramètre #toolbar=0 (Chrome) pour limiter l'affichage des contrôles
          (dont le bouton de téléchargement de la barre d'outils). -->
-    <div class="pdf-viewer-wrap" id="charte-viewer-wrap">
+    <div class="pdf-viewer-wrap" id="charte-viewer-wrap" oncontextmenu="return false">
       <div class="pdf-viewer-toolbar">
         <button type="button" onclick="reloadCharteViewer()" title="Recharger">↻</button>
       </div>
       <iframe class="pdf-viewer-frame" id="charte-viewer-frame"
               src="reglement-choc-des-renards.pdf#toolbar=0&navpanes=0&view=FitH"
-              title="Charte du Choc des Renards" referrerpolicy="no-referrer"></iframe>
+              title="Charte du Choc des Renards" referrerpolicy="no-referrer" oncontextmenu="return false"></iframe>
       <div class="pdf-viewer-fallback" id="charte-viewer-fallback">
         <div class="fv-icon">📄</div>
         <div>Votre navigateur ne peut pas afficher le PDF dans la visionneuse.</div>
@@ -3904,6 +3911,9 @@
 // Les pages sans cle (accueil, reglement, mes-notifs, confidentialite) sont
 // toujours accessibles. Les autres sont soumises au filtre _hiddenTabs.
 const PAGE_TO_TAB = {
+  accueil: 'accueil',
+  reglement: 'charte',
+  'mes-notifs': 'messages',
   classement: 'ranking',
   'score-match': 'matches',
   performances: 'performances',
@@ -3913,8 +3923,12 @@ const PAGE_TO_TAB = {
   'mon-profil': 'profil',
   vitrine: 'vitrine',
 }
-// Pages toujours accessibles (pas soumises au filtre des onglets caches)
-const ALWAYS_ACCESSIBLE_PAGES = ['accueil', 'reglement', 'mes-notifs', 'confidentialite']
+// Pages toujours accessibles (pas soumises au filtre des onglets caches).
+// 'accueil' DOIT rester ici : c'est la destination de repli utilisée par
+// showPage() lui-même quand une page cachée est demandée — si on la
+// bloquait aussi, on obtiendrait une redirection infinie vers elle-même.
+// 'confidentialite' reste toujours accessible pour des raisons légales.
+const ALWAYS_ACCESSIBLE_PAGES = ['accueil', 'confidentialite']
 function isTabHiddenForUser(tabKey) {
   if (!tabKey) return false
   // Les comptes lies (yanis, alexandre) voient toujours tout
@@ -8467,15 +8481,16 @@ function showFeedback(id, msg, ok) {
 
 /* ── Onglets visibles ── */
 const PLAYER_TABS = [
-  { key: 'ranking', label: 'Classement' },
-  { key: 'matches', label: 'Mes matchs' },
-  { key: 'planned', label: 'Mes matchs planifiés' },
-  { key: 'specials', label: 'Rencontres en cours' },
-  { key: 'performances', label: 'Performances' },
-  { key: 'gallery', label: 'Galerie photos' },
+  { key: 'accueil', label: 'Accueil', locked: true },
+  { key: 'charte', label: 'Charte' },
+  { key: 'messages', label: 'Messages' },
+  { key: 'profil', label: 'Mon profil' },
   { key: 'faq', label: 'FAQ' },
   { key: 'contact', label: 'Contact' },
-  { key: 'profil', label: 'Mon profil' },
+  { key: 'ranking', label: 'Classement' },
+  { key: 'matches', label: 'Score du match' },
+  { key: 'performances', label: 'Performances' },
+  { key: 'gallery', label: 'Souvenirs' },
   { key: 'vitrine', label: 'Vitrine' },
 ]
 let _hiddenTabs = []
@@ -8496,17 +8511,20 @@ function renderTabsVisibility() {
   if (!container) return
   const order = currentTabOrderKeys()
   const ordered = order.map(k => PLAYER_TABS.find(t => t.key === k)).filter(Boolean)
-  container.innerHTML = ordered.map(t => `
-    <label draggable="true" data-tabkey="${t.key}"
+  container.innerHTML = ordered.map(t => {
+    const locked = !!t.locked
+    const visible = locked || !_hiddenTabs.includes(t.key)
+    return `
+    <label draggable="true" data-tabkey="${t.key}" ${locked ? 'data-locked="1"' : ''}
       ondragstart="tabOrderDragStart(event,'${t.key}')"
       ondragover="event.preventDefault()"
       ondrop="tabOrderDrop(event,'${t.key}')"
-      style="display:flex;align-items:center;gap:0.6rem;cursor:grab;background:var(--dark3);border:1px solid var(--dark4);border-radius:8px;padding:0.5rem 0.9rem;${!_hiddenTabs.includes(t.key) ? 'border-color:var(--orange)' : ''}">
+      style="display:flex;align-items:center;gap:0.6rem;cursor:grab;background:var(--dark3);border:1px solid var(--dark4);border-radius:8px;padding:0.5rem 0.9rem;${visible ? 'border-color:var(--orange)' : ''}">
       <span style="opacity:0.5;user-select:none">⠿</span>
-      <input type="checkbox" value="${t.key}" ${!_hiddenTabs.includes(t.key) ? 'checked' : ''} style="accent-color:var(--orange)">
-      <span style="font-family:var(--font-heading);font-size:0.88rem;font-weight:600;color:${!_hiddenTabs.includes(t.key) ? 'var(--orange)' : 'var(--gray)'}">${t.label}</span>
+      <input type="checkbox" value="${t.key}" ${visible ? 'checked' : ''} ${locked ? 'disabled title="Toujours visible — page d\'accueil"' : ''} style="accent-color:var(--orange)">
+      <span style="font-family:var(--font-heading);font-size:0.88rem;font-weight:600;color:${visible ? 'var(--orange)' : 'var(--gray)'}">${t.label}${locked ? ' <span style="opacity:0.55;font-weight:400;text-transform:none;font-size:0.78rem">(toujours visible)</span>' : ''}</span>
     </label>
-  `).join('')
+  `}).join('')
 }
 
 function tabOrderDragStart(e, key) {
@@ -8530,17 +8548,40 @@ async function saveHiddenTabs() {
   const labels = document.querySelectorAll('#tabs-visibility-list label[data-tabkey]')
   const order = [...labels].map(l => l.dataset.tabkey)
   const checkboxes = document.querySelectorAll('#tabs-visibility-list input[type=checkbox]')
-  const hiddenTabs = [...checkboxes].filter(c => !c.checked).map(c => c.value)
+  // Un onglet "locked" (Accueil) reste toujours visible, même si son
+  // checkbox est désactivé côté DOM — on l'exclut explicitement ici par
+  // sécurité plutôt que de se fier uniquement à l'attribut disabled.
+  const lockedKeys = new Set(PLAYER_TABS.filter(t => t.locked).map(t => t.key))
+  const hiddenTabs = [...checkboxes].filter(c => !c.checked && !lockedKeys.has(c.value)).map(c => c.value)
+  const btn = document.getElementById('save-hidden-tabs-btn')
+  const feedback = document.getElementById('tabs-order-feedback')
+  const prevLabel = btn ? btn.textContent : null
+  if (btn) { btn.disabled = true }
+  if (feedback) { feedback.textContent = ''; feedback.style.color = '' }
   try {
     const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'update_hidden_tabs', hiddenTabs, tabOrder: order }) })
     const data = await res.json()
     if (res.ok) {
       _hiddenTabs = hiddenTabs; _tabOrder = order
       renderTabsVisibility(); applyDockOrder()
+      if (feedback) { feedback.textContent = '✓ Modifications enregistrées.'; feedback.style.color = '#6ddc6d' }
+      if (btn) { btn.textContent = '✓ Enregistré !' }
       showFeedback('other-actions-feedback', '✓ ' + data.message, true)
+    } else {
+      if (feedback) { feedback.textContent = '✗ ' + (data.error || 'Erreur.'); feedback.style.color = '#ff7070' }
+      showFeedback('other-actions-feedback', '✗ ' + data.error, false)
     }
-    else showFeedback('other-actions-feedback', '✗ ' + data.error, false)
-  } catch { showFeedback('other-actions-feedback', '✗ Erreur réseau.', false) }
+  } catch {
+    if (feedback) { feedback.textContent = '✗ Erreur réseau.'; feedback.style.color = '#ff7070' }
+    showFeedback('other-actions-feedback', '✗ Erreur réseau.', false)
+  } finally {
+    if (btn) {
+      setTimeout(() => { btn.disabled = false; btn.textContent = prevLabel }, 1600)
+    }
+    if (feedback) {
+      setTimeout(() => { feedback.textContent = '' }, 4000)
+    }
+  }
 }
 
 // Charge les onglets caches + leur ordre pour les utilisateurs non-admin.
@@ -8586,8 +8627,8 @@ function applyHiddenTabs() {
 
 // Réordonne les boutons du dock qui correspondent à des onglets
 // configurables (data-tab présent dans PLAYER_TABS), en suivant l'ordre
-// choisi par l'admin. Les items sans data-tab (Accueil, Charte, Messages)
-// ne sont pas concernés par ce réglage et gardent leurs positions relatives.
+// choisi par l'admin. Cela couvre désormais tous les onglets, y compris
+// Accueil/Charte/Messages.
 function applyDockOrder() {
   const dock = document.querySelector('nav.dock')
   if (!dock) return
@@ -8877,15 +8918,16 @@ async function loadBotsStatus() {
 async function createBots() {
   const input = document.getElementById('bots-count-input')
   const count = parseInt(input.value, 10)
+  const perfectMode = document.getElementById('bots-perfect-mode')?.checked || false
   if (isNaN(count) || count < 1 || count > 100) {
     alert('Le nombre de bots doit être entre 1 et 100.')
     return
   }
-  if (!confirm(`Créer ${count} bot(s) de test ?`)) return
+  if (!confirm(`Créer ${count} bot(s) de test${perfectMode ? ' en mode élève parfait' : ''} ?`)) return
   const feedback = document.getElementById('other-actions-feedback')
   feedback.textContent = 'Création des bots…'; feedback.style.color = 'var(--orange)'
   try {
-    const res = await fetch('/api/admin/bots', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'create', count }) })
+    const res = await fetch('/api/admin/bots', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'create', count, perfectMode }) })
     const data = await res.json()
     if (res.ok) {
       feedback.textContent = '✓ ' + (data.message || 'Bots créés.')
