@@ -4085,8 +4085,18 @@ async function createBots(req, res) {
       message: `${created} bot(s) créé(s)${perfectMode && !migrationMissing ? ' en mode élève parfait' : ''}.${warning}`,
     })
   } catch (err) {
-    console.error('[bots create]', err)
-    return res.status(500).json({ error: 'Erreur serveur.' })
+    console.error('[bots create] FULL ERROR:', JSON.stringify({
+      message: err?.message, code: err?.code, meta: err?.meta, name: err?.name,
+    }, null, 2))
+    console.error(err)
+    // Panneau admin uniquement (déjà protégé par requireAdmin) : on renvoie
+    // le détail réel de l'erreur plutôt qu'un message générique muet, pour
+    // pouvoir diagnostiquer sans avoir besoin d'accéder aux logs serveur.
+    return res.status(500).json({
+      error: `Erreur serveur : ${err?.message || 'inconnue'}${err?.code ? ' (code ' + err.code + ')' : ''}`,
+      code: err?.code || null,
+      meta: err?.meta || null,
+    })
   }
 }
 
