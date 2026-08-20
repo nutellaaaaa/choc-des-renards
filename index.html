@@ -2364,6 +2364,12 @@
 
     <!-- Utilisateurs -->
     <div id="admin-users" class="admin-section">
+      <div id="users-bots-toggle-row" style="display:flex;align-items:center;gap:0.6rem;margin-bottom:1rem;font-size:0.85rem;color:var(--gray-light)">
+        <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer">
+          <input type="checkbox" id="users-show-bots" onchange="renderUsersTable()" style="accent-color:var(--orange)">
+          <span>🤖 Afficher les bots dans ce tableau (<strong id="users-bots-count" style="color:var(--orange)">0</strong> actuellement)</span>
+        </label>
+      </div>
       <div class="admin-table-wrap">
         <table class="admin-table">
           <thead><tr><th>Pseudo</th><th>Nom</th><th>Prénom</th><th>Tél.</th><th>Cat.</th><th>Statut</th><th>Actif</th><th>Inscrit le</th><th>Actions</th></tr></thead>
@@ -6245,84 +6251,106 @@ async function loadAllAdminDataWithProgress() {
 }
 
 /* ── Utilisateurs ── */
+let _lastUsersData = []
+
 async function loadUsers() {
   try {
     const res = await fetch('/api/admin/action', { headers: authHeaders() })
     if (!res.ok) return
     const { users } = await res.json()
-    const accepted = users.filter(u => u.accepted && !u.banned)
-    const pending  = users.filter(u => !u.accepted && !u.banned)
-    const banned   = users.filter(u => u.banned)
+    _lastUsersData = users || []
+    renderUsersTable()
 
-    setBadge('badge-users', accepted.length + banned.length)
-    setBadge('badge-pending', pending.length)
-
-    const tblU = document.getElementById('tbl-users')
-    const allActive = [...accepted, ...banned]
-    if (allActive.length === 0) {
-      tblU.innerHTML = ''; document.getElementById('users-empty').style.display = 'block'
-    } else {
-      document.getElementById('users-empty').style.display = 'none'
-      tblU.innerHTML = allActive.map(u => `
-        <tr>
-          <td><strong style="color:var(--white)">${esc(u.username)}</strong></td>
-          <td>${esc(capName(u.lastName))}</td><td>${esc(capName(u.firstName))}</td><td>${esc(u.phone)}</td>
-          <td><span class="player-level level-${u.category || 'NC'}">${u.category || 'NC'}</span></td>
-          <td>${u.banned ? '<span class="status-badge status-banned">Banni</span>' : '<span class="status-badge status-ok">Accepté</span>'}</td>
-          <td>${u.active ? '<span class="status-badge status-ok">Actif</span>' : '<span class="status-badge status-inactive">Inactif</span>'}</td>
-          <td style="color:var(--gray);font-size:0.82rem">${fmtDate(u.createdAt)}</td>
-          <td>
-            <div class="admin-actions">
-              <button class="btn-sm btn-edit" onclick="openEditModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">Modifier</button>
-              <div class="actions-more">
-                <button class="btn-sm btn-more" onclick="toggleActionsMenu(this)" aria-label="Plus d'actions">⋯</button>
-                <div class="actions-menu">
-                  <button onclick="openPasswordModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">🔑 Mot de passe</button>
-                  <button onclick="openMatchModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">+ Match</button>
-                  <button onclick="quickNotify(${u.id},'${esc(capName(u.firstName))} ${esc(capName(u.lastName))}')">✉ Notifier</button>
-                  ${u.active
-                    ? `<button onclick="adminAction('deactivate',${u.id})">Désactiver</button>`
-                    : `<button onclick="adminAction('activate',${u.id})">Activer</button>`}
-                  ${u.banned
-                    ? `<button onclick="adminAction('unban',${u.id})">Débannir</button>
-                       <button class="danger" onclick="adminAction('delete_banned',${u.id})">🗑 Supprimer définitivement</button>`
-                    : `<button class="danger" onclick="adminAction('ban',${u.id})">Bannir</button>`}
-                </div>
-              </div>
-            </div>
-          </td>
-        </tr>`).join('')
-    }
-
-    const tblP = document.getElementById('tbl-pending')
-    if (pending.length === 0) {
-      tblP.innerHTML = ''; document.getElementById('pending-empty').style.display = 'block'
-    } else {
-      document.getElementById('pending-empty').style.display = 'none'
-      tblP.innerHTML = pending.map(u => `
-        <tr>
-          <td><strong style="color:var(--white)">${esc(u.username)}</strong></td>
-          <td>${esc(u.lastName)}</td><td>${esc(u.firstName)}</td><td>${esc(u.phone)}</td>
-          <td><span class="player-level level-${u.category || 'NC'}">${u.category || 'NC'}</span></td>
-          <td style="color:var(--gray);font-size:0.82rem">${fmtDate(u.createdAt)}</td>
-          <td>
-            <div class="admin-actions">
-              <button class="btn-sm btn-accept" onclick="adminAction('accept',${u.id})">✓ Accepter</button>
-              <button class="btn-sm btn-refuse" onclick="adminAction('refuse',${u.id})">✗ Refuser</button>
-            </div>
-          </td>
-        </tr>`).join('')
-    }
-
-    // Populate filtre historique
+    // Populate filtre historique (comptes réels uniquement — inutile de
+    // proposer 50 bots dans le filtre de connexions)
+    const realUsers = _lastUsersData.filter(u => !u.isBot)
+    const accepted = realUsers.filter(u => u.accepted && !u.banned)
+    const pending  = realUsers.filter(u => !u.accepted && !u.banned)
+    const banned   = realUsers.filter(u => u.banned)
     const histFilter = document.getElementById('history-user-filter')
     const currentVal = histFilter.value
     const allUsers = [...accepted, ...banned, ...pending]
     histFilter.innerHTML = '<option value="">— Tous les joueurs —</option>' +
       allUsers.map(u => `<option value="${u.id}">${esc(capName(u.firstName))} ${esc(capName(u.lastName))} (@${esc(u.username)})</option>`).join('')
     histFilter.value = currentVal
-
   } catch(e) { console.error('[loadUsers]', e) }
+}
+
+// Rendu du tableau Utilisateurs à partir des données déjà chargées — permet
+// de basculer l'affichage des bots (checkbox "🤖 Afficher les bots") sans
+// re-fetch, et surtout de rendre la création de bots vérifiable d'un coup
+// d'œil (compteur toujours visible, même quand la case est décochée).
+function renderUsersTable() {
+  const users = _lastUsersData
+  const showBots = document.getElementById('users-show-bots')?.checked || false
+  const botCount = users.filter(u => u.isBot).length
+  const botCountEl = document.getElementById('users-bots-count')
+  if (botCountEl) botCountEl.textContent = botCount
+
+  const pool = showBots ? users : users.filter(u => !u.isBot)
+  const accepted = pool.filter(u => u.accepted && !u.banned)
+  const pending  = pool.filter(u => !u.accepted && !u.banned && !u.isBot) // les bots sont toujours accepted:true, rien à faire ici
+  const banned   = pool.filter(u => u.banned)
+
+  setBadge('badge-users', users.filter(u => !u.isBot && u.accepted && !u.banned).length + users.filter(u => !u.isBot && u.banned).length)
+  setBadge('badge-pending', users.filter(u => !u.isBot && !u.accepted && !u.banned).length)
+
+  const tblU = document.getElementById('tbl-users')
+  const allActive = [...accepted, ...banned]
+  if (allActive.length === 0) {
+    tblU.innerHTML = ''; document.getElementById('users-empty').style.display = 'block'
+  } else {
+    document.getElementById('users-empty').style.display = 'none'
+    tblU.innerHTML = allActive.map(u => `
+      <tr${u.isBot ? ' style="opacity:0.75"' : ''}>
+        <td><strong style="color:var(--white)">${esc(u.username)}</strong>${u.isBot ? ' <span style="font-size:0.7rem;font-weight:700;padding:1px 6px;border-radius:10px;background:rgba(130,180,255,0.15);color:#82B4FF;border:1px solid rgba(130,180,255,0.35);vertical-align:middle">🤖 BOT</span>' : ''}</td>
+        <td>${esc(capName(u.lastName))}</td><td>${esc(capName(u.firstName))}</td><td>${esc(u.phone)}</td>
+        <td><span class="player-level level-${u.category || 'NC'}">${u.category || 'NC'}</span></td>
+        <td>${u.banned ? '<span class="status-badge status-banned">Banni</span>' : '<span class="status-badge status-ok">Accepté</span>'}</td>
+        <td>${u.active ? '<span class="status-badge status-ok">Actif</span>' : '<span class="status-badge status-inactive">Inactif</span>'}</td>
+        <td style="color:var(--gray);font-size:0.82rem">${fmtDate(u.createdAt)}</td>
+        <td>
+          <div class="admin-actions">
+            <button class="btn-sm btn-edit" onclick="openEditModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">Modifier</button>
+            <div class="actions-more">
+              <button class="btn-sm btn-more" onclick="toggleActionsMenu(this)" aria-label="Plus d'actions">⋯</button>
+              <div class="actions-menu">
+                <button onclick="openPasswordModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">🔑 Mot de passe</button>
+                <button onclick="openMatchModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">+ Match</button>
+                <button onclick="quickNotify(${u.id},'${esc(capName(u.firstName))} ${esc(capName(u.lastName))}')">✉ Notifier</button>
+                ${u.active
+                  ? `<button onclick="adminAction('deactivate',${u.id})">Désactiver</button>`
+                  : `<button onclick="adminAction('activate',${u.id})">Activer</button>`}
+                ${u.banned
+                  ? `<button onclick="adminAction('unban',${u.id})">Débannir</button>
+                     <button class="danger" onclick="adminAction('delete_banned',${u.id})">🗑 Supprimer définitivement</button>`
+                  : `<button class="danger" onclick="adminAction('ban',${u.id})">Bannir</button>`}
+              </div>
+            </div>
+          </div>
+        </td>
+      </tr>`).join('')
+  }
+
+  const tblP = document.getElementById('tbl-pending')
+  if (pending.length === 0) {
+    tblP.innerHTML = ''; document.getElementById('pending-empty').style.display = 'block'
+  } else {
+    document.getElementById('pending-empty').style.display = 'none'
+    tblP.innerHTML = pending.map(u => `
+      <tr>
+        <td><strong style="color:var(--white)">${esc(u.username)}</strong></td>
+        <td>${esc(u.lastName)}</td><td>${esc(u.firstName)}</td><td>${esc(u.phone)}</td>
+        <td><span class="player-level level-${u.category || 'NC'}">${u.category || 'NC'}</span></td>
+        <td style="color:var(--gray);font-size:0.82rem">${fmtDate(u.createdAt)}</td>
+        <td>
+          <div class="admin-actions">
+            <button class="btn-sm btn-accept" onclick="adminAction('accept',${u.id})">✓ Accepter</button>
+            <button class="btn-sm btn-refuse" onclick="adminAction('refuse',${u.id})">✗ Refuser</button>
+          </div>
+        </td>
+      </tr>`).join('')
+  }
 }
 
 /* ── Historique ── */
