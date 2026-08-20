@@ -1387,12 +1387,11 @@ async function handleAction(req, res) {
       }
 
       const users = await prisma.user.findMany({
-        where: { isBot: false },
         orderBy: { createdAt: 'desc' },
         select: {
           id: true, username: true, firstName: true, lastName: true,
           phone: true, category: true, role: true,
-          accepted: true, banned: true, active: true, createdAt: true,
+          accepted: true, banned: true, active: true, createdAt: true, isBot: true,
         },
       })
       return res.status(200).json({ users })
