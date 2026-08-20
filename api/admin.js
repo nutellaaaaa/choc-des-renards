@@ -4023,25 +4023,38 @@ async function createBots(req, res) {
     })
 
     let created = 0
+    let migrationMissing = false
     for (let i = 1; i <= count; i++) {
       const n = maxN + i
       const category = VALID_CATEGORIES[Math.floor(Math.random() * VALID_CATEGORIES.length)]
-      const user = await prisma.user.create({
-        data: {
-          username: `bot_${n}`,
-          passwordHash,
-          firstName: 'Bot',
-          lastName: String(n),
-          phone: '0600000000',
-          category,
-          role: 'USER',
-          accepted: true,
-          banned: false,
-          active: true,
-          isBot: true,
-          isPerfectBot: perfectMode,
-        },
-      })
+      const baseData = {
+        username: `bot_${n}`,
+        passwordHash,
+        firstName: 'Bot',
+        lastName: String(n),
+        phone: '0600000000',
+        category,
+        role: 'USER',
+        accepted: true,
+        banned: false,
+        active: true,
+        isBot: true,
+      }
+      let user
+      try {
+        user = await prisma.user.create({ data: { ...baseData, isPerfectBot: perfectMode } })
+      } catch (createErr) {
+        // Filet de sécurité : si la colonne isPerfectBot n'existe pas encore
+        // en base (migration Prisma "npx prisma migrate dev" non appliquée
+        // après l'ajout du champ), on ne bloque pas toute la création des
+        // bots — on retente sans ce champ et on prévient l'admin dans le
+        // message de retour plutôt que de renvoyer une erreur 500 muette.
+        const msg = String(createErr?.message || '')
+        const isMissingColumn = createErr?.code === 'P2022' || /isPerfectBot/i.test(msg)
+        if (!isMissingColumn) throw createErr
+        migrationMissing = true
+        user = await prisma.user.create({ data: baseData })
+      }
       created++
       // "Mode élève parfait" : ce bot ne se connecte jamais, ne lit pas de
       // notifications, ne consulte pas la FAQ et n'envoie pas de message de
@@ -4050,7 +4063,10 @@ async function createBots(req, res) {
       // à chaque tick). On ne programme donc PAS de tâche 'login' initiale
       // pour lui : c'est cette tâche qui, normalement, déclenche en cascade
       // toute l'activité "vie de joueur" (connexion, lecture FAQ, contact…).
-      if (!perfectMode) {
+      // Si la migration manque, le bot est créé en mode normal (impossible
+      // de savoir qu'il devait être "parfait" sans la colonne) — cohérent
+      // avec l'avertissement renvoyé ci-dessous.
+      if (!perfectMode || migrationMissing) {
         await prisma.botTask.create({
           data: {
             botId: user.id,
@@ -4061,7 +4077,13 @@ async function createBots(req, res) {
       }
     }
 
-    return res.status(201).json({ ok: true, createdCount: created, message: `${created} bot(s) créé(s)${perfectMode ? ' en mode élève parfait' : ''}.` })
+    const warning = migrationMissing
+      ? ' ⚠️ La colonne "isPerfectBot" n\'existe pas encore en base (migration Prisma manquante) — les bots ont été créés en mode normal. Lancez `npx prisma migrate dev` puis redéployez pour activer le mode élève parfait.'
+      : ''
+    return res.status(201).json({
+      ok: true, createdCount: created, migrationMissing,
+      message: `${created} bot(s) créé(s)${perfectMode && !migrationMissing ? ' en mode élève parfait' : ''}.${warning}`,
+    })
   } catch (err) {
     console.error('[bots create]', err)
     return res.status(500).json({ error: 'Erreur serveur.' })
@@ -4478,10 +4500,21 @@ async function scheduleUnreadNotificationsForBots() {
 // scheduleBotSubmitScore() (bots normaux), il n'y a ici aucune chance de
 // ne jamais programmer la tâche.
 async function schedulePerfectBotScores() {
-  const perfectBots = await prisma.user.findMany({
-    where: { isBot: true, isPerfectBot: true },
-    select: { id: true },
-  })
+  let perfectBots
+  try {
+    perfectBots = await prisma.user.findMany({
+      where: { isBot: true, isPerfectBot: true },
+      select: { id: true },
+    })
+  } catch (err) {
+    // Filet de sécurité : colonne isPerfectBot absente en base (migration
+    // Prisma non appliquée) — on ignore silencieusement plutôt que de faire
+    // échouer tout le tick des bots (qui tourne à chaque ouverture du
+    // panneau admin).
+    const msg = String(err?.message || '')
+    if (err?.code === 'P2022' || /isPerfectBot/i.test(msg)) return
+    throw err
+  }
   if (perfectBots.length === 0) return
   const botIds = perfectBots.map(b => b.id)
 

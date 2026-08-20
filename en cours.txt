@@ -131,3 +131,9 @@ Voici un petit récapitulatif des statuts des matchs si jamais ce n'était pas t
 - Utiliser une visionneuse pour le pdf de la charte 
 
 - Médaille en ligne 
+
+
+Pas d'intro
+Pas de création de bots
+Pas d'interdiction de clic droit sur la charte
+

@@ -182,7 +182,9 @@
   .pdf-btn:hover { background: var(--orange-light); transform: translateY(-2px); }
   /* Visionneuse PDF de la charte — empêche le téléchargement facile */
   .pdf-viewer-wrap { position: relative; width: 100%; height: clamp(420px, 70vh, 820px); background: var(--dark2); border: 1px solid var(--dark4); border-left: 3px solid var(--orange); border-radius: 12px; overflow: hidden; margin-bottom: 2rem; }
-  .pdf-viewer-frame { width: 100%; height: 100%; border: 0; display: block; background: #525659; }
+  .pdf-viewer-canvas-scroll { width: 100%; height: 100%; overflow-y: auto; overflow-x: hidden; background: #525659; -webkit-overflow-scrolling: touch; }
+  #charte-viewer-canvas-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 10px; user-select: none; -webkit-user-select: none; }
+  #charte-viewer-canvas-wrap canvas { max-width: 100%; height: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.4); border-radius: 2px; -webkit-user-drag: none; pointer-events: none; }
   .pdf-viewer-fallback { position: absolute; inset: 0; z-index: 3; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; text-align: center; padding: 1.5rem; color: var(--gray-light); font-size: 0.95rem; background: var(--dark2); }
   .pdf-viewer-fallback .fv-icon { font-size: 2.4rem; }
   .pdf-viewer-toolbar { position: absolute; top: 0.6rem; right: 0.6rem; z-index: 4; display: flex; gap: 0.4rem; }
@@ -2090,10 +2092,6 @@
         <input type="checkbox" id="reg-rgpd">
         <label for="reg-rgpd">Je consens à ce que mes données soient collectées et utilisées pour l'organisation du Choc Des Renards (promis, pas de fouille sauvage). Pour plus d'informations, nous vous encourageons à vous renseigner sur <a href="#" onclick="showPrivacyPage(); return false;">Vos données et vos droits</a>.</label>
       </div>
-      <div class="checkbox-group-rgpd" style="display:none">
-        <input type="checkbox" id="reg-ack" checked>
-        <label for="reg-ack">J'ai pris connaissance des règles du tournoi et j'accepte de m'y conformer.</label>
-      </div>
       
       <div id="reg-error" class="auth-error"></div>
       <button class="auth-submit" id="reg-btn" onclick="handleRegister()">Créer mon compte</button>
@@ -3529,17 +3527,22 @@
     </div>
 
     <!-- Visionneuse PDF de la charte : le PDF est affiché en lecture seule,
-         avec la scrollbar native du lecteur intégré du navigateur (pas de
-         shield par-dessus, pour ne pas bloquer le défilement). On force le
-         paramètre #toolbar=0 (Chrome) pour limiter l'affichage des contrôles
-         (dont le bouton de téléchargement de la barre d'outils). -->
+         avec la scrollbar native du navigateur (overflow-y auto) pour
+         défiler dans tout le document sans avoir à l'ouvrir dans un
+         nouvel onglet. Rendu via PDF.js (canvas), et pas via <iframe> :
+         un <iframe src="fichier.pdf"> délègue le rendu au lecteur PDF
+         natif du navigateur, une brique interne totalement hors d'atteinte
+         du JS de la page (impossible d'y intercepter le clic droit, quoi
+         qu'on essaie côté parent). En rendant les pages sur de vrais
+         <canvas> qui appartiennent au document de la page, le clic droit
+         devient enfin bloquable normalement. -->
     <div class="pdf-viewer-wrap" id="charte-viewer-wrap" oncontextmenu="return false">
       <div class="pdf-viewer-toolbar">
         <button type="button" onclick="reloadCharteViewer()" title="Recharger">↻</button>
       </div>
-      <iframe class="pdf-viewer-frame" id="charte-viewer-frame"
-              src="reglement-choc-des-renards.pdf#toolbar=0&navpanes=0&view=FitH"
-              title="Charte du Choc des Renards" referrerpolicy="no-referrer" oncontextmenu="return false"></iframe>
+      <div class="pdf-viewer-canvas-scroll" id="charte-viewer-canvas-scroll" oncontextmenu="return false">
+        <div id="charte-viewer-canvas-wrap"></div>
+      </div>
       <div class="pdf-viewer-fallback" id="charte-viewer-fallback">
         <div class="fv-icon">📄</div>
         <div>Votre navigateur ne peut pas afficher le PDF dans la visionneuse.</div>
@@ -3961,6 +3964,7 @@ function showPage(id, btn) {
   if (id === 'reglement' || id === 'faq') {
     document.querySelectorAll('#page-' + id + ' .article.open').forEach(closeArticle)
   }
+  if (id === 'reglement') ensureCharteRendered()
   if (id === 'classement') loadClassement()
   if (id === 'performances') loadPerformances()
   if (id === 'souvenirs') loadGallery()
@@ -4039,22 +4043,93 @@ window.addEventListener('pagehide', () => {
   document.querySelectorAll('.article.open').forEach(closeArticle);
 });
 
-/* ===== PDF VIEWER (Charte) - blocks download, plein écran retiré (défilement natif conservé) ===== */
+/* ===== PDF VIEWER (Charte) — rendu via PDF.js sur <canvas> =====
+   Pourquoi pas un simple <iframe src="fichier.pdf"> ? Parce qu'un iframe
+   PDF est affiché par le lecteur natif du navigateur, une brique interne
+   isolée du document de la page — impossible d'y intercepter le clic
+   droit depuis notre JS, quelle que soit la méthode essayée (c'est une
+   limite de sécurité du navigateur, pas un manque côté code). En rendant
+   chaque page sur un vrai <canvas> (qui appartient réellement au DOM de
+   la page), le clic droit devient bloquable normalement. */
 const CHARTE_PDF = 'reglement-choc-des-renards.pdf'
+const PDFJS_VERSION = '3.11.174'
+let _charteRenderToken = 0
+let _charteLoaded = false
+
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`)
+    if (existing) {
+      if (existing.dataset.loaded === '1') return resolve()
+      existing.addEventListener('load', () => resolve())
+      existing.addEventListener('error', () => reject(new Error('script load failed: ' + src)))
+      return
+    }
+    const s = document.createElement('script')
+    s.src = src
+    s.onload = () => { s.dataset.loaded = '1'; resolve() }
+    s.onerror = () => reject(new Error('script load failed: ' + src))
+    document.head.appendChild(s)
+  })
+}
+
+async function ensurePdfJsLoaded() {
+  if (window.pdfjsLib) return
+  await loadScriptOnce(`https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.min.js`)
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.js`
+}
+
+async function renderCharteWithPdfJs() {
+  const scrollWrap = document.getElementById('charte-viewer-canvas-scroll')
+  const container = document.getElementById('charte-viewer-canvas-wrap')
+  const fallback = document.getElementById('charte-viewer-fallback')
+  if (!container || !fallback) return
+  const myToken = ++_charteRenderToken
+  fallback.style.display = 'none'
+  container.innerHTML = '<div style="color:#ddd;padding:2rem;text-align:center;font-family:var(--font-heading);letter-spacing:0.06em">Chargement de la charte…</div>'
+  try {
+    await ensurePdfJsLoaded()
+    if (myToken !== _charteRenderToken) return
+    const pdf = await window.pdfjsLib.getDocument(CHARTE_PDF).promise
+    if (myToken !== _charteRenderToken) return
+    container.innerHTML = ''
+    const targetWidth = (scrollWrap?.clientWidth || container.clientWidth || 760) - 20 // marge padding
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      if (myToken !== _charteRenderToken) return
+      const page = await pdf.getPage(pageNum)
+      const unscaled = page.getViewport({ scale: 1 })
+      const scale = Math.max(0.5, targetWidth / unscaled.width)
+      const viewport = page.getViewport({ scale })
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.ceil(viewport.width)
+      canvas.height = Math.ceil(viewport.height)
+      canvas.oncontextmenu = () => false
+      container.appendChild(canvas)
+      const ctx = canvas.getContext('2d')
+      await page.render({ canvasContext: ctx, viewport }).promise
+    }
+    _charteLoaded = true
+  } catch (e) {
+    console.error('[charte pdf.js]', e)
+    if (myToken === _charteRenderToken) {
+      container.innerHTML = ''
+      fallback.style.display = 'flex'
+    }
+  }
+}
 
 function reloadCharteViewer() {
-  const frame = document.getElementById('charte-viewer-frame')
-  if (frame) { frame.src = CHARTE_PDF + '#toolbar=0&navpanes=0&view=FitH&t=' + Date.now() }
+  _charteLoaded = false
+  renderCharteWithPdfJs()
 }
 
-function initCharteViewerFallback() {
-  const frame = document.getElementById('charte-viewer-frame')
-  const fallback = document.getElementById('charte-viewer-fallback')
-  if (!frame || !fallback) return
-  frame.addEventListener('load', () => { fallback.style.display = 'none' })
-  frame.addEventListener('error', () => { fallback.style.display = 'flex' })
+// Rendu paresseux : seulement au premier affichage de la page Charte
+// (déclenché depuis showPage()), pas au chargement initial du site.
+function ensureCharteRendered() {
+  if (_charteLoaded) return
+  renderCharteWithPdfJs()
 }
-window.addEventListener('DOMContentLoaded', initCharteViewerFallback)
+
 document.addEventListener('keydown', (e) => {
   const wrap = document.getElementById('charte-viewer-wrap')
   if (!wrap || !wrap.offsetParent) return
@@ -4294,8 +4369,10 @@ async function handleLogin() {
     if (data.loginEventId) localStorage.setItem('cdr_login_event_id', data.loginEventId)
     currentUser = data.user; pendingNotifications = data.pendingNotifications || []
     showApp()
-    // Intro cinématique désactivée (ses 3 boutons ont été retirés) : on ne
-    // déclenche plus jamais cet overlay, le joueur arrive directement sur le site.
+    // Intro cinématique réservée aux joueurs (jamais aux admins), uniquement
+    // sur une connexion explicite — pas au rafraîchissement de session.
+    // Lecture 100% automatique désormais (aucun bouton à cliquer).
+    if (currentUser.role !== 'ADMIN') playLoginIntro()
   } catch { errorEl.textContent = 'Erreur réseau. Réessayez.' }
   finally { btn.disabled = false; btn.textContent = 'Se connecter' }
 }
@@ -4312,9 +4389,10 @@ function playLoginIntro() {
   document.querySelectorAll('#intro-overlay .intro-stage').forEach(s => s.classList.remove('visible'))
   document.getElementById('intro-gate').classList.add('visible')
   document.getElementById('intro-progress-bar').style.width = '0%'
-  const skipBtn = document.getElementById('intro-skip')
-  skipBtn.classList.remove('visible')
-  setTimeout(() => skipBtn.classList.add('visible'), 1200)
+  // Lecture 100% automatique : plus besoin de cliquer sur "Cliquer pour
+  // commencer" — l'animation démarre toute seule après un court délai
+  // (laisse le temps au fondu d'entrée de l'overlay de se voir).
+  setTimeout(() => introStartVideo(), 500)
 }
 
 function introClickBurst(e) {
@@ -4417,6 +4495,11 @@ function introShowWelcome() {
   document.getElementById('intro-loading').classList.remove('visible')
   document.getElementById('intro-welcome-name').textContent = (currentUser && (currentUser.firstName || currentUser.username)) || ''
   document.getElementById('intro-welcome').classList.add('visible')
+  // Lecture 100% automatique : plus besoin de cliquer sur "Continuer" —
+  // on laisse le message de bienvenue le temps d'être lu, puis on enchaîne.
+  const welcomeEl = document.getElementById('intro-welcome')
+  clearTimeout(welcomeEl._introFallback)
+  welcomeEl._introFallback = setTimeout(() => introFinish(), 2500)
 }
 
 function introFinish() {
@@ -8930,8 +9013,8 @@ async function createBots() {
     const res = await fetch('/api/admin/bots', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'create', count, perfectMode }) })
     const data = await res.json()
     if (res.ok) {
-      feedback.textContent = '✓ ' + (data.message || 'Bots créés.')
-      feedback.style.color = '#6ddc6d'
+      feedback.textContent = (data.migrationMissing ? '⚠ ' : '✓ ') + (data.message || 'Bots créés.')
+      feedback.style.color = data.migrationMissing ? '#ffb84d' : '#6ddc6d'
       await Promise.all([loadUsers(), loadBotsStatus()])
     } else {
       feedback.textContent = '✗ ' + (data.error || 'Erreur.')
