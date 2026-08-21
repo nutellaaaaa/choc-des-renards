@@ -1170,8 +1170,8 @@ async function handlePoules(req, res) {
           },
         }),
         prisma.user.findMany({
-          where: { accepted: true, banned: false, active: true, isBot: false, username: { notIn: ADMIN_USERNAMES } },
-          select: { id: true, firstName: true, lastName: true, username: true, category: true },
+          where: { accepted: true, banned: false, active: true, username: { notIn: ADMIN_USERNAMES } },
+          select: { id: true, firstName: true, lastName: true, username: true, category: true, isBot: true },
           orderBy: { lastName: 'asc' },
         }),
       ])
@@ -1276,7 +1276,7 @@ async function handlePoules(req, res) {
       const allAssigned = await prisma.pouleMember.findMany({ select: { userId: true } })
       const assignedIds = new Set(allAssigned.map(m => m.userId))
       const eligible = await prisma.user.findMany({
-        where: { accepted: true, banned: false, active: true, isBot: false, username: { notIn: ADMIN_USERNAMES } },
+        where: { accepted: true, banned: false, active: true, username: { notIn: ADMIN_USERNAMES } },
         select: { id: true },
       })
       const pool = eligible.filter(u => !assignedIds.has(u.id))
@@ -2041,8 +2041,8 @@ async function handleMatch(req, res) {
           },
         }),
         prisma.user.findMany({
-          where: { accepted: true, banned: false, active: true, isBot: false, username: { notIn: ADMIN_USERNAMES } },
-          select: { id: true, firstName: true, lastName: true, username: true, category: true },
+          where: { accepted: true, banned: false, active: true, username: { notIn: ADMIN_USERNAMES } },
+          select: { id: true, firstName: true, lastName: true, username: true, category: true, isBot: true },
           orderBy: { lastName: 'asc' },
         }),
         prisma.specialMatch.findMany({

@@ -5212,14 +5212,7 @@ async function loadClassement() {
     const res = await fetch('/api/matches', { headers: authHeaders() })
     if (!res.ok) { container.innerHTML = '<div class="admin-empty">Impossible de charger le classement.</div>'; return }
     const { phase, round, players, poules, phase2Groups } = await res.json()
-    // Bug 4 : filtrer les bots cote client (filtrage de secours si le serveur
-    // n a pas encore filtre, ou si le snapshot contient encore des bots).
-    const isBotUsername = (u) => {
-      if (!u || !u.username) return false
-      return /^bot_\d+$/i.test(u.username)
-    }
-    const filteredPlayers = (players || []).filter(p => !isBotUsername(p))
-    classementPlayers = filteredPlayers
+    classementPlayers = players || []
 
     document.getElementById('classement-subtitle').textContent = 'Phase en cours : ' + phaseLabel(phase, round)
 
@@ -5265,9 +5258,9 @@ async function loadClassement() {
       html += `<div id="class-groups" class="phase-content${defaultTab === 'groups' ? ' active' : ''}">`
       for (const g of phase2Groups) {
         const gMembers = (g.members || []).map(m => {
-          const pl = filteredPlayers.find(p => p.id === (m.userId || m.id))
+          const pl = classementPlayers.find(p => p.id === (m.userId || m.id))
           return pl || { ...m.user, points: 0, wins: 0, losses: 0, played: 0, setDiff: 0 }
-        }).filter(m => !isBotUsername(m))
+        })
         html += `<div class="poule-title">🦊 ${esc(g.name)}</div>`
         html += renderGroupList(gMembers)
       }
@@ -5389,13 +5382,7 @@ async function loadPerformances() {
     const res = await fetch('/api/matches', { headers: authHeaders() })
     if (!res.ok) { container.innerHTML = '<div class="admin-empty">Impossible de charger les performances.</div>'; return }
     const { phase, players } = await res.json()
-    // Bug 4 : filtrer les bots cote client (les bots supprimes ne doivent
-    // plus apparaitre dans les performances).
-    const isBotUsername = (u) => {
-      if (!u || !u.username) return false
-      return /^bot_\d+$/i.test(u.username)
-    }
-    perfPlayers = (players || []).filter(p => !isBotUsername(p))
+    perfPlayers = players || []
     classementPlayers = perfPlayers // réutilise la modale de détail joueur (showPlayerDetail / bindPlayerRows)
     perfBestProgressionId = computeBestProgressionId(perfPlayers)
 
