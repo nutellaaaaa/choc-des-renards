@@ -991,6 +991,13 @@
   .status-badge { display: inline-block; font-family: var(--font-heading); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; }
   .status-ok       { background: rgba(100,220,100,0.15); color: #6ddc6d; }
   .status-inactive { background: rgba(136,136,136,0.15); color: #aaa; }
+  /* Badge actif/inactif cliquable dans le tableau Utilisateurs */
+  .status-toggle {
+    cursor: pointer; border: none; outline: none;
+    transition: filter 0.15s, transform 0.1s;
+  }
+  .status-toggle:hover { filter: brightness(1.25); transform: scale(1.07); }
+  .status-toggle:active { transform: scale(0.97); }
   .status-wait     { background: rgba(255,220,50,0.15);  color: #ffd700; }
   .status-banned   { background: rgba(255,100,100,0.15); color: #ff7070; }
   .log-success { color: #6ddc6d; }
@@ -6307,7 +6314,10 @@ function renderUsersTable() {
         <td>${esc(capName(u.lastName))}</td><td>${esc(capName(u.firstName))}</td><td>${esc(u.phone)}</td>
         <td><span class="player-level level-${u.category || 'NC'}">${u.category || 'NC'}</span></td>
         <td>${u.banned ? '<span class="status-badge status-banned">Banni</span>' : '<span class="status-badge status-ok">Accepté</span>'}</td>
-        <td>${u.active ? '<span class="status-badge status-ok">Actif</span>' : '<span class="status-badge status-inactive">Inactif</span>'}</td>
+        <td>${u.active
+          ? `<button class="status-badge status-ok status-toggle" onclick="toggleActive(${u.id},true)" title="Cliquer pour désactiver">Actif</button>`
+          : `<button class="status-badge status-inactive status-toggle" onclick="toggleActive(${u.id},false)" title="Cliquer pour activer">Inactif</button>`
+        }</td>
         <td style="color:var(--gray);font-size:0.82rem">${fmtDate(u.createdAt)}</td>
         <td>
           <div class="admin-actions">
@@ -6318,9 +6328,6 @@ function renderUsersTable() {
                 <button onclick="openPasswordModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">🔑 Mot de passe</button>
                 <button onclick="openMatchModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">+ Match</button>
                 <button onclick="quickNotify(${u.id},'${esc(capName(u.firstName))} ${esc(capName(u.lastName))}')">✉ Notifier</button>
-                ${u.active
-                  ? `<button onclick="adminAction('deactivate',${u.id})">Désactiver</button>`
-                  : `<button onclick="adminAction('activate',${u.id})">Activer</button>`}
                 ${u.banned
                   ? `<button onclick="adminAction('unban',${u.id})">Débannir</button>
                      <button class="danger" onclick="adminAction('delete_banned',${u.id})">🗑 Supprimer définitivement</button>`
@@ -6397,6 +6404,17 @@ function renderHistory(events) {
       <td style="font-size:0.78rem;color:var(--gray)">${esc(e.ip||'—')}</td>
     </tr>`
   }).join('')
+}
+
+/* ── Toggle actif/inactif (clic direct sur le badge) ── */
+async function toggleActive(userId, currentlyActive) {
+  const action = currentlyActive ? 'deactivate' : 'activate'
+  try {
+    const res  = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({action, userId}) })
+    const data = await res.json()
+    if (!res.ok) { alert(data.error||'Erreur.'); return }
+    await loadUsers()
+  } catch { alert('Erreur réseau.') }
 }
 
 /* ── Actions admin ── */
