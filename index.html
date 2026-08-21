@@ -283,6 +283,16 @@
   .perf-badge { display: inline-flex; align-items: center; gap: 0.25rem; font-family: var(--font-heading); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; padding: 0.2rem 0.55rem; border-radius: 20px; white-space: nowrap; vertical-align: middle; }
   .perf-badge-streak { background: rgba(255, 122, 26, 0.15); color: var(--orange); border: 1px solid var(--orange-dim, #6b3a1a); }
   .perf-badge-progress { background: rgba(70, 200, 120, 0.15); color: #4ec97f; border: 1px solid rgba(70, 200, 120, 0.35); }
+  .perf-badge-bete-noire    { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.35); }
+  .perf-badge-elite         { background: rgba(64, 156, 255, 0.15); color: #6bb6ff; border: 1px solid rgba(64, 156, 255, 0.4); }
+  .perf-badge-insubmersible { background: rgba(34, 180, 243, 0.15); color: #60c8f5; border: 1px solid rgba(34, 180, 243, 0.35); }
+  .perf-badge-renaissance   { background: rgba(255, 87, 34, 0.15);  color: #ff8a65; border: 1px solid rgba(255, 87, 34, 0.35); }
+  .perf-badge-rookie        { background: rgba(76, 175, 80, 0.15);  color: #81c784; border: 1px solid rgba(76, 175, 80, 0.35); }
+  .perf-badge-veteran       { background: rgba(255, 193, 7, 0.15);  color: #ffd54f; border: 1px solid rgba(255, 193, 7, 0.35); }
+  .perf-badge-sans-faute    { background: rgba(0, 188, 212, 0.15);  color: #4dd0e1; border: 1px solid rgba(0, 188, 212, 0.35); }
+  .perf-badge-mur           { background: rgba(100, 160, 230, 0.15); color: #90c0f0; border: 1px solid rgba(100, 160, 230, 0.35); }
+  .perf-badge-intouchable   { background: rgba(186, 85, 211, 0.15); color: #da8fef; border: 1px solid rgba(186, 85, 211, 0.35); }
+  .perf-badge-equilibriste  { background: rgba(233, 30, 99, 0.15);  color: #f06292; border: 1px solid rgba(233, 30, 99, 0.35); }
   .player-name .perf-badge { margin-left: 0.5rem; }
   .matches-list { display: flex; flex-direction: column; gap: 0.75rem; }
   .match-card { background: var(--dark3); border: 1px solid var(--dark4); border-radius: 10px; padding: 1rem 1.25rem; }
@@ -2789,6 +2799,15 @@
             <button class="btn-sm btn-edit" onclick="fastForwardBots()">⏩ Avancer le temps</button>
           </div>
           <div id="bots-status" style="margin-top:0.6rem;font-size:0.82rem;color:var(--gray)"></div>
+        </div>
+        <div class="other-action-card" style="grid-column:1/-1">
+          <h4>🏅 Badges — Onglet Performances</h4>
+          <p>Cochez les badges à afficher dans l'onglet Performances (carte joueur et tableau). Les badges décochés restent calculés mais n'apparaissent pas. Passez la souris sur un badge pour lire sa description.</p>
+          <div id="badges-visibility-list" style="display:flex;flex-wrap:wrap;gap:0.7rem;margin-top:0.8rem"></div>
+          <div style="display:flex;align-items:center;gap:0.9rem;margin-top:0.9rem;flex-wrap:wrap">
+            <button class="btn-sm btn-accept" id="save-hidden-badges-btn" onclick="saveBadgesConfig()">Enregistrer</button>
+            <span id="badges-config-feedback" style="font-size:0.85rem;font-weight:600"></span>
+          </div>
         </div>
       </div>
       <div id="other-actions-feedback" class="modal-success" style="margin-top:1rem"></div>
@@ -5326,6 +5345,64 @@ function switchClassTab(id, btn) {
 /* ══════════════ PERFORMANCES ══════════════ */
 let perfPlayers = []
 let perfBestProgressionId = null
+let perfTireurEliteId     = null
+let perfRenardArgenteId   = null
+let perfMurDeGlaceId      = null
+let _hiddenBadges = []
+
+// Catalogue des badges — utilisé pour le panneau admin et le rendu
+const PERF_BADGES = [
+  { key: 'streak',         emoji: '🔥', label: "X d'affilée",       desc: "Série de victoires consécutives ≥ 3 depuis le dernier match. Affiche le nombre exact. S'arrête à la première défaite." },
+  { key: 'top_mois',       emoji: '📈', label: 'Top du mois',        desc: "Badge unique — joueur avec le plus de points gagnés ce mois-ci (3 pts/victoire, 1 pt/défaite). Non attribué si personne n'a encore de points." },
+  { key: 'bete_noire',     emoji: '💀', label: 'Bête noire',         desc: "A battu le même adversaire au moins 3 fois au total en carrière. Plusieurs joueurs peuvent le porter simultanément." },
+  { key: 'tireur_elite',   emoji: '🎯', label: "Tireur d'élite",     desc: "Badge unique — meilleur taux de victoire ce mois-ci (minimum 3 matchs joués ce mois pour être éligible)." },
+  { key: 'insubmersible',  emoji: '🌊', label: 'Insubmersible',      desc: "N'a jamais enchaîné plus de 2 défaites consécutives sur toute sa carrière. Requis : min. 5 matchs joués." },
+  { key: 'renaissance',    emoji: '⚡', label: 'Renaissance',         desc: "A enchaîné au moins 3 victoires consécutives immédiatement après une série d'au moins 3 défaites consécutives." },
+  { key: 'petit_nouveau',  emoji: '🐣', label: 'Petit Nouveau',      desc: "A remporté au moins 1 victoire parmi ses 5 premiers matchs au total. Le badge disparaît dès le 6e match." },
+  { key: 'renard_argente', emoji: '🦊', label: 'Renard Argenté',     desc: "Badge unique — le joueur ayant disputé le plus grand nombre de matchs au total. Le doyen du tournoi." },
+  { key: 'sans_faute',     emoji: '📅', label: 'Sans Faute',         desc: "A joué au moins 1 match lors de chacune des 4 dernières semaines civiles (lundi–dimanche)." },
+  { key: 'mur_de_glace',   emoji: '🧊', label: 'Mur de Glace',       desc: "Badge unique — le moins de défaites sur ses 10 derniers matchs, parmi les joueurs en ayant ≥ 10 au total." },
+  { key: 'intouchable',    emoji: '👑', label: 'Intouchable',         desc: "Zéro défaite ce mois-ci avec au minimum 3 matchs joués ce mois. Plusieurs joueurs peuvent le porter simultanément." },
+  { key: 'equilibriste',   emoji: '🎲', label: 'Équilibriste',        desc: "Win rate entre 45 % et 55 % sur toute sa carrière (minimum 10 matchs joués). L'éternel équilibré." },
+]
+
+function loadBadgesConfig() {
+  try {
+    const stored = localStorage.getItem('cdr_hidden_badges')
+    _hiddenBadges = stored ? JSON.parse(stored) : []
+    if (!Array.isArray(_hiddenBadges)) _hiddenBadges = []
+  } catch { _hiddenBadges = [] }
+}
+
+function renderBadgesVisibility() {
+  const container = document.getElementById('badges-visibility-list')
+  if (!container) return
+  container.innerHTML = PERF_BADGES.map(b => {
+    const visible = !_hiddenBadges.includes(b.key)
+    return `<label title="${b.desc}"
+      style="display:flex;align-items:center;gap:0.6rem;cursor:pointer;background:var(--dark3);border:1px solid ${visible ? 'var(--orange)' : 'var(--dark4)'};border-radius:8px;padding:0.5rem 0.9rem;">
+      <input type="checkbox" value="${b.key}" ${visible ? 'checked' : ''} style="accent-color:var(--orange)">
+      <span style="font-family:var(--font-heading);font-size:0.88rem;font-weight:600;color:${visible ? 'var(--orange)' : 'var(--gray)'}">${b.emoji} ${b.label}</span>
+    </label>`
+  }).join('')
+}
+
+function saveBadgesConfig() {
+  const checkboxes = document.querySelectorAll('#badges-visibility-list input[type=checkbox]')
+  _hiddenBadges = [...checkboxes].filter(c => !c.checked).map(c => c.value)
+  const feedback = document.getElementById('badges-config-feedback')
+  const btn = document.getElementById('save-hidden-badges-btn')
+  try {
+    localStorage.setItem('cdr_hidden_badges', JSON.stringify(_hiddenBadges))
+    renderBadgesVisibility()
+    if (perfPlayers.length > 0) renderPerformancesList(perfPlayers)
+    if (feedback) { feedback.textContent = '✓ Enregistré.'; feedback.style.color = '#6ddc6d' }
+    if (btn) { const prev = btn.textContent; btn.textContent = '✓ Enregistré !'; setTimeout(() => { btn.textContent = prev }, 1800) }
+  } catch {
+    if (feedback) { feedback.textContent = '✗ Erreur de sauvegarde.'; feedback.style.color = '#ff7070' }
+  }
+  if (feedback) setTimeout(() => { feedback.textContent = '' }, 4000)
+}
 
 // Résultat (victoire/défaite) d'un match du point de vue du joueur
 function matchIsWin(m) {
@@ -5366,11 +5443,194 @@ function computeBestProgressionId(list) {
   return bestId // null si personne n'a encore de points ce mois-ci
 }
 
+// 💀 Bête noire — a battu le même adversaire ≥ 3 fois en carrière
+function computeIsBeteNoire(player) {
+  const winsVs = {}
+  for (const m of (player.matches || [])) {
+    if (!matchIsWin(m)) continue
+    const key = ((m.opponentFirstName || '') + ' ' + (m.opponentLastName || '')).trim().toLowerCase()
+    if (!key) continue
+    winsVs[key] = (winsVs[key] || 0) + 1
+    if (winsVs[key] >= 3) return true
+  }
+  return false
+}
+
+// 🎯 Tireur d'élite — meilleur taux de victoire du mois (min. 3 matchs)
+function computeMonthlyWinRate(matches) {
+  const now = new Date()
+  let wins = 0, total = 0
+  for (const m of (matches || [])) {
+    if (!m.matchDate) continue
+    const d = new Date(m.matchDate)
+    if (d.getFullYear() !== now.getFullYear() || d.getMonth() !== now.getMonth()) continue
+    total++
+    if (matchIsWin(m)) wins++
+  }
+  return total >= 3 ? wins / total : -1
+}
+
+function computeTireurEliteId(list) {
+  let bestId = null, bestRate = -1
+  for (const p of (list || [])) {
+    const rate = computeMonthlyWinRate(p.matches)
+    if (rate > bestRate) { bestRate = rate; bestId = p.id }
+  }
+  return bestRate >= 0 ? bestId : null
+}
+
+// 🌊 Insubmersible — jamais plus de 2 défaites d'affilée (min. 5 matchs)
+function computeIsInsubmersible(player) {
+  const matches = player.matches || []
+  if (matches.length < 5) return false
+  let streak = 0
+  // matches = du plus récent au plus ancien → on parcourt chronologiquement (reverse)
+  for (const m of [...matches].reverse()) {
+    if (!matchIsWin(m)) { if (++streak > 2) return false }
+    else streak = 0
+  }
+  return true
+}
+
+// ⚡ Renaissance — 3+ victoires juste après 3+ défaites consécutives
+function computeIsRenaissance(player) {
+  const matches = player.matches || []
+  if (matches.length < 6) return false
+  const chrono = [...matches].reverse().map(m => matchIsWin(m) ? 'W' : 'L')
+  let i = 0
+  while (i < chrono.length) {
+    if (chrono[i] === 'L') {
+      let lEnd = i
+      while (lEnd < chrono.length && chrono[lEnd] === 'L') lEnd++
+      if (lEnd - i >= 3) {
+        let wEnd = lEnd
+        while (wEnd < chrono.length && chrono[wEnd] === 'W') wEnd++
+        if (wEnd - lEnd >= 3) return true
+      }
+      i = lEnd
+    } else { i++ }
+  }
+  return false
+}
+
+// 🐣 Petit Nouveau — ≥ 1 victoire parmi ses ≤ 5 premiers matchs
+function computeIsPetitNouveau(player) {
+  const matches = player.matches || []
+  if (matches.length === 0 || matches.length > 5) return false
+  return matches.some(m => matchIsWin(m))
+}
+
+// 🦊 Renard Argenté — le joueur avec le plus de matchs au total
+function computeRenardArgenteId(list) {
+  let bestId = null, most = 0
+  for (const p of (list || [])) {
+    const n = (p.matches || []).length
+    if (n > most) { most = n; bestId = p.id }
+  }
+  return most > 0 ? bestId : null
+}
+
+// 📅 Sans Faute — au moins 1 match lors de chacune des 4 dernières semaines civiles
+function computeIsSansFaute(player) {
+  const now = new Date()
+  // Lundi de la semaine courante (minuit UTC)
+  const day = now.getDay() // 0=dim, 1=lun…
+  const mondayOffset = (day === 0 ? -6 : 1 - day)
+  const thisMonday = new Date(now)
+  thisMonday.setUTCHours(0, 0, 0, 0)
+  thisMonday.setDate(thisMonday.getDate() + mondayOffset)
+  const matches = player.matches || []
+  for (let i = 0; i < 4; i++) {
+    const wStart = thisMonday.getTime() - i * 7 * 86400000
+    const wEnd   = wStart + 7 * 86400000
+    const hasMatch = matches.some(m => {
+      if (!m.matchDate) return false
+      const t = new Date(m.matchDate).getTime()
+      return t >= wStart && t < wEnd
+    })
+    if (!hasMatch) return false
+  }
+  return true
+}
+
+// 🧊 Mur de Glace — le moins de défaites sur les 10 derniers matchs (min. 10 matchs)
+function computeMurDeGlaceId(list) {
+  let bestId = null, fewest = Infinity
+  for (const p of (list || [])) {
+    const matches = p.matches || []
+    if (matches.length < 10) continue
+    const losses = matches.slice(0, 10).filter(m => !matchIsWin(m)).length
+    if (losses < fewest) { fewest = losses; bestId = p.id }
+  }
+  return bestId
+}
+
+// 👑 Intouchable — 0 défaite ce mois avec ≥ 3 matchs joués ce mois
+function computeIsIntouchable(player) {
+  const now = new Date()
+  let losses = 0, total = 0
+  for (const m of (player.matches || [])) {
+    if (!m.matchDate) continue
+    const d = new Date(m.matchDate)
+    if (d.getFullYear() !== now.getFullYear() || d.getMonth() !== now.getMonth()) continue
+    total++
+    if (!matchIsWin(m)) losses++
+  }
+  return total >= 3 && losses === 0
+}
+
+// 🎲 Équilibriste — win rate entre 45 % et 55 % (min. 10 matchs)
+function computeIsEquilibriste(player) {
+  const matches = player.matches || []
+  if (matches.length < 10) return false
+  const wins = matches.filter(m => matchIsWin(m)).length
+  const rate = wins / matches.length
+  return rate >= 0.45 && rate <= 0.55
+}
+
 function playerBadgesHtml(p) {
   let badges = ''
-  const streak = computeCurrentStreak(p.matches)
-  if (streak >= 3) badges += `<span class="perf-badge perf-badge-streak" title="${streak} victoires d'affilée">🔥 ${streak} d'affilée</span>`
-  if (perfBestProgressionId && p.id === perfBestProgressionId) badges += `<span class="perf-badge perf-badge-progress" title="Meilleure progression du mois">📈 Top du mois</span>`
+  const show = key => !_hiddenBadges.includes(key)
+
+  // 🔥 Série en cours
+  if (show('streak')) {
+    const streak = computeCurrentStreak(p.matches)
+    if (streak >= 3) badges += `<span class="perf-badge perf-badge-streak" title="${streak} victoires d'affilée">🔥 ${streak} d'affilée</span>`
+  }
+  // 📈 Top du mois
+  if (show('top_mois') && perfBestProgressionId && p.id === perfBestProgressionId)
+    badges += `<span class="perf-badge perf-badge-progress" title="Meilleure progression du mois">📈 Top du mois</span>`
+  // 💀 Bête noire
+  if (show('bete_noire') && computeIsBeteNoire(p))
+    badges += `<span class="perf-badge perf-badge-bete-noire" title="A battu le même adversaire ≥ 3 fois">💀 Bête noire</span>`
+  // 🎯 Tireur d'élite
+  if (show('tireur_elite') && perfTireurEliteId && p.id === perfTireurEliteId)
+    badges += `<span class="perf-badge perf-badge-elite" title="Meilleur taux de victoire ce mois (min. 3 matchs)">🎯 Tireur d'élite</span>`
+  // 🌊 Insubmersible
+  if (show('insubmersible') && computeIsInsubmersible(p))
+    badges += `<span class="perf-badge perf-badge-insubmersible" title="Jamais plus de 2 défaites d'affilée (carrière)">🌊 Insubmersible</span>`
+  // ⚡ Renaissance
+  if (show('renaissance') && computeIsRenaissance(p))
+    badges += `<span class="perf-badge perf-badge-renaissance" title="3+ victoires après 3+ défaites consécutives">⚡ Renaissance</span>`
+  // 🐣 Petit Nouveau
+  if (show('petit_nouveau') && computeIsPetitNouveau(p))
+    badges += `<span class="perf-badge perf-badge-rookie" title="Première victoire parmi les 5 premiers matchs">🐣 Petit Nouveau</span>`
+  // 🦊 Renard Argenté
+  if (show('renard_argente') && perfRenardArgenteId && p.id === perfRenardArgenteId)
+    badges += `<span class="perf-badge perf-badge-veteran" title="Le joueur le plus expérimenté du tournoi">🦊 Renard Argenté</span>`
+  // 📅 Sans Faute
+  if (show('sans_faute') && computeIsSansFaute(p))
+    badges += `<span class="perf-badge perf-badge-sans-faute" title="A joué chaque semaine sur les 4 dernières">📅 Sans Faute</span>`
+  // 🧊 Mur de Glace
+  if (show('mur_de_glace') && perfMurDeGlaceId && p.id === perfMurDeGlaceId)
+    badges += `<span class="perf-badge perf-badge-mur" title="Moins de défaites sur les 10 derniers matchs">🧊 Mur de Glace</span>`
+  // 👑 Intouchable
+  if (show('intouchable') && computeIsIntouchable(p))
+    badges += `<span class="perf-badge perf-badge-intouchable" title="Zéro défaite ce mois (min. 3 matchs joués)">👑 Intouchable</span>`
+  // 🎲 Équilibriste
+  if (show('equilibriste') && computeIsEquilibriste(p))
+    badges += `<span class="perf-badge perf-badge-equilibriste" title="Win rate 45–55 % sur toute la carrière (min. 10 matchs)">🎲 Équilibriste</span>`
+
   return badges
 }
 
@@ -5384,7 +5644,11 @@ async function loadPerformances() {
     const { phase, players } = await res.json()
     perfPlayers = players || []
     classementPlayers = perfPlayers // réutilise la modale de détail joueur (showPlayerDetail / bindPlayerRows)
+    loadBadgesConfig()
     perfBestProgressionId = computeBestProgressionId(perfPlayers)
+    perfTireurEliteId     = computeTireurEliteId(perfPlayers)
+    perfRenardArgenteId   = computeRenardArgenteId(perfPlayers)
+    perfMurDeGlaceId      = computeMurDeGlaceId(perfPlayers)
 
     if (phase === 'PHASE0') {
       myCard.style.display = 'none'
@@ -8913,6 +9177,9 @@ async function loadOtherActionsConfig() {
     renderTabsVisibility()
     applyHiddenTabs()
     applyDockOrder()
+    // Badges performances
+    loadBadgesConfig()
+    renderBadgesVisibility()
     // Rappels auto
     _autoRemindersEnabled = data.autoRemindersEnabled ?? true
     updateAutoReminderBtn()
