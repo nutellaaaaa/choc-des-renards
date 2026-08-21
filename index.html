@@ -6144,6 +6144,7 @@ function goBackToKingdom() {
   const wrap = document.getElementById('admin-content-wrap')
   if (hub) hub.classList.remove('hide')
   if (wrap) wrap.style.display = 'none'
+  if (typeof syncKBadges === 'function') syncKBadges()
   window.scrollTo(0, 0)
 }
 
@@ -7163,9 +7164,10 @@ async function createGroup() {
   closeModal('create-group-modal'); await loadPoules()
 }
 async function createDefaultGroups() {
-  if (!confirm('Créer "Renards Choquants" et "Renards Choqués" ?')) return
-  await fetch('/api/admin/poules', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'create_group', name: 'Renards Choquants' }) })
-  await fetch('/api/admin/poules', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'create_group', name: 'Renards Choqués' }) })
+  if (!confirm('Créer "Renards Choquants" et "Renards Choqués" et y répartir les joueurs par classement ?')) return
+  const res  = await fetch('/api/admin/poules', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'init_default_groups' }) })
+  const data = await res.json()
+  if (!res.ok) { alert(data.error || 'Erreur lors de la création des groupes.'); return }
   await loadPoules()
 }
 async function renameGroup(id, current) {

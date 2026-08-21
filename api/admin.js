@@ -1306,6 +1306,46 @@ async function handlePoules(req, res) {
     }
   }
 
+  // Crée "Renards Choquants" et "Renards Choqués" et y répartit les joueurs
+  // selon le classement courant : première moitié (les plus forts) → Choquants,
+  // seconde moitié → Choqués.
+  if (action === 'init_default_groups') {
+    try {
+      // Récupérer tous les joueurs actifs avec leurs matchs publiés
+      const users = await prisma.user.findMany({
+        where: { accepted: true, banned: false, active: true, username: { notIn: ADMIN_USERNAMES } },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true, createdAt: true,
+          matches: { where: { published: true }, include: { sets: { orderBy: { setNumber: 'asc' } } } },
+        },
+      })
+
+      // Classer selon le même critère que le classement affiché
+      const ranked = sortPlayers(users.map(u => ({ id: u.id, createdAt: u.createdAt, ...computeStats(u.matches) })))
+
+      const half = Math.ceil(ranked.length / 2)
+      const topHalf    = ranked.slice(0, half)   // joueurs les plus forts
+      const bottomHalf = ranked.slice(half)       // joueurs les moins forts
+
+      await prisma.$transaction(async tx => {
+        const g1 = await tx.phase2Group.create({ data: { name: 'Renards Choquants' } })
+        const g2 = await tx.phase2Group.create({ data: { name: 'Renards Choqués' } })
+        if (topHalf.length > 0) {
+          await tx.phase2GroupMember.createMany({ data: topHalf.map(p => ({ groupId: g1.id, userId: p.id })) })
+        }
+        if (bottomHalf.length > 0) {
+          await tx.phase2GroupMember.createMany({ data: bottomHalf.map(p => ({ groupId: g2.id, userId: p.id })) })
+        }
+      })
+
+      return res.status(201).json({ ok: true })
+    } catch (err) {
+      console.error('[admin/poules init_default_groups]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
   if (action === 'rename_group') {
     const { groupId, name } = req.body
     const gid = parseInt(groupId, 10)
@@ -2476,6 +2516,22 @@ async function handleMatch(req, res) {
         }
       }
 
+      // Bots : soumission immédiate du score — pas besoin du cycle
+      // tick → read_notification → submit_score.
+      // botSubmitScore crée les deux entrées Match ET supprime le PlannedMatch
+      // en une transaction, donc on ne l'appelle qu'une seule fois par match,
+      // même si les deux joueurs sont des bots.
+      const botMatchesDone = new Set()
+      for (const t of targets) {
+        if (!t.user.isBot) continue
+        const pmId = t.plannedMatch.id
+        if (botMatchesDone.has(pmId)) continue
+        botMatchesDone.add(pmId)
+        await botSubmitScore({ botId: t.userId, payload: { plannedMatchId: pmId }, dueAt: new Date() }).catch(err => {
+          console.error('[notify_next_send] botSubmitScore pmId='+pmId, err)
+        })
+      }
+
       return res.status(200).json({ ok: true, count })
     } catch (err) {
       console.error('[admin/match notify_next_send]', err)
@@ -2767,6 +2823,32 @@ function shiftPastBlackouts(date, blackouts) {
     }
   }
   return cur
+}
+
+// Étend la deadline pour compenser les jours de blackout qui tombent
+// à l'intérieur de la fenêtre [windowStart, deadline].
+// Résultat : la fenêtre est coupée en deux (avant + après les vacances)
+// tout en conservant le même nombre de jours jouables.
+// Itère car l'extension peut elle-même chevaucher un autre blackout.
+function extendDeadlineForBlackouts(windowStart, rawDeadline, blackouts) {
+  let deadline = new Date(rawDeadline)
+  let moved = true
+  let guard = 0
+  while (moved && guard < 50) {
+    moved = false
+    guard++
+    for (const bp of blackouts) {
+      const overlapStart = bp.dateStart > windowStart ? bp.dateStart : windowStart
+      const overlapEnd   = bp.dateEnd   < deadline    ? bp.dateEnd   : deadline
+      if (overlapStart <= overlapEnd) {
+        const blackoutDays = Math.round((overlapEnd.getTime() - overlapStart.getTime()) / MS_PER_DAY) + 1
+        deadline = addDays(deadline, blackoutDays)
+        moved = true
+        break // relancer : l'extension peut chevaucher un autre blackout
+      }
+    }
+  }
+  return deadline
 }
 
 // Génère un calendrier round-robin (méthode du cercle) pour une liste d'IDs joueurs.
@@ -3131,7 +3213,8 @@ async function computePhase1(req, res, answers) {
     for (const { poule, byId, filteredRounds } of pouleData) {
       filteredRounds.forEach((roundPairs, rIdx) => {
         const scheduledDate = roundDates[rIdx]
-        const deadlineAt = addHours(addDays(scheduledDate, settings.cycleLengthDays), -settings.deadlineHoursBeforeCycleEnd)
+        const rawDeadline = addHours(addDays(scheduledDate, settings.cycleLengthDays), -settings.deadlineHoursBeforeCycleEnd)
+        const deadlineAt = extendDeadlineForBlackouts(scheduledDate, rawDeadline, blackouts)
         for (const [a, b] of roundPairs) {
           const p1 = byId.get(a), p2 = byId.get(b)
           const auto = computeAutoMalus(p1.category, p2.category, dynamicMalusList)
@@ -3204,8 +3287,8 @@ async function computeNextMatchTargets() {
     where: { forfeited: false, scheduledDate: { not: null } },
     orderBy: { scheduledDate: 'asc' },
     include: {
-      player1: { select: { id: true, firstName: true, lastName: true, username: true } },
-      player2: { select: { id: true, firstName: true, lastName: true, username: true } },
+      player1: { select: { id: true, firstName: true, lastName: true, username: true, isBot: true } },
+      player2: { select: { id: true, firstName: true, lastName: true, username: true, isBot: true } },
     },
   })
 
@@ -3650,7 +3733,8 @@ async function computePhase2Round(req, res, answers, roundOverride) {
     if (cursor.getTime() !== rawDate.getTime()) log('avertissement', `Ronde ${round} initialement prévue le ${fmtDate(rawDate)} — décalée au ${fmtDate(cursor)} (période de non-jeu).`)
     else log('info', `Ronde ${round} : ${fmtDate(cursor)}.`)
     const scheduledDate = cursor
-    const deadlineAt = addHours(addDays(scheduledDate, settings.cycleLengthDays), -settings.deadlineHoursBeforeCycleEnd)
+    const rawDeadlineAt = addHours(addDays(scheduledDate, settings.cycleLengthDays), -settings.deadlineHoursBeforeCycleEnd)
+    const deadlineAt = extendDeadlineForBlackouts(scheduledDate, rawDeadlineAt, blackouts)
 
     if (deadlineAt > settings.periodEnd) {
       log('avertissement', `La deadline de cette ronde (${fmtDateTime(deadlineAt)}) dépasse la fin de période prévue (${fmtDate(settings.periodEnd)}).`)
