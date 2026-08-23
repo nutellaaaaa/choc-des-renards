@@ -668,7 +668,6 @@ async function handleChat(req, res) {
       const [plannedMatches, specialMatches] = await Promise.all([
         prisma.plannedMatch.findMany({
           where: {
-            phase: currentPhase,
             forfeited: false,
             OR: [{ player1Id: uid }, { player2Id: uid }],
           },
@@ -691,8 +690,8 @@ async function handleChat(req, res) {
 
       // Créer les chats manquants pour les PlannedMatches
       for (const pm of plannedMatches) {
-        const existing = await prisma.matchChat.findFirst({
-          where: { player1Id: pm.player1Id, player2Id: pm.player2Id, phase: pm.phase },
+        const existing = await prisma.matchChat.findUnique({
+          where: { plannedMatchId: pm.id },
         })
         if (!existing) {
           const newChat = await prisma.matchChat.create({
@@ -723,11 +722,18 @@ async function handleChat(req, res) {
         }
       }
 
-      // Charger tous les chats (y compris ceux qu'on vient de créer)
+      // Charger tous les chats actifs du joueur (quelle que soit la phase)
+      // On exclut les chats "orphelins" dont le match associé a été supprimé
+      // (plannedMatchId = null ET specialMatchId = null après onDelete: SetNull).
       const chats = await prisma.matchChat.findMany({
         where: {
-          phase: currentPhase,
-          OR: [{ player1Id: uid }, { player2Id: uid }],
+          AND: [
+            { OR: [{ player1Id: uid }, { player2Id: uid }] },
+            { OR: [
+              { plannedMatchId: { not: null } },
+              { specialMatchId: { not: null } },
+            ]},
+          ],
         },
         include: {
           player1: { select: { id: true, firstName: true, lastName: true, username: true } },
