@@ -662,6 +662,68 @@ async function handleChat(req, res) {
       const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
       const currentPhase = state?.currentPhase || 'PHASE0'
 
+      // ── Auto-création des conversations manquantes ──
+      // On récupère tous les matchs planifiés et rencontres spéciales actifs
+      // du joueur, et on crée un MatchChat pour chaque paire qui n'en a pas encore.
+      const [plannedMatches, specialMatches] = await Promise.all([
+        prisma.plannedMatch.findMany({
+          where: {
+            phase: currentPhase,
+            forfeited: false,
+            OR: [{ player1Id: uid }, { player2Id: uid }],
+          },
+          include: {
+            player1: { select: { id: true, firstName: true, lastName: true } },
+            player2: { select: { id: true, firstName: true, lastName: true } },
+          },
+        }),
+        prisma.specialMatch.findMany({
+          where: {
+            resolved: false,
+            OR: [{ player1Id: uid }, { player2Id: uid }],
+          },
+          include: {
+            player1: { select: { id: true, firstName: true, lastName: true } },
+            player2: { select: { id: true, firstName: true, lastName: true } },
+          },
+        }),
+      ])
+
+      // Créer les chats manquants pour les PlannedMatches
+      for (const pm of plannedMatches) {
+        const existing = await prisma.matchChat.findFirst({
+          where: { player1Id: pm.player1Id, player2Id: pm.player2Id, phase: pm.phase },
+        })
+        if (!existing) {
+          const newChat = await prisma.matchChat.create({
+            data: { player1Id: pm.player1Id, player2Id: pm.player2Id, phase: pm.phase, plannedMatchId: pm.id },
+          })
+          await prisma.matchChatMessage.create({
+            data: {
+              chatId: newChat.id, senderId: null, isAuto: true,
+              content: `💬 Conversation ouverte entre ${pm.player1.firstName} ${pm.player1.lastName} et ${pm.player2.firstName} ${pm.player2.lastName}. Utilisez cet espace pour organiser votre match. Le score devra être renseigné dans l'onglet "Score du match" par le gagnant.`,
+            },
+          })
+        }
+      }
+
+      // Créer les chats manquants pour les SpecialMatches
+      for (const sm of specialMatches) {
+        const existing = await prisma.matchChat.findUnique({ where: { specialMatchId: sm.id } })
+        if (!existing) {
+          const newChat = await prisma.matchChat.create({
+            data: { player1Id: sm.player1Id, player2Id: sm.player2Id, phase: currentPhase, specialMatchId: sm.id },
+          })
+          await prisma.matchChatMessage.create({
+            data: {
+              chatId: newChat.id, senderId: null, isAuto: true,
+              content: `💬 Conversation ouverte entre ${sm.player1.firstName} ${sm.player1.lastName} et ${sm.player2.firstName} ${sm.player2.lastName}. Utilisez cet espace pour organiser votre rencontre spéciale. Le score devra être renseigné dans l'onglet "Score du match" par le gagnant.`,
+            },
+          })
+        }
+      }
+
+      // Charger tous les chats (y compris ceux qu'on vient de créer)
       const chats = await prisma.matchChat.findMany({
         where: {
           phase: currentPhase,
@@ -699,7 +761,6 @@ async function handleChat(req, res) {
         }
       }))
 
-      // Badge total = total des non-lus toutes conversations confondues
       const totalUnread = enriched.reduce((a, c) => a + c.unreadCount, 0)
       return res.status(200).json({ chats: enriched, totalUnread })
     } catch (err) {
