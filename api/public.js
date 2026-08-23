@@ -401,6 +401,16 @@ async function handleConvocations(req, res) {
     }
   }
 
+  // Vérification serveur : seul le gagnant peut soumettre le score.
+  // playerScore = score du soumettant, opponentScore = score de l'adversaire.
+  const submitterSetWins = sets.filter(s => s.playerScore > s.opponentScore).length
+  const opponentSetWins  = sets.filter(s => s.opponentScore > s.playerScore).length
+  if (submitterSetWins <= opponentSetWins) {
+    return res.status(403).json({
+      error: 'D\'après le score saisi, vous n\'avez pas gagné ce match. Seul le gagnant peut renseigner le score.',
+    })
+  }
+
   try {
     if (convType === 'special') {
       const sm = await prisma.specialMatch.findUnique({ where: { id: cid } })
@@ -427,6 +437,8 @@ async function handleConvocations(req, res) {
       // Le joueur qui saisit le score renseigne toujours playerScore/opponentScore
       // depuis SON point de vue → on inverse pour le match miroir de l'adversaire.
       const scorerIsP1 = sm.player1Id === uid
+      const winner = scorerIsP1 ? p1 : p2
+      const loser  = scorerIsP1 ? p2 : p1
 
       await prisma.specialMatch.update({ where: { id: cid }, data: { resolved: true } })
 
@@ -463,6 +475,18 @@ async function handleConvocations(req, res) {
         }),
       ])
 
+      // Notifier le perdant que le score a été saisi par son adversaire.
+      const scoreSummary = sets.map(s => `${s.opponentScore}–${s.playerScore}`).join(', ')
+      await prisma.notification.create({
+        data: {
+          userId: loser.id,
+          type: 'message',
+          title: 'Score de votre match renseigné',
+          message: `${winner.firstName} ${winner.lastName} a renseigné le score de votre rencontre spéciale. Résultat (votre score) : ${scoreSummary}. Le score est en attente de publication par l'administrateur.`,
+          opponentName: `${winner.firstName} ${winner.lastName}`,
+        },
+      })
+
       return res.status(201).json({ ok: true, match1: m1, match2: m2 })
     }
 
@@ -479,6 +503,8 @@ async function handleConvocations(req, res) {
     const roundInt = pm.phase === 'PHASE2' ? pm.roundNumber : null
     const noteStr = note ? note.trim() : (pm.note || null)
     const scorerIsP1 = pm.player1Id === uid
+    const winner = scorerIsP1 ? pm.player1 : pm.player2
+    const loser  = scorerIsP1 ? pm.player2 : pm.player1
 
     const [m1, m2] = await Promise.all([
       prisma.match.create({
@@ -514,6 +540,18 @@ async function handleConvocations(req, res) {
     ])
 
     await prisma.plannedMatch.delete({ where: { id: cid } })
+
+    // Notifier le perdant que le score a été saisi par son adversaire.
+    const scoreSummary = sets.map(s => `${s.opponentScore}–${s.playerScore}`).join(', ')
+    await prisma.notification.create({
+      data: {
+        userId: loser.id,
+        type: 'message',
+        title: 'Score de votre match renseigné',
+        message: `${winner.firstName} ${winner.lastName} a renseigné le score de votre match. Résultat (votre score) : ${scoreSummary}. Le score est en attente de publication par l'administrateur.`,
+        opponentName: `${winner.firstName} ${winner.lastName}`,
+      },
+    })
 
     return res.status(201).json({ ok: true, match1: m1, match2: m2 })
   } catch (err) {

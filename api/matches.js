@@ -100,6 +100,27 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // Scores récemment soumis par le joueur connecté — alimente la section
+  // archive de l'onglet "Score du match" (matchs en attente de publication
+  // ou déjà publiés, soumis via convocation dans les 90 derniers jours).
+  if (req.query.submitted === '1') {
+    const auth = requireAuth(req, res)
+    if (!auth) return
+    try {
+      const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+      const matches = await prisma.match.findMany({
+        where: { userId: auth.userId, createdAt: { gte: since } },
+        orderBy: { matchDate: 'desc' },
+        take: 20,
+        include: { sets: { orderBy: { setNumber: 'asc' } } },
+      })
+      return res.status(200).json({ matches })
+    } catch (err) {
+      console.error('[matches submitted]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
   // Rencontres en cours (public)
   if (req.query.public === '1') {
     try {

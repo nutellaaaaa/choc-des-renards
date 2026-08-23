@@ -3313,7 +3313,11 @@
     <h3>Renseigner le <span>Score</span></h3>
     <input type="hidden" id="sc-type">
     <input type="hidden" id="sc-id">
-    <div id="sc-players" style="background:var(--dark3);border:1px solid var(--dark4);border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.95rem;color:var(--gray-light)"></div>
+    <input type="hidden" id="sc-opponent-id">
+    <div id="sc-players" style="background:var(--dark3);border:1px solid var(--dark4);border-radius:8px;padding:0.75rem 1rem;margin-bottom:0.6rem;font-size:0.95rem;color:var(--gray-light)"></div>
+    <div style="background:rgba(255,109,0,0.07);border-left:3px solid var(--orange);border-radius:0 6px 6px 0;padding:0.55rem 0.85rem;margin-bottom:1rem;font-size:0.85rem;color:var(--orange-light)">
+      🏆 Vous avez gagné le match ? C'est à vous de renseigner le score ci-dessous. Si vous avez perdu, attendez que votre adversaire le saisisse — vous serez notifié(e).
+    </div>
     <div class="form-group">
       <label>Date du match</label>
       <input type="date" id="sc-date">
@@ -3791,8 +3795,13 @@
 <div id="page-score-match" class="page">
   <div class="section">
     <h1 class="section-title">Score du <span>match</span></h1>
-    <p class="section-subtitle">Vous êtes convoqué(e) à un match ? Renseignez le score avant la date limite pour qu'il soit ajouté à la liste des matchs à publier.</p>
+    <p class="section-subtitle">C'est le <strong>gagnant</strong> du match qui renseigne le score. Une fois soumis, il est automatiquement enregistré pour les deux joueurs et envoyé à l'administrateur pour publication.</p>
     <div id="score-match-list"><div class="admin-empty">Chargement…</div></div>
+    <div id="score-match-archive" style="display:none;margin-top:2.5rem">
+      <h2 class="section-title" style="font-size:1.15rem">Scores <span>soumis</span></h2>
+      <p style="font-size:0.87rem;color:var(--gray);margin-bottom:1rem">Vos matchs dont le score a déjà été renseigné (90 derniers jours).</p>
+      <div id="score-match-archive-list"></div>
+    </div>
   </div>
 </div>
 
@@ -4655,6 +4664,7 @@ function showNotifOverlay() {
     if (notif.opponentName) metaHtml += `<div>🎯 Adversaire : <strong>${esc(notif.opponentName)}</strong></div>`
     if (notif.startDate) metaHtml += `<div>📅 Match prévu le : <strong>${new Date(notif.startDate).toLocaleDateString('fr-FR')}</strong></div>`
     if (notif.endDate)   metaHtml += `<div>⏰ Deadline de saisie : <strong>${new Date(notif.endDate).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong></div>`
+    metaHtml += `<div style="margin-top:0.6rem;padding:0.5rem 0.75rem;background:rgba(255,109,0,0.08);border-left:3px solid var(--orange);border-radius:0 5px 5px 0;font-size:0.85rem;color:var(--orange-light)">🏆 Vous avez gagné le match ? C'est à <strong>vous</strong> de renseigner le score dans l'onglet <em>Score du match</em>. Si vous avez perdu, vous serez notifié(e) dès que votre adversaire aura saisi le score.</div>`
   }
   const typeLabel = isSpecial ? 'Rencontre spéciale' : isNextMatch ? 'Prochain match' : isDeadlineReminder ? 'Rappel de deadline' : 'Message'
   body.innerHTML = `<div class="notif-type">${typeLabel}</div>
@@ -5001,41 +5011,101 @@ async function loadConvocationsBadge() {
 }
 
 async function loadScoreMatch() {
-  const list = document.getElementById('score-match-list')
+  const list        = document.getElementById('score-match-list')
+  const archiveWrap = document.getElementById('score-match-archive')
+  const archiveList = document.getElementById('score-match-archive-list')
   list.innerHTML = '<div class="admin-empty">Chargement…</div>'
+
   try {
-    const convocations = await fetchConvocations()
+    // Charger en parallèle les convocations en attente et l'archive des scores déjà soumis
+    const [convocations, submittedData] = await Promise.all([
+      fetchConvocations(),
+      fetch('/api/matches?submitted=1', { headers: authHeaders() })
+        .then(r => r.ok ? r.json() : { matches: [] })
+        .catch(() => ({ matches: [] })),
+    ])
+    const submitted = submittedData.matches || []
+
     setBadge('badge-score-match', convocations.filter(c => !c.expired).length)
+
+    // ── Convocations actives ──
     if (convocations.length === 0) {
-      list.innerHTML = '<div class="admin-empty">Aucune convocation en attente pour l\'instant.</div>'; return
+      list.innerHTML = '<div class="admin-empty">Aucune convocation en attente pour l\'instant.</div>'
+    } else {
+      list.innerHTML = convocations.map(c => {
+        const oppName   = c.opponent ? `${esc(capName(c.opponent.firstName))} ${esc(capName(c.opponent.lastName))}` : 'Adversaire inconnu'
+        const typeLabel = c.type === 'special' ? '🗓 Rencontre spéciale' : '📋 Match planifié'
+        const deadlineLine = c.deadline
+          ? `<div style="margin-top:0.25rem">⏰ ${c.type === 'special' ? 'Date limite' : 'Date prévue'} : <strong>${fmtDateOnly(c.deadline)}</strong></div>`
+          : ''
+        const reasonLine = c.reason
+          ? `<div style="margin-top:0.2rem">📌 <strong>${esc(c.reason)}</strong></div>`
+          : ''
+        const winnerHint = `<div style="margin-top:0.6rem;padding:0.5rem 0.75rem;background:rgba(255,109,0,0.07);border-left:3px solid var(--orange);border-radius:0 5px 5px 0;font-size:0.84rem;color:var(--orange-light)">🏆 Vous avez gagné le match ? C'est à vous de renseigner le score. Si vous avez perdu, attendez que votre adversaire le saisisse — vous serez notifié(e).</div>`
+        return `
+        <div class="notif-history-card" style="opacity:${c.expired ? 0.55 : 1}">
+          <div class="notif-history-title">🏸 Contre ${oppName}</div>
+          <div class="notif-history-meta">${typeLabel}</div>
+          ${deadlineLine}${reasonLine}
+          ${c.expired
+            ? `<div style="color:#ff6b6b;font-size:0.85rem;margin-top:0.5rem">⛔ La date limite est dépassée. Contactez l'administrateur.</div>`
+            : `${winnerHint}<button class="btn-modal-save" style="margin-top:0.75rem" onclick='openScoreModal(${JSON.stringify(c).replace(/'/g, "&#39;")})'>Renseigner le score</button>`}
+        </div>`
+      }).join('')
     }
-    list.innerHTML = convocations.map(c => {
-      const oppName = c.opponent ? `${esc(capName(c.opponent.firstName))} ${esc(capName(c.opponent.lastName))}` : 'Adversaire inconnu'
-      const typeLabel = c.type === 'special' ? '🗓 Rencontre spéciale' : '📋 Match planifié'
-      const deadlineLine = c.deadline
-        ? `<div>⏰ ${c.type === 'special' ? 'Date limite' : 'Date prévue'} : <strong>${fmtDateOnly(c.deadline)}</strong></div>`
-        : ''
-      const reasonLine = c.reason ? `<div>📌 Motif : <strong>${esc(c.reason)}</strong></div>` : ''
-      return `
-      <div class="notif-history-card" style="opacity:${c.expired ? 0.55 : 1}">
-        <div class="notif-history-title">🏸 Contre ${oppName}</div>
-        <div class="notif-history-meta">${typeLabel}</div>
-        ${deadlineLine}${reasonLine}
-        ${c.expired
-          ? `<div style="color:#ff6b6b;font-size:0.85rem;margin-top:0.5rem">La date limite est dépassée. Contactez l'administrateur.</div>`
-          : `<button class="btn-modal-save" style="margin-top:0.75rem" onclick='openScoreModal(${JSON.stringify(c).replace(/'/g, "&#39;")})'>Renseigner le score</button>`}
-      </div>`
-    }).join('')
-  } catch(e) { list.innerHTML = '<div class="admin-empty">Erreur de chargement.</div>' }
+
+    // ── Archive des scores déjà soumis ──
+    if (submitted.length === 0) {
+      archiveWrap.style.display = 'none'
+    } else {
+      archiveWrap.style.display = ''
+      archiveList.innerHTML = submitted.map(m => {
+        const oppName = [m.opponentFirstName, m.opponentLastName].filter(Boolean).map(n => esc(capName(n))).join(' ') || 'Adversaire inconnu'
+        const playerSetWins   = m.sets.filter(s => s.playerScore > s.opponentScore).length
+        const opponentSetWins = m.sets.filter(s => s.opponentScore > s.playerScore).length
+        const resultLabel = playerSetWins > opponentSetWins
+          ? `<span style="color:#4caf84;font-weight:700;font-size:0.85rem">✔ Victoire</span>`
+          : playerSetWins < opponentSetWins
+            ? `<span style="color:#ff6b6b;font-weight:700;font-size:0.85rem">✘ Défaite</span>`
+            : `<span style="color:var(--gray);font-weight:700;font-size:0.85rem">Nul</span>`
+        const setsDetail = m.sets.map(s =>
+          `<span style="font-variant-numeric:tabular-nums;white-space:nowrap">${s.playerScore}–${s.opponentScore}</span>`
+        ).join(' <span style="color:var(--dark5)">·</span> ')
+        const pubLine = m.published
+          ? `<div style="font-size:0.78rem;color:#4caf84;margin-top:0.3rem">✅ Publié au classement</div>`
+          : `<div style="font-size:0.78rem;color:var(--gray);margin-top:0.3rem">⏳ En attente de publication par l'administrateur</div>`
+        return `
+        <div class="notif-history-card" style="opacity:0.75;border-left:3px solid var(--dark5)">
+          <div class="notif-history-title" style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem">
+            <span>🏸 Contre ${oppName}</span>
+            ${resultLabel}
+          </div>
+          <div class="notif-history-meta" style="margin-top:0.2rem">
+            ${fmtDateOnly(m.matchDate)}
+            ${m.sets.length ? ` &nbsp;·&nbsp; ${setsDetail}` : ''}
+          </div>
+          ${pubLine}
+        </div>`
+      }).join('')
+    }
+
+  } catch(e) {
+    list.innerHTML = '<div class="admin-empty">Erreur de chargement.</div>'
+  }
 }
 
 function openScoreModal(conv) {
   document.getElementById('sc-type').value = conv.type
   document.getElementById('sc-id').value = conv.id
-  const oppName = conv.opponent ? `${esc(capName(conv.opponent.firstName))} ${esc(capName(conv.opponent.lastName))}` : 'Adversaire inconnu'
+  document.getElementById('sc-opponent-id').value = conv.opponent ? (conv.opponent.id || '') : ''
+  const oppName = conv.opponent
+    ? `${esc(capName(conv.opponent.firstName))} ${esc(capName(conv.opponent.lastName))}`
+    : 'Adversaire inconnu'
   document.getElementById('sc-players').innerHTML = `🏸 Match contre <strong>${oppName}</strong>`
-  document.getElementById('sc-date').value = new Date().toISOString().slice(0,10)
-  document.getElementById('sc-note').value = ''
+  document.getElementById('sc-date').value = conv.deadline
+    ? new Date(Math.min(new Date(conv.deadline), new Date())).toISOString().slice(0,10)
+    : new Date().toISOString().slice(0,10)
+  document.getElementById('sc-note').value = conv.note || ''
   document.getElementById('sc-error').textContent = ''
   document.getElementById('sc-sets').innerHTML = ''
   scSetCount = 0
@@ -5077,6 +5147,16 @@ async function submitScoreMatch() {
     const os = parseInt(row.querySelector('input:nth-of-type(2)').value, 10)
     sets.push({ setNumber: i+1, playerScore: ps, opponentScore: os })
   })
+
+  // Vérification côté client : seul le gagnant peut soumettre.
+  // playerScore = votre score, opponentScore = score adverse.
+  const mySetWins  = sets.filter(s => s.playerScore > s.opponentScore).length
+  const oppSetWins = sets.filter(s => s.opponentScore > s.playerScore).length
+  if (mySetWins <= oppSetWins) {
+    errorEl.textContent = "D'après ce score, vous n'avez pas gagné le match. Seul le gagnant renseigne le score — si vous avez perdu, attendez que votre adversaire le saisisse."
+    return
+  }
+
   try {
     const res = await fetch('/api/public?resource=convocations', {
       method: 'POST', headers: authHeaders(),
