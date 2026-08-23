@@ -68,6 +68,9 @@ model User {
   contactMessages ContactMessage[]
   botTasks       BotTask[]
   whatsappMessages WhatsappMessage[]
+  chats1         MatchChat[]        @relation("ChatPlayer1")
+  chats2         MatchChat[]        @relation("ChatPlayer2")
+  chatMessages   MatchChatMessage[] @relation("ChatMessageSender")
 }
 
 
@@ -220,6 +223,7 @@ model SpecialMatch {
   player1  User    @relation("Player1", fields: [player1Id], references: [id])
   player2  User    @relation("Player2", fields: [player2Id], references: [id])
   matches  Match[]
+  chat     MatchChat?
 }
 
 
@@ -252,6 +256,7 @@ model PlannedMatch {
   player2 User @relation("PlannedPlayer2", fields: [player2Id], references: [id])
   notifications Notification[]
   whatsappMessages WhatsappMessage[]
+  chat     MatchChat?
 }
 
 
@@ -460,7 +465,39 @@ model WhatsappMessage {
 }
 
 
-// ═══════════════════ BOTS DE TEST ═══════════════════
+// ═══════════════════ COMMUNICATION JOUEUR-JOUEUR ═══════════════════
+
+// Une conversation par paire de joueurs (un par PlannedMatch ou SpecialMatch).
+// Active de l'ouverture de la convocation jusqu'à la fin de la phase concernée.
+model MatchChat {
+  id             Int      @id @default(autoincrement())
+  plannedMatchId Int?     @unique
+  specialMatchId Int?     @unique
+  player1Id      Int
+  player2Id      Int
+  phase          Phase
+  createdAt      DateTime @default(now())
+
+  plannedMatch PlannedMatch?      @relation(fields: [plannedMatchId], references: [id], onDelete: SetNull)
+  specialMatch SpecialMatch?      @relation(fields: [specialMatchId], references: [id], onDelete: SetNull)
+  player1      User               @relation("ChatPlayer1", fields: [player1Id], references: [id], onDelete: Cascade)
+  player2      User               @relation("ChatPlayer2", fields: [player2Id], references: [id], onDelete: Cascade)
+  messages     MatchChatMessage[]
+}
+
+model MatchChatMessage {
+  id         Int      @id @default(autoincrement())
+  chatId     Int
+  senderId   Int?     // null = message automatique système
+  content    String
+  isAuto     Boolean  @default(false)
+  readBy     String   @default("[]") // JSON array d'userIds ayant lu le message
+  createdAt  DateTime @default(now())
+
+  chat   MatchChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender User?     @relation("ChatMessageSender", fields: [senderId], references: [id], onDelete: SetNull)
+}
+
 
 
 // File d'actions programmées pour un bot (voir api/admin.js → handleBots).

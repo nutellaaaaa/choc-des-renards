@@ -50,6 +50,8 @@ module.exports = async function handler(req, res) {
       return handleNotifications(req, res)
     case 'convocations':
       return handleConvocations(req, res)
+    case 'chat':
+      return handleChat(req, res)
     default:
       return res.status(400).json({ error: 'resource invalide ou manquant.' })
   }
@@ -401,8 +403,7 @@ async function handleConvocations(req, res) {
     }
   }
 
-  // Vérification serveur : seul le gagnant peut soumettre le score.
-  // playerScore = score du soumettant, opponentScore = score de l'adversaire.
+  // Vérification serveur : seul le gagnant peut soumettre.
   const submitterSetWins = sets.filter(s => s.playerScore > s.opponentScore).length
   const opponentSetWins  = sets.filter(s => s.opponentScore > s.playerScore).length
   if (submitterSetWins <= opponentSetWins) {
@@ -475,17 +476,31 @@ async function handleConvocations(req, res) {
         }),
       ])
 
-      // Notifier le perdant que le score a été saisi par son adversaire.
-      const scoreSummary = sets.map(s => `${s.opponentScore}–${s.playerScore}`).join(', ')
+      // Notification au perdant
+      const loserScoreSummary = sets.map(s => `${s.opponentScore}–${s.playerScore}`).join(', ')
       await prisma.notification.create({
         data: {
           userId: loser.id,
           type: 'message',
           title: 'Score de votre match renseigné',
-          message: `${winner.firstName} ${winner.lastName} a renseigné le score de votre rencontre spéciale. Résultat (votre score) : ${scoreSummary}. Le score est en attente de publication par l'administrateur.`,
+          message: `${winner.firstName} ${winner.lastName} a renseigné le score de votre rencontre spéciale. Résultat (votre score) : ${loserScoreSummary}. En attente de publication.`,
           opponentName: `${winner.firstName} ${winner.lastName}`,
         },
       })
+
+      // Message automatique dans la conversation du match (si elle existe)
+      const winnerScoreSummary = sets.map(s => `${s.playerScore}–${s.opponentScore}`).join(', ')
+      const specialChat = await prisma.matchChat.findUnique({ where: { specialMatchId: cid } })
+      if (specialChat) {
+        await prisma.matchChatMessage.create({
+          data: {
+            chatId: specialChat.id,
+            senderId: null,
+            isAuto: true,
+            content: `🏸 Score renseigné par ${winner.firstName} ${winner.lastName} : ${winnerScoreSummary} (du point de vue de ${winner.firstName}). En attente de publication par l'administrateur.`,
+          },
+        })
+      }
 
       return res.status(201).json({ ok: true, match1: m1, match2: m2 })
     }
@@ -541,21 +556,260 @@ async function handleConvocations(req, res) {
 
     await prisma.plannedMatch.delete({ where: { id: cid } })
 
-    // Notifier le perdant que le score a été saisi par son adversaire.
-    const scoreSummary = sets.map(s => `${s.opponentScore}–${s.playerScore}`).join(', ')
+    // Notification au perdant
+    const loserScoreSummary = sets.map(s => `${s.opponentScore}–${s.playerScore}`).join(', ')
     await prisma.notification.create({
       data: {
         userId: loser.id,
         type: 'message',
         title: 'Score de votre match renseigné',
-        message: `${winner.firstName} ${winner.lastName} a renseigné le score de votre match. Résultat (votre score) : ${scoreSummary}. Le score est en attente de publication par l'administrateur.`,
+        message: `${winner.firstName} ${winner.lastName} a renseigné le score de votre match. Résultat (votre score) : ${loserScoreSummary}. En attente de publication.`,
         opponentName: `${winner.firstName} ${winner.lastName}`,
       },
     })
+
+    // Message automatique dans la conversation du match.
+    // Le plannedMatch vient d'être supprimé (delete ci-dessus) → on recherche
+    // le chat par plannedMatchId qui peut être null (SetNull) ou par player1/2.
+    const winnerScoreSummary = sets.map(s => `${s.playerScore}–${s.opponentScore}`).join(', ')
+    const plannedChat = await prisma.matchChat.findFirst({
+      where: {
+        player1Id: pm.player1Id,
+        player2Id: pm.player2Id,
+        phase: pm.phase,
+      },
+    })
+    if (plannedChat) {
+      await prisma.matchChatMessage.create({
+        data: {
+          chatId: plannedChat.id,
+          senderId: null,
+          isAuto: true,
+          content: `🏸 Score renseigné par ${winner.firstName} ${winner.lastName} : ${winnerScoreSummary} (du point de vue de ${winner.firstName}). En attente de publication par l'administrateur.`,
+        },
+      })
+    }
 
     return res.status(201).json({ ok: true, match1: m1, match2: m2 })
   } catch (err) {
     console.error('[convocations submit]', err)
     return res.status(500).json({ error: 'Erreur serveur.' })
   }
+}
+/* ============================================================
+ * CHAT — Communication joueur-joueur autour d'un match planifié
+ * ou d'une rencontre spéciale.
+ *
+ * GET  ?resource=chat                → liste des conversations actives
+ * GET  ?resource=chat&chatId=N       → messages d'une conversation
+ * POST ?resource=chat { action: 'send', chatId, content } → envoyer un message
+ * POST ?resource=chat { action: 'read', chatId }          → marquer comme lu
+ * ============================================================ */
+async function handleChat(req, res) {
+  const auth = requireAuth(req, res)
+  if (!auth) return
+  const uid = auth.userId
+
+  // ── GET : liste des chats ou messages d'un chat ──
+  if (req.method === 'GET') {
+    const chatId = req.query.chatId ? parseInt(req.query.chatId, 10) : null
+
+    // Messages d'une conversation spécifique
+    if (chatId) {
+      try {
+        const chat = await prisma.matchChat.findUnique({
+          where: { id: chatId },
+          include: {
+            player1: { select: { id: true, firstName: true, lastName: true, username: true } },
+            player2: { select: { id: true, firstName: true, lastName: true, username: true } },
+            messages: {
+              orderBy: { createdAt: 'asc' },
+              include: {
+                sender: { select: { id: true, firstName: true, lastName: true } },
+              },
+            },
+          },
+        })
+        if (!chat) return res.status(404).json({ error: 'Conversation introuvable.' })
+        if (chat.player1Id !== uid && chat.player2Id !== uid)
+          return res.status(403).json({ error: 'Cette conversation ne vous concerne pas.' })
+
+        // Marquer tous les messages non lus par ce joueur comme lus
+        const toMark = chat.messages.filter(m => {
+          const readBy = JSON.parse(m.readBy || '[]')
+          return !readBy.includes(uid)
+        })
+        if (toMark.length > 0) {
+          await Promise.all(toMark.map(m => {
+            const readBy = JSON.parse(m.readBy || '[]')
+            readBy.push(uid)
+            return prisma.matchChatMessage.update({
+              where: { id: m.id },
+              data: { readBy: JSON.stringify(readBy) },
+            })
+          }))
+        }
+
+        return res.status(200).json({ chat })
+      } catch (err) {
+        console.error('[chat GET messages]', err)
+        return res.status(500).json({ error: 'Erreur serveur.' })
+      }
+    }
+
+    // Liste des conversations actives pour ce joueur
+    try {
+      const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
+      const currentPhase = state?.currentPhase || 'PHASE0'
+
+      const chats = await prisma.matchChat.findMany({
+        where: {
+          phase: currentPhase,
+          OR: [{ player1Id: uid }, { player2Id: uid }],
+        },
+        include: {
+          player1: { select: { id: true, firstName: true, lastName: true, username: true } },
+          player2: { select: { id: true, firstName: true, lastName: true, username: true } },
+          messages: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+
+      // Compter les messages non lus par conversation
+      const enriched = await Promise.all(chats.map(async c => {
+        const allMessages = await prisma.matchChatMessage.findMany({
+          where: { chatId: c.id },
+          select: { readBy: true },
+        })
+        const unread = allMessages.filter(m => {
+          const readBy = JSON.parse(m.readBy || '[]')
+          return !readBy.includes(uid)
+        }).length
+        const opponent = c.player1Id === uid ? c.player2 : c.player1
+        const lastMsg = c.messages[0] || null
+        return {
+          id: c.id,
+          phase: c.phase,
+          opponent,
+          lastMessage: lastMsg ? { content: lastMsg.content, createdAt: lastMsg.createdAt, isAuto: lastMsg.isAuto } : null,
+          unreadCount: unread,
+        }
+      }))
+
+      // Badge total = total des non-lus toutes conversations confondues
+      const totalUnread = enriched.reduce((a, c) => a + c.unreadCount, 0)
+      return res.status(200).json({ chats: enriched, totalUnread })
+    } catch (err) {
+      console.error('[chat GET list]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée.' })
+
+  const { action, chatId, content } = req.body || {}
+  const cid = parseInt(chatId, 10)
+  if (isNaN(cid)) return res.status(400).json({ error: 'chatId invalide.' })
+
+  // Vérifier que le joueur est bien participant de cette conversation
+  const chat = await prisma.matchChat.findUnique({ where: { id: cid } })
+  if (!chat) return res.status(404).json({ error: 'Conversation introuvable.' })
+  if (chat.player1Id !== uid && chat.player2Id !== uid)
+    return res.status(403).json({ error: 'Cette conversation ne vous concerne pas.' })
+
+  // ── POST action: send ──
+  if (action === 'send') {
+    const text = (content || '').trim()
+    if (!text) return res.status(400).json({ error: 'Message vide.' })
+    if (text.length > 500) return res.status(400).json({ error: 'Message trop long (500 caractères max).' })
+
+    try {
+      // Le message est créé comme lu par son expéditeur
+      const readBy = JSON.stringify([uid])
+      const msg = await prisma.matchChatMessage.create({
+        data: {
+          chatId: cid,
+          senderId: uid,
+          content: text,
+          isAuto: false,
+          readBy,
+        },
+        include: {
+          sender: { select: { id: true, firstName: true, lastName: true } },
+        },
+      })
+      return res.status(201).json({ ok: true, message: msg })
+    } catch (err) {
+      console.error('[chat send]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  // ── POST action: create ──
+  // Crée la conversation si elle n'existe pas encore (déclenchée par le frontend
+  // quand un joueur ouvre l'onglet chat pour la première fois pour un match donné).
+  if (action === 'create') {
+    const { convType, convId } = req.body || {}
+    const convIdInt = parseInt(convId, 10)
+    if (!['special', 'planned'].includes(convType) || isNaN(convIdInt))
+      return res.status(400).json({ error: 'convType/convId invalides.' })
+
+    try {
+      // Récupérer les infos du match
+      let player1Id, player2Id, phase, plannedMatchId = null, specialMatchId = null
+      if (convType === 'planned') {
+        const pm = await prisma.plannedMatch.findUnique({ where: { id: convIdInt } })
+        if (!pm) return res.status(404).json({ error: 'Match planifié introuvable.' })
+        if (pm.player1Id !== uid && pm.player2Id !== uid)
+          return res.status(403).json({ error: 'Ce match ne vous concerne pas.' })
+        player1Id = pm.player1Id; player2Id = pm.player2Id
+        phase = pm.phase; plannedMatchId = pm.id
+      } else {
+        const sm = await prisma.specialMatch.findUnique({ where: { id: convIdInt } })
+        if (!sm) return res.status(404).json({ error: 'Rencontre spéciale introuvable.' })
+        if (sm.player1Id !== uid && sm.player2Id !== uid)
+          return res.status(403).json({ error: 'Ce match ne vous concerne pas.' })
+        player1Id = sm.player1Id; player2Id = sm.player2Id
+        const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
+        phase = state?.currentPhase || 'PHASE0'
+        specialMatchId = sm.id
+      }
+
+      // Créer ou récupérer la conversation (upsert-like via findFirst + create)
+      const existing = plannedMatchId
+        ? await prisma.matchChat.findFirst({ where: { player1Id, player2Id, phase } })
+        : await prisma.matchChat.findUnique({ where: { specialMatchId } })
+
+      if (existing) return res.status(200).json({ ok: true, chatId: existing.id, created: false })
+
+      const newChat = await prisma.matchChat.create({
+        data: { player1Id, player2Id, phase, plannedMatchId, specialMatchId },
+      })
+
+      // Message de bienvenue automatique
+      const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
+      const [p1, p2] = await Promise.all([
+        prisma.user.findUnique({ where: { id: player1Id }, select: { firstName: true, lastName: true } }),
+        prisma.user.findUnique({ where: { id: player2Id }, select: { firstName: true, lastName: true } }),
+      ])
+      await prisma.matchChatMessage.create({
+        data: {
+          chatId: newChat.id,
+          senderId: null,
+          isAuto: true,
+          content: `💬 Conversation ouverte entre ${p1.firstName} ${p1.lastName} et ${p2.firstName} ${p2.lastName}. Utilisez cet espace pour organiser votre match (date, lieu, heure). Le score devra être renseigné dans l'onglet "Score du match" par le gagnant.`,
+        },
+      })
+
+      return res.status(201).json({ ok: true, chatId: newChat.id, created: true })
+    } catch (err) {
+      console.error('[chat create]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  return res.status(400).json({ error: 'Action invalide.' })
 }

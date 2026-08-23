@@ -1173,6 +1173,38 @@
   .notif-history-title { font-weight: 600; color: var(--white); font-size: 0.95rem; margin-bottom: 0.25rem; }
   .notif-history-meta { font-size: 0.8rem; color: var(--gray); }
 
+  /* ══════════════ CHAT JOUEUR-JOUEUR ══════════════ */
+  .chat-conv-card { display:flex; align-items:center; gap:0.85rem; background:var(--dark3); border:1px solid var(--dark4); border-radius:10px; padding:0.85rem 1rem; margin-bottom:0.65rem; cursor:pointer; transition:border-color 0.18s,background 0.18s; }
+  .chat-conv-card:hover { border-color:var(--orange); background:var(--dark4); }
+  .chat-conv-card.has-unread { border-color:var(--orange); }
+  .chat-conv-avatar { width:40px; height:40px; border-radius:50%; background:var(--orange); color:#fff; display:flex; align-items:center; justify-content:center; font-family:var(--font-heading); font-size:1rem; font-weight:700; flex-shrink:0; }
+  .chat-conv-body { flex:1; min-width:0; }
+  .chat-conv-name { font-weight:600; font-size:0.95rem; color:var(--white); }
+  .chat-conv-preview { font-size:0.8rem; color:var(--gray); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:0.15rem; }
+  .chat-conv-meta { display:flex; flex-direction:column; align-items:flex-end; gap:0.3rem; flex-shrink:0; }
+  .chat-conv-time { font-size:0.75rem; color:var(--gray); }
+  .chat-unread-badge { background:var(--orange); color:#fff; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:0.72rem; font-weight:700; }
+  .btn-back-chat { background:none; border:none; color:var(--orange); font-size:0.88rem; cursor:pointer; padding:0; margin-bottom:0.85rem; font-family:var(--font-heading); font-weight:600; letter-spacing:0.03em; }
+  .btn-back-chat:hover { color:var(--orange-light); }
+  #chat-conv-header { background:var(--dark3); border:1px solid var(--dark4); border-radius:10px; padding:0.75rem 1rem; margin-bottom:0.85rem; font-size:0.88rem; color:var(--gray-light); }
+  #chat-messages { display:flex; flex-direction:column; gap:0.55rem; min-height:220px; max-height:52vh; overflow-y:auto; padding:0.75rem 0; margin-bottom:0.75rem; scroll-behavior:smooth; }
+  .chat-bubble-wrap { display:flex; flex-direction:column; }
+  .chat-bubble-wrap.mine { align-items:flex-end; }
+  .chat-bubble-wrap.theirs { align-items:flex-start; }
+  .chat-bubble-wrap.auto { align-items:center; }
+  .chat-bubble { max-width:78%; padding:0.6rem 0.9rem; border-radius:16px; font-size:0.88rem; line-height:1.45; word-break:break-word; }
+  .chat-bubble-wrap.mine .chat-bubble { background:var(--orange); color:#fff; border-bottom-right-radius:4px; }
+  .chat-bubble-wrap.theirs .chat-bubble { background:var(--dark3); color:var(--gray-light); border:1px solid var(--dark4); border-bottom-left-radius:4px; }
+  .chat-bubble-wrap.auto .chat-bubble { background:rgba(255,109,0,0.07); border:1px dashed var(--orange); color:var(--gray-light); border-radius:8px; font-size:0.82rem; text-align:center; max-width:90%; }
+  .chat-sender { font-size:0.73rem; color:var(--gray); margin-bottom:0.2rem; }
+  .chat-time { font-size:0.71rem; color:var(--gray); margin-top:0.2rem; }
+  #chat-input-row { display:flex; gap:0.5rem; align-items:flex-end; }
+  #chat-input { flex:1; background:var(--dark3); border:1px solid var(--dark4); border-radius:10px; color:var(--white); padding:0.65rem 0.85rem; font-size:0.88rem; resize:none; outline:none; font-family:var(--font-body); line-height:1.4; transition:border-color 0.18s; }
+  #chat-input:focus { border-color:var(--orange); }
+  #chat-send-btn { width:42px; height:42px; border-radius:50%; border:none; background:var(--orange); color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background 0.18s; }
+  #chat-send-btn:hover { background:var(--orange-light); }
+  #chat-send-btn svg { width:18px; height:18px; stroke:#fff; }
+
 
   /* ── Photos / Galerie ── */
   .photo-upload-zone { border: 2px dashed var(--dark4); border-radius: 10px; padding: 1.1rem; text-align: center; cursor: pointer; transition: border-color 0.2s; background: var(--dark3); margin-bottom: 0.5rem; }
@@ -3316,7 +3348,7 @@
     <input type="hidden" id="sc-opponent-id">
     <div id="sc-players" style="background:var(--dark3);border:1px solid var(--dark4);border-radius:8px;padding:0.75rem 1rem;margin-bottom:0.6rem;font-size:0.95rem;color:var(--gray-light)"></div>
     <div style="background:rgba(255,109,0,0.07);border-left:3px solid var(--orange);border-radius:0 6px 6px 0;padding:0.55rem 0.85rem;margin-bottom:1rem;font-size:0.85rem;color:var(--orange-light)">
-      🏆 Vous avez gagné le match ? C'est à vous de renseigner le score ci-dessous. Si vous avez perdu, attendez que votre adversaire le saisisse — vous serez notifié(e).
+      🏆 Vous avez gagné ? C'est à vous de renseigner le score. Si vous avez perdu, attendez que votre adversaire le saisisse — vous serez notifié(e).
     </div>
     <div class="form-group">
       <label>Date du match</label>
@@ -3491,6 +3523,12 @@
     <span class="dock-label">Score du match</span>
     <span class="badge dock-badge" id="badge-score-match" hidden>–</span>
     <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="3"/><path d="M12 10c-1 3-1 3 3 6l4-4c-3-3-3-3-6-3"/><path d="M15 15l4 4"/></svg>
+  </button>
+
+  <button class="nav-btn dock-item" data-tab="chat" onclick="showPage('chat-match',this)" aria-label="Communication">
+    <span class="dock-label">Communication</span>
+    <span class="badge dock-badge" id="badge-chat" hidden>–</span>
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
   </button>
 
   <button class="nav-btn dock-item" data-tab="performances" onclick="showPage('performances',this)" aria-label="Performances">
@@ -3795,12 +3833,35 @@
 <div id="page-score-match" class="page">
   <div class="section">
     <h1 class="section-title">Score du <span>match</span></h1>
-    <p class="section-subtitle">C'est le <strong>gagnant</strong> du match qui renseigne le score. Une fois soumis, il est automatiquement enregistré pour les deux joueurs et envoyé à l'administrateur pour publication.</p>
+    <p class="section-subtitle">C'est le <strong>gagnant</strong> du match qui renseigne le score. Une fois soumis, il est automatiquement enregistré pour les deux joueurs.</p>
     <div id="score-match-list"><div class="admin-empty">Chargement…</div></div>
     <div id="score-match-archive" style="display:none;margin-top:2.5rem">
       <h2 class="section-title" style="font-size:1.15rem">Scores <span>soumis</span></h2>
       <p style="font-size:0.87rem;color:var(--gray);margin-bottom:1rem">Vos matchs dont le score a déjà été renseigné (90 derniers jours).</p>
       <div id="score-match-archive-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE COMMUNICATION -->
+<div id="page-chat-match" class="page">
+  <div class="section">
+    <h1 class="section-title">Communi<span>cation</span></h1>
+    <p class="section-subtitle">Échangez avec votre adversaire du moment pour organiser votre match (date, lieu, heure). La conversation est disponible tout au long de votre phase commune.</p>
+    <div id="chat-list-view">
+      <div id="chat-list"><div class="admin-empty">Chargement…</div></div>
+    </div>
+    <div id="chat-conv-view" style="display:none">
+      <button class="btn-back-chat" onclick="closeChatConv()">← Retour</button>
+      <div id="chat-conv-header"></div>
+      <div id="chat-messages"></div>
+      <div id="chat-input-row">
+        <textarea id="chat-input" placeholder="Votre message…" rows="2" maxlength="500" onkeydown="chatInputKeydown(event)"></textarea>
+        <button id="chat-send-btn" onclick="sendChatMessage()">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" fill="none" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>
+        </button>
+      </div>
+      <div id="chat-error" style="color:#ff6b6b;font-size:0.83rem;min-height:1.2em;margin-top:0.3rem"></div>
     </div>
   </div>
 </div>
@@ -3958,6 +4019,7 @@ const PAGE_TO_TAB = {
   accueil: 'accueil',
   reglement: 'charte',
   'mes-notifs': 'messages',
+  'chat-match': 'chat',
   classement: 'ranking',
   'score-match': 'matches',
   performances: 'performances',
@@ -4014,6 +4076,7 @@ function showPage(id, btn) {
   if (id === 'score-match') loadScoreMatch()
   if (id === 'mon-profil') loadMonProfil()
   if (id === 'vitrine') loadVitrine()
+  if (id === 'chat-match') loadChatList()
 }
 
 function showPrivacyPage() {
@@ -4264,6 +4327,7 @@ function showApp() {
     startSessionHeartbeat()
     loadHomeStats()
     loadConvocationsBadge()
+    loadChatBadge()
     if (pendingNotifications.length > 0) { currentNotifIndex = 0; showNotifOverlay() }
   }
   // La page a pu finir de charger (événement 'load') bien avant que l'utilisateur ne se
@@ -5014,15 +5078,13 @@ async function loadScoreMatch() {
   const list        = document.getElementById('score-match-list')
   const archiveWrap = document.getElementById('score-match-archive')
   const archiveList = document.getElementById('score-match-archive-list')
-  list.innerHTML = '<div class="admin-empty">Chargement…</div>'
+  if (list) list.innerHTML = '<div class="admin-empty">Chargement…</div>'
 
   try {
-    // Charger en parallèle les convocations en attente et l'archive des scores déjà soumis
     const [convocations, submittedData] = await Promise.all([
       fetchConvocations(),
       fetch('/api/matches?submitted=1', { headers: authHeaders() })
-        .then(r => r.ok ? r.json() : { matches: [] })
-        .catch(() => ({ matches: [] })),
+        .then(r => r.ok ? r.json() : { matches: [] }).catch(() => ({ matches: [] })),
     ])
     const submitted = submittedData.matches || []
 
@@ -5030,18 +5092,17 @@ async function loadScoreMatch() {
 
     // ── Convocations actives ──
     if (convocations.length === 0) {
-      list.innerHTML = '<div class="admin-empty">Aucune convocation en attente pour l\'instant.</div>'
+      if (list) list.innerHTML = '<div class="admin-empty">Aucune convocation en attente pour l\'instant.</div>'
     } else {
-      list.innerHTML = convocations.map(c => {
+      if (list) list.innerHTML = convocations.map(c => {
         const oppName   = c.opponent ? `${esc(capName(c.opponent.firstName))} ${esc(capName(c.opponent.lastName))}` : 'Adversaire inconnu'
         const typeLabel = c.type === 'special' ? '🗓 Rencontre spéciale' : '📋 Match planifié'
         const deadlineLine = c.deadline
           ? `<div style="margin-top:0.25rem">⏰ ${c.type === 'special' ? 'Date limite' : 'Date prévue'} : <strong>${fmtDateOnly(c.deadline)}</strong></div>`
           : ''
-        const reasonLine = c.reason
-          ? `<div style="margin-top:0.2rem">📌 <strong>${esc(c.reason)}</strong></div>`
-          : ''
+        const reasonLine = c.reason ? `<div style="margin-top:0.2rem">📌 <strong>${esc(c.reason)}</strong></div>` : ''
         const winnerHint = `<div style="margin-top:0.6rem;padding:0.5rem 0.75rem;background:rgba(255,109,0,0.07);border-left:3px solid var(--orange);border-radius:0 5px 5px 0;font-size:0.84rem;color:var(--orange-light)">🏆 Vous avez gagné le match ? C'est à vous de renseigner le score. Si vous avez perdu, attendez que votre adversaire le saisisse — vous serez notifié(e).</div>`
+        const oppJson = JSON.stringify(c.opponent || {}).replace(/'/g, "&#39;")
         return `
         <div class="notif-history-card" style="opacity:${c.expired ? 0.55 : 1}">
           <div class="notif-history-title">🏸 Contre ${oppName}</div>
@@ -5049,48 +5110,46 @@ async function loadScoreMatch() {
           ${deadlineLine}${reasonLine}
           ${c.expired
             ? `<div style="color:#ff6b6b;font-size:0.85rem;margin-top:0.5rem">⛔ La date limite est dépassée. Contactez l'administrateur.</div>`
-            : `${winnerHint}<button class="btn-modal-save" style="margin-top:0.75rem" onclick='openScoreModal(${JSON.stringify(c).replace(/'/g, "&#39;")})'>Renseigner le score</button>`}
+            : `${winnerHint}
+               <div style="display:flex;gap:0.6rem;margin-top:0.75rem;flex-wrap:wrap">
+                 <button class="btn-modal-save" onclick='openScoreModal(${JSON.stringify(c).replace(/'/g,"&#39;")})'>Renseigner le score</button>
+                 <button class="btn-modal-cancel" style="flex:0 0 auto" onclick='openChatFromConvocation("${c.type}",${c.id},${oppJson})'>💬 Organiser le match</button>
+               </div>`}
         </div>`
       }).join('')
     }
 
-    // ── Archive des scores déjà soumis ──
+    // ── Archive des scores soumis ──
+    if (!archiveWrap) return
     if (submitted.length === 0) {
       archiveWrap.style.display = 'none'
     } else {
       archiveWrap.style.display = ''
-      archiveList.innerHTML = submitted.map(m => {
+      if (archiveList) archiveList.innerHTML = submitted.map(m => {
         const oppName = [m.opponentFirstName, m.opponentLastName].filter(Boolean).map(n => esc(capName(n))).join(' ') || 'Adversaire inconnu'
         const playerSetWins   = m.sets.filter(s => s.playerScore > s.opponentScore).length
         const opponentSetWins = m.sets.filter(s => s.opponentScore > s.playerScore).length
         const resultLabel = playerSetWins > opponentSetWins
           ? `<span style="color:#4caf84;font-weight:700;font-size:0.85rem">✔ Victoire</span>`
-          : playerSetWins < opponentSetWins
-            ? `<span style="color:#ff6b6b;font-weight:700;font-size:0.85rem">✘ Défaite</span>`
-            : `<span style="color:var(--gray);font-weight:700;font-size:0.85rem">Nul</span>`
+          : `<span style="color:#ff6b6b;font-weight:700;font-size:0.85rem">✘ Défaite</span>`
         const setsDetail = m.sets.map(s =>
           `<span style="font-variant-numeric:tabular-nums;white-space:nowrap">${s.playerScore}–${s.opponentScore}</span>`
-        ).join(' <span style="color:var(--dark5)">·</span> ')
+        ).join(' · ')
         const pubLine = m.published
           ? `<div style="font-size:0.78rem;color:#4caf84;margin-top:0.3rem">✅ Publié au classement</div>`
           : `<div style="font-size:0.78rem;color:var(--gray);margin-top:0.3rem">⏳ En attente de publication par l'administrateur</div>`
         return `
         <div class="notif-history-card" style="opacity:0.75;border-left:3px solid var(--dark5)">
           <div class="notif-history-title" style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem">
-            <span>🏸 Contre ${oppName}</span>
-            ${resultLabel}
+            <span>🏸 Contre ${oppName}</span>${resultLabel}
           </div>
-          <div class="notif-history-meta" style="margin-top:0.2rem">
-            ${fmtDateOnly(m.matchDate)}
-            ${m.sets.length ? ` &nbsp;·&nbsp; ${setsDetail}` : ''}
-          </div>
+          <div class="notif-history-meta">${fmtDateOnly(m.matchDate)}${m.sets.length ? ` · ${setsDetail}` : ''}</div>
           ${pubLine}
         </div>`
       }).join('')
     }
-
   } catch(e) {
-    list.innerHTML = '<div class="admin-empty">Erreur de chargement.</div>'
+    if (list) list.innerHTML = '<div class="admin-empty">Erreur de chargement.</div>'
   }
 }
 
@@ -5098,9 +5157,7 @@ function openScoreModal(conv) {
   document.getElementById('sc-type').value = conv.type
   document.getElementById('sc-id').value = conv.id
   document.getElementById('sc-opponent-id').value = conv.opponent ? (conv.opponent.id || '') : ''
-  const oppName = conv.opponent
-    ? `${esc(capName(conv.opponent.firstName))} ${esc(capName(conv.opponent.lastName))}`
-    : 'Adversaire inconnu'
+  const oppName = conv.opponent ? `${esc(capName(conv.opponent.firstName))} ${esc(capName(conv.opponent.lastName))}` : 'Adversaire inconnu'
   document.getElementById('sc-players').innerHTML = `🏸 Match contre <strong>${oppName}</strong>`
   document.getElementById('sc-date').value = conv.deadline
     ? new Date(Math.min(new Date(conv.deadline), new Date())).toISOString().slice(0,10)
@@ -5147,16 +5204,13 @@ async function submitScoreMatch() {
     const os = parseInt(row.querySelector('input:nth-of-type(2)').value, 10)
     sets.push({ setNumber: i+1, playerScore: ps, opponentScore: os })
   })
-
-  // Vérification côté client : seul le gagnant peut soumettre.
-  // playerScore = votre score, opponentScore = score adverse.
+  // Vérification côté client : le soumettant doit être le gagnant
   const mySetWins  = sets.filter(s => s.playerScore > s.opponentScore).length
   const oppSetWins = sets.filter(s => s.opponentScore > s.playerScore).length
   if (mySetWins <= oppSetWins) {
     errorEl.textContent = "D'après ce score, vous n'avez pas gagné le match. Seul le gagnant renseigne le score — si vous avez perdu, attendez que votre adversaire le saisisse."
     return
   }
-
   try {
     const res = await fetch('/api/public?resource=convocations', {
       method: 'POST', headers: authHeaders(),
@@ -5168,6 +5222,191 @@ async function submitScoreMatch() {
     await loadScoreMatch()
   } catch(e) { errorEl.textContent = 'Erreur réseau.' }
 }
+/* ══════════════ CHAT JOUEUR-JOUEUR ══════════════ */
+let _currentChatId = null
+let _chatPollInterval = null
+
+// ── Badge non-lus (appelé au login et toutes les 30s) ──
+async function loadChatBadge() {
+  try {
+    const res = await fetch('/api/public?resource=chat', { headers: authHeaders() })
+    if (!res.ok) return
+    const data = await res.json()
+    const total = data.totalUnread || 0
+    setBadge('badge-chat', total)
+  } catch(e) { /* silencieux */ }
+}
+
+// ── Liste des conversations ──
+async function loadChatList() {
+  const list = document.getElementById('chat-list')
+  if (!list) return
+  list.innerHTML = '<div class="admin-empty">Chargement…</div>'
+
+  // S'assurer qu'on est sur la vue liste
+  document.getElementById('chat-list-view').style.display = ''
+  document.getElementById('chat-conv-view').style.display = 'none'
+  stopChatPolling()
+
+  try {
+    const res = await fetch('/api/public?resource=chat', { headers: authHeaders() })
+    if (!res.ok) { list.innerHTML = '<div class="admin-empty">Erreur de chargement.</div>'; return }
+    const data = await res.json()
+    const chats = data.chats || []
+    setBadge('badge-chat', data.totalUnread || 0)
+
+    if (chats.length === 0) {
+      list.innerHTML = `<div class="admin-empty">Aucune conversation active pour l'instant.<br><span style="font-size:0.83rem;color:var(--gray)">Une conversation s'ouvre automatiquement dès qu'un match vous est planifié.</span></div>`
+      return
+    }
+
+    list.innerHTML = chats.map(c => {
+      const initials = (c.opponent.firstName[0] || '') + (c.opponent.lastName[0] || '')
+      const preview = c.lastMessage
+        ? (c.lastMessage.isAuto ? '🤖 ' : '') + c.lastMessage.content.slice(0, 60) + (c.lastMessage.content.length > 60 ? '…' : '')
+        : 'Pas encore de message'
+      const timeStr = c.lastMessage ? fmtChatTime(c.lastMessage.createdAt) : ''
+      return `
+      <div class="chat-conv-card ${c.unreadCount > 0 ? 'has-unread' : ''}" onclick="openChatConv(${c.id}, ${JSON.stringify(c.opponent).replace(/"/g, '&quot;')})">
+        <div class="chat-conv-avatar">${esc(initials.toUpperCase())}</div>
+        <div class="chat-conv-body">
+          <div class="chat-conv-name">${esc(capName(c.opponent.firstName))} ${esc(capName(c.opponent.lastName))}</div>
+          <div class="chat-conv-preview">${esc(preview)}</div>
+        </div>
+        <div class="chat-conv-meta">
+          <span class="chat-conv-time">${timeStr}</span>
+          ${c.unreadCount > 0 ? `<span class="chat-unread-badge">${c.unreadCount}</span>` : ''}
+        </div>
+      </div>`
+    }).join('')
+  } catch(e) {
+    list.innerHTML = '<div class="admin-empty">Erreur de chargement.</div>'
+  }
+}
+
+// ── Ouvrir une conversation ──
+async function openChatConv(chatId, opponent) {
+  _currentChatId = chatId
+  document.getElementById('chat-list-view').style.display = 'none'
+  document.getElementById('chat-conv-view').style.display = ''
+  document.getElementById('chat-conv-header').innerHTML =
+    `💬 Conversation avec <strong>${esc(capName(opponent.firstName))} ${esc(capName(opponent.lastName))}</strong>` +
+    `<div style="font-size:0.78rem;color:var(--gray);margin-top:0.2rem">Utilisez cet espace pour organiser votre match. Le score se saisit dans l'onglet <em>Score du match</em>.</div>`
+  document.getElementById('chat-error').textContent = ''
+  document.getElementById('chat-input').value = ''
+  await refreshChatMessages()
+  startChatPolling()
+}
+
+function closeChatConv() {
+  stopChatPolling()
+  _currentChatId = null
+  document.getElementById('chat-conv-view').style.display = 'none'
+  document.getElementById('chat-list-view').style.display = ''
+  loadChatList()
+}
+
+// ── Charger / rafraîchir les messages ──
+async function refreshChatMessages() {
+  if (!_currentChatId) return
+  try {
+    const res = await fetch(`/api/public?resource=chat&chatId=${_currentChatId}`, { headers: authHeaders() })
+    if (!res.ok) return
+    const data = await res.json()
+    renderChatMessages(data.chat.messages)
+    loadChatBadge()
+  } catch(e) { /* silencieux */ }
+}
+
+function renderChatMessages(messages) {
+  const container = document.getElementById('chat-messages')
+  if (!container) return
+  const myId = currentUser?.id
+  const wasAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 60
+
+  container.innerHTML = messages.map(m => {
+    if (m.isAuto) {
+      return `<div class="chat-bubble-wrap auto">
+        <div class="chat-bubble">${esc(m.content)}</div>
+        <span class="chat-time">${fmtChatTime(m.createdAt)}</span>
+      </div>`
+    }
+    const isMine = m.sender?.id === myId
+    const senderName = m.sender ? `${capName(m.sender.firstName)} ${capName(m.sender.lastName)}` : ''
+    return `<div class="chat-bubble-wrap ${isMine ? 'mine' : 'theirs'}">
+      ${!isMine ? `<span class="chat-sender">${esc(senderName)}</span>` : ''}
+      <div class="chat-bubble">${esc(m.content)}</div>
+      <span class="chat-time">${fmtChatTime(m.createdAt)}</span>
+    </div>`
+  }).join('')
+
+  if (wasAtBottom || messages.length <= 5) {
+    container.scrollTop = container.scrollHeight
+  }
+}
+
+// ── Envoyer un message ──
+async function sendChatMessage() {
+  if (!_currentChatId) return
+  const input = document.getElementById('chat-input')
+  const errorEl = document.getElementById('chat-error')
+  const content = (input.value || '').trim()
+  errorEl.textContent = ''
+  if (!content) return
+  const btn = document.getElementById('chat-send-btn')
+  btn.disabled = true
+  try {
+    const res = await fetch('/api/public?resource=chat', {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ action: 'send', chatId: _currentChatId, content }),
+    })
+    const data = await res.json()
+    if (!res.ok) { errorEl.textContent = data.error || 'Erreur.'; return }
+    input.value = ''
+    await refreshChatMessages()
+  } catch(e) { errorEl.textContent = 'Erreur réseau.' }
+  finally { btn.disabled = false; input.focus() }
+}
+
+// Entrée = envoyer, Shift+Entrée = saut de ligne
+function chatInputKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage() }
+}
+
+// ── Polling toutes les 8s quand une conversation est ouverte ──
+function startChatPolling() {
+  stopChatPolling()
+  _chatPollInterval = setInterval(refreshChatMessages, 8000)
+}
+function stopChatPolling() {
+  if (_chatPollInterval) { clearInterval(_chatPollInterval); _chatPollInterval = null }
+}
+
+// ── Utilitaire : format de temps pour les bulles ──
+function fmtChatTime(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const now = new Date()
+  const sameDay = d.toDateString() === now.toDateString()
+  if (sameDay) return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+}
+
+// ── Créer la conversation depuis l'onglet "Score du match" ──
+// Appelé quand un joueur clique sur "Ouvrir la conversation" dans une convocation.
+async function openChatFromConvocation(convType, convId, opponent) {
+  try {
+    const res = await fetch('/api/public?resource=chat', {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ action: 'create', convType, convId }),
+    })
+    const data = await res.json()
+    if (!res.ok) { alert(data.error || 'Erreur.'); return }
+    showPage('chat-match', document.querySelector('.nav-btn[data-tab="chat"]'))
+    await openChatConv(data.chatId, opponent)
+  } catch(e) { alert('Erreur réseau.') }
+}
+
 const INACTIVITY_MS = 15 * 60 * 1000
 const WARN_BEFORE_MS = 60 * 1000
 const INACTIVITY_EXEMPT_USERNAMES = ['admin', 'yanis']
@@ -5243,10 +5482,16 @@ async function checkSessionServer() {
 
 function startSessionHeartbeat() {
   stopSessionHeartbeat()
-  const beat = () => checkSessionServer()
-  heartbeatTimer = setInterval(beat, 60 * 1000) // toutes les 60 secondes
+  let heartbeatTick = 0
+  const beat = () => {
+    checkSessionServer()
+    heartbeatTick++
+    // Rafraîchir le badge chat toutes les 30s (tous les 2 beats de 60s manquerait le premier,
+    // donc on utilise un compteur et on le fait à chaque tick impair pour décaler avec le check session)
+    if (heartbeatTick % 2 === 0 || heartbeatTick === 1) loadChatBadge()
+  }
+  heartbeatTimer = setInterval(beat, 30 * 1000) // toutes les 30 secondes
   document.addEventListener('visibilitychange', onHeartbeatVisibilityChange)
-  // Verification immediate au demarrage
   setTimeout(beat, 2000)
 }
 
@@ -8946,6 +9191,7 @@ const PLAYER_TABS = [
   { key: 'accueil', label: 'Accueil', locked: true },
   { key: 'charte', label: 'Charte' },
   { key: 'messages', label: 'Messages' },
+  { key: 'chat', label: 'Communication' },
   { key: 'profil', label: 'Mon profil' },
   { key: 'faq', label: 'FAQ' },
   { key: 'contact', label: 'Contact' },

@@ -132,8 +132,7 @@ Voici un petit récapitulatif des statuts des matchs si jamais ce n'était pas t
 
 - Médaille en ligne 
 
+a.fillon256 --> Analyse complète du site
+a.fillon257 --> Fonctionnalité chat éphémère entre deux adversaire
 
-Pas d'intro
-Pas de création de bots
-Pas d'interdiction de clic droit sur la charte
-
+- Fonctionnalité matchs rempli par le gagnant
