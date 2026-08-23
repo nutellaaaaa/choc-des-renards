@@ -711,46 +711,10 @@ async function handleChat(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée.' })
 
   const { action, chatId, content } = req.body || {}
-  const cid = parseInt(chatId, 10)
-  if (isNaN(cid)) return res.status(400).json({ error: 'chatId invalide.' })
-
-  // Vérifier que le joueur est bien participant de cette conversation
-  const chat = await prisma.matchChat.findUnique({ where: { id: cid } })
-  if (!chat) return res.status(404).json({ error: 'Conversation introuvable.' })
-  if (chat.player1Id !== uid && chat.player2Id !== uid)
-    return res.status(403).json({ error: 'Cette conversation ne vous concerne pas.' })
-
-  // ── POST action: send ──
-  if (action === 'send') {
-    const text = (content || '').trim()
-    if (!text) return res.status(400).json({ error: 'Message vide.' })
-    if (text.length > 500) return res.status(400).json({ error: 'Message trop long (500 caractères max).' })
-
-    try {
-      // Le message est créé comme lu par son expéditeur
-      const readBy = JSON.stringify([uid])
-      const msg = await prisma.matchChatMessage.create({
-        data: {
-          chatId: cid,
-          senderId: uid,
-          content: text,
-          isAuto: false,
-          readBy,
-        },
-        include: {
-          sender: { select: { id: true, firstName: true, lastName: true } },
-        },
-      })
-      return res.status(201).json({ ok: true, message: msg })
-    } catch (err) {
-      console.error('[chat send]', err)
-      return res.status(500).json({ error: 'Erreur serveur.' })
-    }
-  }
 
   // ── POST action: create ──
-  // Crée la conversation si elle n'existe pas encore (déclenchée par le frontend
-  // quand un joueur ouvre l'onglet chat pour la première fois pour un match donné).
+  // Crée la conversation si elle n'existe pas encore. Pas de chatId ici (la conv
+  // n'existe pas encore), donc on le traite en premier avant toute validation de chatId.
   if (action === 'create') {
     const { convType, convId } = req.body || {}
     const convIdInt = parseInt(convId, 10)
@@ -758,7 +722,6 @@ async function handleChat(req, res) {
       return res.status(400).json({ error: 'convType/convId invalides.' })
 
     try {
-      // Récupérer les infos du match
       let player1Id, player2Id, phase, plannedMatchId = null, specialMatchId = null
       if (convType === 'planned') {
         const pm = await prisma.plannedMatch.findUnique({ where: { id: convIdInt } })
@@ -778,7 +741,7 @@ async function handleChat(req, res) {
         specialMatchId = sm.id
       }
 
-      // Créer ou récupérer la conversation (upsert-like via findFirst + create)
+      // Récupérer la conversation existante ou en créer une nouvelle
       const existing = plannedMatchId
         ? await prisma.matchChat.findFirst({ where: { player1Id, player2Id, phase } })
         : await prisma.matchChat.findUnique({ where: { specialMatchId } })
@@ -790,7 +753,6 @@ async function handleChat(req, res) {
       })
 
       // Message de bienvenue automatique
-      const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
       const [p1, p2] = await Promise.all([
         prisma.user.findUnique({ where: { id: player1Id }, select: { firstName: true, lastName: true } }),
         prisma.user.findUnique({ where: { id: player2Id }, select: { firstName: true, lastName: true } }),
@@ -807,6 +769,43 @@ async function handleChat(req, res) {
       return res.status(201).json({ ok: true, chatId: newChat.id, created: true })
     } catch (err) {
       console.error('[chat create]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  // Pour send et toute autre action, le chatId est obligatoire
+  const cid = parseInt(chatId, 10)
+  if (isNaN(cid)) return res.status(400).json({ error: 'chatId invalide.' })
+
+  // Vérifier que le joueur est bien participant de cette conversation
+  const chat = await prisma.matchChat.findUnique({ where: { id: cid } })
+  if (!chat) return res.status(404).json({ error: 'Conversation introuvable.' })
+  if (chat.player1Id !== uid && chat.player2Id !== uid)
+    return res.status(403).json({ error: 'Cette conversation ne vous concerne pas.' })
+
+  // ── POST action: send ──
+  if (action === 'send') {
+    const text = (content || '').trim()
+    if (!text) return res.status(400).json({ error: 'Message vide.' })
+    if (text.length > 500) return res.status(400).json({ error: 'Message trop long (500 caractères max).' })
+
+    try {
+      const readBy = JSON.stringify([uid])
+      const msg = await prisma.matchChatMessage.create({
+        data: {
+          chatId: cid,
+          senderId: uid,
+          content: text,
+          isAuto: false,
+          readBy,
+        },
+        include: {
+          sender: { select: { id: true, firstName: true, lastName: true } },
+        },
+      })
+      return res.status(201).json({ ok: true, message: msg })
+    } catch (err) {
+      console.error('[chat send]', err)
       return res.status(500).json({ error: 'Erreur serveur.' })
     }
   }
