@@ -435,6 +435,12 @@
   .profil-active-badge { display: inline-flex; align-items: center; gap: 0.4rem; font-family: var(--font-heading); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.25rem 0.7rem; border-radius: 20px; }
   .profil-active-badge.active { background: rgba(68,204,102,0.15); color: #44CC66; border: 1px solid rgba(68,204,102,0.35); }
   .profil-active-badge.inactive { background: rgba(136,136,136,0.12); color: #aaa; border: 1px solid rgba(136,136,136,0.3); }
+  .profil-pwa-badge { display: inline-flex; align-items: center; gap: 0.4rem; font-family: var(--font-heading); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.25rem 0.7rem; border-radius: 20px; }
+  .profil-pwa-badge.pwa-yes { background: rgba(255,109,0,0.15); color: var(--orange); border: 1px solid rgba(255,109,0,0.4); }
+  .profil-pwa-badge.pwa-no  { background: rgba(136,136,136,0.12); color: #aaa; border: 1px solid rgba(136,136,136,0.3); }
+  .btn-get-app { display: inline-flex; align-items: center; gap: 0.5rem; background: var(--orange); color: #000; border: none; cursor: pointer; font-family: var(--font-heading); font-size: 0.88rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.6rem 1.4rem; border-radius: 8px; transition: all 0.2s; text-decoration: none; }
+  .btn-get-app:hover { background: var(--orange-light); transform: translateY(-1px); }
+  .btn-get-app svg { flex-shrink: 0; }
 
   /* PAGE CONFIDENTIALITÉ */
   .privacy-wrap { max-width: 860px; margin: 0 auto; padding: 3rem 2rem 4rem; }
@@ -5112,8 +5118,28 @@ async function loadMonProfil() {
             <span class="profil-label">Inscrit depuis</span>
             <span class="profil-value">${createdAt ? createdAt.toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' }) : '<span style="color:var(--gray);font-style:italic">Non disponible</span>'}</span>
           </div>
+          <div class="profil-row">
+            <span class="profil-label">App mobile CDR</span>
+            <span class="profil-value">
+              ${(typeof pwaIsStandalone === 'function' && pwaIsStandalone())
+                ? '<span class="profil-pwa-badge pwa-yes">📱 OUI</span>'
+                : '<span class="profil-pwa-badge pwa-no">🌐 NON</span>'}
+            </span>
+          </div>
         </div>
       </div>
+
+      ${(typeof pwaIsStandalone === 'function' && !pwaIsStandalone()) ? `
+      <div style="margin-bottom:2rem;padding:1.25rem 1.5rem;background:var(--dark2);border:1px solid var(--dark4);border-left:3px solid var(--orange);border-radius:12px;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+        <div>
+          <div style="font-family:var(--font-heading);font-size:0.72rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--orange);margin-bottom:0.3rem;">Accès rapide</div>
+          <div style="font-size:0.95rem;color:var(--gray-light);">Installez l'app CDR sur votre écran d'accueil pour un accès instantané.</div>
+        </div>
+        <button class="btn-get-app" onclick="(function(){if(typeof pwaInstall==='function'&&typeof pwaHasPrompt==='function'&&pwaHasPrompt()){pwaInstall()}else if(/iphone|ipad|ipod/i.test(navigator.userAgent)){document.getElementById('pwa-ios-hint')&&(document.getElementById('pwa-ios-hint').style.display='flex',document.getElementById('pwa-ios-hint').classList.add('visible'))}else{alert('Pour installer : dans votre navigateur, ouvrez le menu ⋮ et choisissez « Ajouter à l\\'écran d\\'accueil ».')}})()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v13m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+          Obtenir l'application
+        </button>
+      </div>` : ''}
 
       <div class="profil-stat-grid">
         <div class="profil-stat">
@@ -10957,10 +10983,14 @@ async function deleteMedal(id) {
   // 2. BANNIÈRE D'INSTALLATION
   // ─────────────────────────────────────────────────────────────────────────
   const DISMISS_KEY   = 'pwa_install_dismissed'
-  const DISMISS_DAYS  = 30   // ne plus montrer pendant 30 jours après fermeture
+  const DISMISS_DAYS  = 7    // ne plus montrer pendant 7 jours après fermeture
   const SHOW_DELAY_MS = 4000 // attendre 4s après chargement avant de montrer
 
   let _installPrompt = null  // stocke l'événement beforeinstallprompt
+
+  // Exposer pour usage dans d'autres fonctions (ex: profil)
+  window.pwaIsStandalone = function() { return _isStandalone() }
+  window.pwaHasPrompt    = function() { return !!_installPrompt }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
