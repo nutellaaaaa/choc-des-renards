@@ -133,6 +133,6 @@ Voici un petit récapitulatif des statuts des matchs si jamais ce n'était pas t
 - Médaille en ligne 
 
 a.fillon256 --> Analyse complète du site
-a.fillon257 --> Fonctionnalité chat éphémère entre deux adversaire
+a.fillon2008 --> PWA
 
 - Fonctionnalité matchs rempli par le gagnant

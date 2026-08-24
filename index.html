@@ -5,6 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Le Choc des Renards</title>
 <link rel="icon" type="image/png" href="cdr-logo-blanc.png">
+
+<!-- PWA -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#FF6D00">
+<meta name="mobile-web-app-capable" content="yes">
+<!-- iOS Safari -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CDR">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png">
+<link rel="apple-touch-icon" sizes="144x144" href="/icons/icon-144.png">
+<link rel="apple-touch-icon" sizes="128x128" href="/icons/icon-128.png">
+<!-- Splash screen iOS (généré automatiquement à partir de background_color + icône) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@300;400;500;600;700&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -10741,6 +10755,102 @@ async function deleteMedal(id) {
   <button class="lightbox-nav lightbox-next" onclick="lbNav(1);event.stopPropagation()">&#8250;</button>
   <div class="lightbox-caption" id="lb-caption"></div>
 </div>
+
+
+<!-- ═══════════════ PWA — Service Worker ═══════════════
+     Enregistrement du SW et gestion des mises à jour.
+     Le toast "Mise à jour disponible" s'affiche quand un nouveau
+     SW est détecté ; un clic recharge la page pour l'activer.
+════════════════════════════════════════════════════════ -->
+<div id="pwa-update-toast" style="
+  display:none; position:fixed; bottom:88px; left:50%; transform:translateX(-50%);
+  background:#1E1E1E; border:1px solid #FF6D00; border-radius:10px;
+  padding:0.7rem 1.2rem; font-size:0.87rem; color:#fff; z-index:9999;
+  box-shadow:0 4px 24px rgba(0,0,0,0.5); white-space:nowrap;
+  display:none; align-items:center; gap:0.8rem;">
+  <span>🆕 Mise à jour disponible</span>
+  <button onclick="pwaApplyUpdate()" style="
+    background:#FF6D00; color:#fff; border:none; border-radius:6px;
+    padding:0.3rem 0.8rem; font-size:0.82rem; cursor:pointer; font-weight:600;">
+    Recharger
+  </button>
+  <button onclick="document.getElementById('pwa-update-toast').style.display='none'" style="
+    background:none; color:#888; border:none; cursor:pointer; font-size:1rem; line-height:1;">
+    ✕
+  </button>
+</div>
+
+<script>
+(function () {
+  // ── Enregistrement du Service Worker ──
+  if (!('serviceWorker' in navigator)) return
+
+  let _newWorker = null
+
+  navigator.serviceWorker.register('/sw.js')
+    .then(reg => {
+      // Vérifier les mises à jour en arrière-plan toutes les 60s
+      setInterval(() => reg.update(), 60 * 1000)
+
+      reg.addEventListener('updatefound', () => {
+        const newSW = reg.installing
+        newSW.addEventListener('statechange', () => {
+          // Un nouveau SW est installé et attend (pas encore actif) → on propose de recharger
+          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+            _newWorker = newSW
+            const toast = document.getElementById('pwa-update-toast')
+            if (toast) toast.style.display = 'flex'
+          }
+        })
+      })
+    })
+    .catch(err => console.warn('[PWA] Enregistrement SW échoué :', err))
+
+  // Rechargement automatique quand le nouveau SW prend le contrôle
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload()
+  })
+
+  window.pwaApplyUpdate = function () {
+    if (_newWorker) {
+      _newWorker.postMessage({ type: 'SKIP_WAITING' })
+    } else {
+      window.location.reload()
+    }
+  }
+
+  // ── Raccourcis manifest (?tab=…) ──
+  // Les shortcuts du manifest.json utilisent ?tab=xxx pour ouvrir directement
+  // un onglet. On les lit ici après l'init de l'auth (en différé).
+  const _origInitAuth = window.initAuth
+  if (typeof _origInitAuth === 'function') {
+    window.initAuth = function () {
+      _origInitAuth.apply(this, arguments)
+      _applyTabShortcut()
+    }
+  }
+
+  function _applyTabShortcut() {
+    const tab = new URLSearchParams(window.location.search).get('tab')
+    if (!tab) return
+    // On attend que l'utilisateur soit connecté avant de rediriger
+    const MAX_WAIT = 5000, INTERVAL = 200
+    let elapsed = 0
+    const poll = setInterval(() => {
+      elapsed += INTERVAL
+      const btn = document.querySelector(`.nav-btn[data-tab="${tab}"]`)
+      if (btn && typeof showPage === 'function') {
+        clearInterval(poll)
+        showPage(btn.dataset.tab || tab, btn)
+        // Nettoyer l'URL sans rechargement
+        window.history.replaceState({}, '', '/')
+      } else if (elapsed >= MAX_WAIT) {
+        clearInterval(poll)
+      }
+    }, INTERVAL)
+  }
+})()
+</script>
 
 </body>
 </html>
