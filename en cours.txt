@@ -133,6 +133,10 @@ Voici un petit récapitulatif des statuts des matchs si jamais ce n'était pas t
 - Médaille en ligne 
 
 a.fillon256 --> Analyse complète du site
-a.fillon2008 --> PWA
+a.fillon2008 --> PWA (modifs faites sur index.html)
 
-- Fonctionnalité matchs rempli par le gagnant
+- Appli
+- Beugs
+- Bye
+- Classement ronde 2 
+- Forfait joueur

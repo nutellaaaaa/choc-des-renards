@@ -2057,6 +2057,105 @@
     display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center;
     margin-bottom: 1.2rem;
   }
+
+  /* ── Bannière d'installation PWA ─────────────────────────────────────────── */
+  #pwa-install-banner {
+    display: none; /* affiché via JS */
+    position: fixed;
+    bottom: 1.4rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(120%);
+    z-index: 200;
+    width: min(420px, calc(100vw - 2rem));
+    background: var(--dark3);
+    border: 1px solid var(--orange);
+    border-radius: 16px;
+    padding: 1rem 1.1rem;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,109,0,0.15);
+    align-items: center;
+    gap: 0.9rem;
+    transition: transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+    opacity: 0;
+  }
+  #pwa-install-banner.visible {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+  /* Sur mobile le dock est en bas, on remonte la bannière */
+  @media (max-width: 1100px) {
+    #pwa-install-banner { bottom: 5.8rem; }
+  }
+  .pwa-banner-icon {
+    width: 52px; height: 52px; border-radius: 12px; flex-shrink: 0;
+    object-fit: cover; border: 1px solid var(--dark4);
+  }
+  .pwa-banner-body { flex: 1; min-width: 0; }
+  .pwa-banner-title {
+    font-family: var(--font-heading); font-size: 1rem; font-weight: 700;
+    color: var(--white); line-height: 1.2; margin-bottom: 0.2rem;
+  }
+  .pwa-banner-sub {
+    font-size: 0.78rem; color: var(--gray); line-height: 1.4;
+  }
+  .pwa-banner-actions { display: flex; gap: 0.5rem; flex-shrink: 0; align-items: center; }
+  .pwa-btn-install {
+    background: var(--orange); color: #fff; border: none; border-radius: 8px;
+    padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 700;
+    cursor: pointer; font-family: var(--font-heading); letter-spacing: 0.03em;
+    white-space: nowrap; transition: background 0.18s;
+  }
+  .pwa-btn-install:hover { background: var(--orange-light); }
+  .pwa-btn-dismiss {
+    background: none; border: none; color: var(--gray); cursor: pointer;
+    font-size: 1.1rem; line-height: 1; padding: 0.2rem; transition: color 0.15s;
+  }
+  .pwa-btn-dismiss:hover { color: var(--white); }
+
+  /* Instructions iOS (cachées par défaut) */
+  #pwa-ios-hint {
+    display: none;
+    position: fixed;
+    bottom: 1.4rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(120%);
+    z-index: 200;
+    width: min(380px, calc(100vw - 2rem));
+    background: var(--dark3);
+    border: 1px solid var(--dark4);
+    border-radius: 16px;
+    padding: 1.1rem 1.2rem;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    opacity: 0;
+    transition: transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+  }
+  #pwa-ios-hint.visible {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+  @media (max-width: 1100px) {
+    #pwa-ios-hint { bottom: 5.8rem; }
+  }
+  .pwa-ios-title {
+    font-family: var(--font-heading); font-size: 0.95rem; font-weight: 700;
+    color: var(--white); margin-bottom: 0.7rem; display: flex;
+    align-items: center; gap: 0.5rem;
+  }
+  .pwa-ios-steps { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+  .pwa-ios-steps li {
+    display: flex; align-items: flex-start; gap: 0.55rem;
+    font-size: 0.82rem; color: var(--gray-light); line-height: 1.4;
+  }
+  .pwa-ios-steps li .step-num {
+    background: var(--dark4); color: var(--orange); border-radius: 50%;
+    width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+    font-size: 0.72rem; font-weight: 700; flex-shrink: 0; margin-top: 1px;
+  }
+  .pwa-ios-close {
+    margin-top: 0.9rem; background: none; border: 1px solid var(--dark4);
+    color: var(--gray); border-radius: 7px; padding: 0.35rem 0.8rem;
+    font-size: 0.8rem; cursor: pointer; width: 100%; transition: border-color 0.15s, color 0.15s;
+  }
+  .pwa-ios-close:hover { border-color: var(--gray); color: var(--white); }
 </style>
 </head>
 <body>
@@ -10757,7 +10856,47 @@ async function deleteMedal(id) {
 </div>
 
 
-<!-- ═══════════════ PWA — Service Worker ═══════════════
+<!-- ═══════════════ PWA — Bannière d'installation ═══════════════ -->
+
+<!-- Android / Chrome : bannière avec bouton Installer -->
+<div id="pwa-install-banner" role="dialog" aria-label="Installer l'application CDR">
+  <img class="pwa-banner-icon" src="/icons/icon-192.png" alt="CDR">
+  <div class="pwa-banner-body">
+    <div class="pwa-banner-title">Installer l'app CDR</div>
+    <div class="pwa-banner-sub">Accès direct depuis votre écran d'accueil, sans navigateur.</div>
+  </div>
+  <div class="pwa-banner-actions">
+    <button class="pwa-btn-install" onclick="pwaInstall()">Installer</button>
+    <button class="pwa-btn-dismiss" onclick="pwaDismiss()" aria-label="Fermer">✕</button>
+  </div>
+</div>
+
+<!-- iOS Safari : instructions manuelles -->
+<div id="pwa-ios-hint" role="dialog" aria-label="Ajouter CDR à l'écran d'accueil">
+  <div class="pwa-ios-title">
+    <img src="/icons/icon-72.png" style="width:28px;height:28px;border-radius:7px;"> Ajouter à l'écran d'accueil
+  </div>
+  <ol class="pwa-ios-steps">
+    <li>
+      <span class="step-num">1</span>
+      <span>Appuyez sur le bouton <strong style="color:var(--white)">Partager</strong>
+      <svg style="width:16px;height:16px;vertical-align:middle;margin:0 2px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+      dans la barre Safari</span>
+    </li>
+    <li>
+      <span class="step-num">2</span>
+      <span>Faites défiler et appuyez sur <strong style="color:var(--white)">« Sur l'écran d'accueil »</strong></span>
+    </li>
+    <li>
+      <span class="step-num">3</span>
+      <span>Appuyez sur <strong style="color:var(--orange)">Ajouter</strong> en haut à droite</span>
+    </li>
+  </ol>
+  <button class="pwa-ios-close" onclick="pwaDismiss()">Compris, ne plus afficher</button>
+</div>
+
+<!-- ═══════════════ PWA — Toast mise à jour ═══════════════ -->
+<div id="pwa-update-toast" style="
      Enregistrement du SW et gestion des mises à jour.
      Le toast "Mise à jour disponible" s'affiche quand un nouveau
      SW est détecté ; un clic recharge la page pour l'activer.
@@ -10782,44 +10921,134 @@ async function deleteMedal(id) {
 
 <script>
 (function () {
-  // ── Enregistrement du Service Worker ──
-  if (!('serviceWorker' in navigator)) return
-
+  // ─────────────────────────────────────────────────────────────────────────
+  // 1. ENREGISTREMENT DU SERVICE WORKER
+  // ─────────────────────────────────────────────────────────────────────────
   let _newWorker = null
 
-  navigator.serviceWorker.register('/sw.js')
-    .then(reg => {
-      // Vérifier les mises à jour en arrière-plan toutes les 60s
-      setInterval(() => reg.update(), 60 * 1000)
-
-      reg.addEventListener('updatefound', () => {
-        const newSW = reg.installing
-        newSW.addEventListener('statechange', () => {
-          // Un nouveau SW est installé et attend (pas encore actif) → on propose de recharger
-          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
-            _newWorker = newSW
-            const toast = document.getElementById('pwa-update-toast')
-            if (toast) toast.style.display = 'flex'
-          }
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => {
+        setInterval(() => reg.update(), 60 * 1000)
+        reg.addEventListener('updatefound', () => {
+          const newSW = reg.installing
+          newSW.addEventListener('statechange', () => {
+            if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+              _newWorker = newSW
+              const toast = document.getElementById('pwa-update-toast')
+              if (toast) toast.style.display = 'flex'
+            }
+          })
         })
       })
-    })
-    .catch(err => console.warn('[PWA] Enregistrement SW échoué :', err))
+      .catch(err => console.warn('[PWA] Enregistrement SW échoué :', err))
 
-  // Rechargement automatique quand le nouveau SW prend le contrôle
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    window.location.reload()
-  })
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload()
+    })
+  }
 
   window.pwaApplyUpdate = function () {
-    if (_newWorker) {
-      _newWorker.postMessage({ type: 'SKIP_WAITING' })
-    } else {
-      window.location.reload()
+    if (_newWorker) _newWorker.postMessage({ type: 'SKIP_WAITING' })
+    else window.location.reload()
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 2. BANNIÈRE D'INSTALLATION
+  // ─────────────────────────────────────────────────────────────────────────
+  const DISMISS_KEY   = 'pwa_install_dismissed'
+  const DISMISS_DAYS  = 30   // ne plus montrer pendant 30 jours après fermeture
+  const SHOW_DELAY_MS = 4000 // attendre 4s après chargement avant de montrer
+
+  let _installPrompt = null  // stocke l'événement beforeinstallprompt
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  function _isDismissed() {
+    try {
+      const ts = parseInt(localStorage.getItem(DISMISS_KEY) || '0', 10)
+      return ts && (Date.now() - ts) < DISMISS_DAYS * 864e5
+    } catch { return false }
+  }
+
+  function _isIOS() {
+    return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream
+  }
+
+  function _isStandalone() {
+    return window.navigator.standalone === true
+      || window.matchMedia('(display-mode: standalone)').matches
+  }
+
+  function _showBanner(id) {
+    const el = document.getElementById(id)
+    if (!el) return
+    el.style.display = 'flex'
+    // Forcer un reflow pour que la transition CSS s'applique
+    void el.offsetWidth
+    el.classList.add('visible')
+  }
+
+  function _hideBanner(id) {
+    const el = document.getElementById(id)
+    if (!el) return
+    el.classList.remove('visible')
+    // Masquer après la fin de la transition (420ms)
+    setTimeout(() => { el.style.display = 'none' }, 450)
+  }
+
+  // ── Fonctions exposées globalement (appelées par les boutons HTML) ────────
+
+  window.pwaInstall = async function () {
+    if (!_installPrompt) return
+    _installPrompt.prompt()
+    const { outcome } = await _installPrompt.userChoice
+    _installPrompt = null
+    _hideBanner('pwa-install-banner')
+    if (outcome === 'accepted') {
+      // Mémoriser que l'installation a eu lieu (pas besoin de ré-afficher)
+      try { localStorage.setItem(DISMISS_KEY, String(Date.now() * 2)) } catch {}
     }
   }
 
-  // ── Raccourcis manifest (?tab=…) ──
+  window.pwaDismiss = function () {
+    _hideBanner('pwa-install-banner')
+    _hideBanner('pwa-ios-hint')
+    // Mémoriser le refus pendant DISMISS_DAYS jours
+    try { localStorage.setItem(DISMISS_KEY, String(Date.now())) } catch {}
+  }
+
+  // ── Logique d'affichage ───────────────────────────────────────────────────
+
+  // Cas Android/Chrome : l'événement beforeinstallprompt se déclenche
+  // automatiquement si le site est PWA-éligible et non encore installé.
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault()   // bloquer la bannière native du navigateur
+    _installPrompt = e
+
+    if (!_isDismissed() && !_isStandalone()) {
+      setTimeout(() => _showBanner('pwa-install-banner'), SHOW_DELAY_MS)
+    }
+  })
+
+  // Cas iOS Safari : pas d'événement, on détecte manuellement.
+  // On affiche les instructions uniquement si l'app n'est pas déjà installée.
+  if (_isIOS() && !_isStandalone() && !_isDismissed()) {
+    setTimeout(() => _showBanner('pwa-ios-hint'), SHOW_DELAY_MS)
+  }
+
+  // L'événement appinstalled se déclenche quand l'utilisateur accepte via
+  // la bannière native ou après pwaInstall(). On nettoie et on cache tout.
+  window.addEventListener('appinstalled', () => {
+    _hideBanner('pwa-install-banner')
+    _installPrompt = null
+    try { localStorage.setItem(DISMISS_KEY, String(Date.now() * 2)) } catch {}
+    console.log('[PWA] App installée avec succès.')
+  })
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 3. RACCOURCIS MANIFEST (?tab=…)
+  // ─────────────────────────────────────────────────────────────────────────
   // Les shortcuts du manifest.json utilisent ?tab=xxx pour ouvrir directement
   // un onglet. On les lit ici après l'init de l'auth (en différé).
   const _origInitAuth = window.initAuth
