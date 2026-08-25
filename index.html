@@ -307,6 +307,7 @@
   .perf-badge-mur           { background: rgba(100, 160, 230, 0.15); color: #90c0f0; border: 1px solid rgba(100, 160, 230, 0.35); }
   .perf-badge-intouchable   { background: rgba(186, 85, 211, 0.15); color: #da8fef; border: 1px solid rgba(186, 85, 211, 0.35); }
   .perf-badge-equilibriste  { background: rgba(233, 30, 99, 0.15);  color: #f06292; border: 1px solid rgba(233, 30, 99, 0.35); }
+  .perf-badge-appli-mobile  { background: rgba(255,109,0,0.15); color: var(--orange); border: 1px solid rgba(255,109,0,0.4); }
   .player-name .perf-badge { margin-left: 0.5rem; }
   .matches-list { display: flex; flex-direction: column; gap: 0.75rem; }
   .match-card { background: var(--dark3); border: 1px solid var(--dark4); border-radius: 10px; padding: 1rem 1.25rem; }
@@ -4458,6 +4459,8 @@ function showApp() {
     loadConvocationsBadge()
     loadChatBadge()
     if (pendingNotifications.length > 0) { currentNotifIndex = 0; showNotifOverlay() }
+    // Détecter si on est en mode app standalone et mémoriser l'ID du joueur
+    if (typeof initPwaBadgeDetection === 'function') initPwaBadgeDetection()
   }
   // La page a pu finir de charger (événement 'load') bien avant que l'utilisateur ne se
   // connecte : sans cet appel explicite, l'animation d'entrée de la page d'accueil
@@ -5140,6 +5143,13 @@ async function loadMonProfil() {
             <span class="profil-label">Notifications push</span>
             <span class="profil-value" id="push-toggle-wrap">
               <span style="color:var(--gray);font-style:italic;font-size:0.85rem">…</span>
+            </span>
+          </div>
+          <div class="profil-row" id="push-test-row" style="display:none">
+            <span class="profil-label"></span>
+            <span class="profil-value">
+              <button class="btn-sm" onclick="pushSendTest()" style="font-size:0.78rem;padding:0.2rem 0.7rem;background:var(--dark4);border:1px solid var(--dark5);color:var(--gray-light);border-radius:6px;cursor:pointer;">🔔 Tester</button>
+              <span id="push-test-feedback" style="font-size:0.8rem;color:var(--gray);margin-left:0.5rem"></span>
             </span>
           </div>
         </div>
@@ -5832,6 +5842,40 @@ let perfRenardArgenteId   = null
 let perfMurDeGlaceId      = null
 let _hiddenBadges = []
 
+// ── Badge Appli Mobile : détection PWA standalone ─────────────────────────
+// Dès que le joueur charge la page en mode standalone (app installée),
+// son ID est mémorisé localement. Le badge persiste même s'il revient
+// plus tard en navigateur classique.
+const _PWA_USERS_KEY = 'cdr_pwa_user_ids'
+let _pwaUserIds = new Set()
+
+function _loadPwaUserIds() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(_PWA_USERS_KEY) || '[]')
+    _pwaUserIds = new Set(Array.isArray(stored) ? stored.map(String) : [])
+  } catch { _pwaUserIds = new Set() }
+}
+
+function _savePwaUserId(uid) {
+  if (!uid) return
+  _pwaUserIds.add(String(uid))
+  try { localStorage.setItem(_PWA_USERS_KEY, JSON.stringify([..._pwaUserIds])) } catch {}
+}
+
+function initPwaBadgeDetection() {
+  _loadPwaUserIds()
+  const isStandalone = window.navigator.standalone === true
+    || window.matchMedia('(display-mode: standalone)').matches
+  if (isStandalone && typeof currentUser !== 'undefined' && currentUser && currentUser.id) {
+    _savePwaUserId(currentUser.id)
+  }
+}
+
+function playerIsPwaUser(p) {
+  if (!p || !p.id) return false
+  return _pwaUserIds.has(String(p.id))
+}
+
 // Catalogue des badges — utilisé pour le panneau admin et le rendu
 const PERF_BADGES = [
   { key: 'streak',         emoji: '🔥', label: "X d'affilée",       desc: "Série de victoires consécutives ≥ 3 depuis le dernier match. Affiche le nombre exact. S'arrête à la première défaite." },
@@ -5846,6 +5890,7 @@ const PERF_BADGES = [
   { key: 'mur_de_glace',   emoji: '🧊', label: 'Mur de Glace',       desc: "Badge unique — le moins de défaites sur ses 10 derniers matchs, parmi les joueurs en ayant ≥ 10 au total." },
   { key: 'intouchable',    emoji: '👑', label: 'Intouchable',         desc: "Zéro défaite ce mois-ci avec au minimum 3 matchs joués ce mois. Plusieurs joueurs peuvent le porter simultanément." },
   { key: 'equilibriste',   emoji: '🎲', label: 'Équilibriste',        desc: "Win rate entre 45 % et 55 % sur toute sa carrière (minimum 10 matchs joués). L'éternel équilibré." },
+  { key: 'appli_mobile',  emoji: '📱', label: 'Appli Mobile CDR',    desc: "Utilise l'application mobile CDR installée sur son téléphone (mode PWA standalone). Badge détecté automatiquement à la connexion et mémorisé." },
 ]
 
 function loadBadgesConfig() {
@@ -6112,8 +6157,73 @@ function playerBadgesHtml(p) {
   // 🎲 Équilibriste
   if (show('equilibriste') && computeIsEquilibriste(p))
     badges += `<span class="perf-badge perf-badge-equilibriste" title="Win rate 45–55 % sur toute la carrière (min. 10 matchs)">🎲 Équilibriste</span>`
+  // 📱 Appli Mobile CDR
+  if (show('appli_mobile') && playerIsPwaUser(p))
+    badges += `<span class="perf-badge perf-badge-appli-mobile" title="Utilise l'application mobile CDR installée">📱 Appli Mobile</span>`
 
   return badges
+}
+
+// ── Détection des nouveaux badges et push téléphone ───────────────────────
+// Mémorise en localStorage les badges déjà signalés au serveur pour ce joueur.
+// À chaque chargement de l'onglet Performances, on compare la liste courante
+// à la liste mémorisée et on appelle badge_push pour les nouveaux.
+const _BADGE_SEEN_KEY = 'cdr_badges_seen'
+
+function _getSeenBadges() {
+  try { return new Set(JSON.parse(localStorage.getItem(_BADGE_SEEN_KEY) || '[]')) }
+  catch { return new Set() }
+}
+
+function _markBadgeSeen(key) {
+  const seen = _getSeenBadges()
+  seen.add(key)
+  try { localStorage.setItem(_BADGE_SEEN_KEY, JSON.stringify([...seen])) } catch {}
+}
+
+async function notifyNewBadges(me) {
+  if (!me || !currentUser || currentUser.role === 'ADMIN') return
+  // Construire la liste des badges actuellement portés par "moi"
+  const activeBadges = []
+  const show = key => !_hiddenBadges.includes(key)
+  if (show('streak') && computeCurrentStreak(me.matches) >= 3)
+    activeBadges.push({ key: 'streak', label: "d'affilée", emoji: '🔥' })
+  if (show('top_mois') && perfBestProgressionId && me.id === perfBestProgressionId)
+    activeBadges.push({ key: 'top_mois', label: 'Top du mois', emoji: '📈' })
+  if (show('bete_noire') && computeIsBeteNoire(me))
+    activeBadges.push({ key: 'bete_noire', label: 'Bête noire', emoji: '💀' })
+  if (show('tireur_elite') && perfTireurEliteId && me.id === perfTireurEliteId)
+    activeBadges.push({ key: 'tireur_elite', label: "Tireur d'élite", emoji: '🎯' })
+  if (show('insubmersible') && computeIsInsubmersible(me))
+    activeBadges.push({ key: 'insubmersible', label: 'Insubmersible', emoji: '🌊' })
+  if (show('renaissance') && computeIsRenaissance(me))
+    activeBadges.push({ key: 'renaissance', label: 'Renaissance', emoji: '⚡' })
+  if (show('petit_nouveau') && computeIsPetitNouveau(me))
+    activeBadges.push({ key: 'petit_nouveau', label: 'Petit Nouveau', emoji: '🐣' })
+  if (show('renard_argente') && perfRenardArgenteId && me.id === perfRenardArgenteId)
+    activeBadges.push({ key: 'renard_argente', label: 'Renard Argenté', emoji: '🦊' })
+  if (show('sans_faute') && computeIsSansFaute(me))
+    activeBadges.push({ key: 'sans_faute', label: 'Sans Faute', emoji: '📅' })
+  if (show('mur_de_glace') && perfMurDeGlaceId && me.id === perfMurDeGlaceId)
+    activeBadges.push({ key: 'mur_de_glace', label: 'Mur de Glace', emoji: '🧊' })
+  if (show('intouchable') && computeIsIntouchable(me))
+    activeBadges.push({ key: 'intouchable', label: 'Intouchable', emoji: '👑' })
+  if (show('equilibriste') && computeIsEquilibriste(me))
+    activeBadges.push({ key: 'equilibriste', label: 'Équilibriste', emoji: '🎲' })
+  if (show('appli_mobile') && playerIsPwaUser(me))
+    activeBadges.push({ key: 'appli_mobile', label: 'Appli Mobile CDR', emoji: '📱' })
+
+  const seen = _getSeenBadges()
+  for (const b of activeBadges) {
+    if (seen.has(b.key)) continue
+    _markBadgeSeen(b.key) // mémoriser immédiatement pour éviter les doublons rapides
+    // Appel silencieux au serveur — pas besoin d'attendre la réponse
+    fetch('/api/public?resource=badge_push', {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ badgeKey: b.key, badgeLabel: b.label, badgeEmoji: b.emoji }),
+    }).catch(() => {})
+  }
 }
 
 async function loadPerformances() {
@@ -6152,6 +6262,8 @@ async function loadPerformances() {
         <div class="player-stat-card"><div class="val">${me.points}</div><div class="lbl">Points</div></div>`
       const myBadges = document.getElementById('my-perf-badges')
       if (myBadges) myBadges.innerHTML = playerBadgesHtml(me)
+      // Détecter les nouveaux badges et envoyer un push téléphone si nécessaire
+      notifyNewBadges(me)
     } else {
       myCard.style.display = 'none'
     }
@@ -11006,6 +11118,12 @@ async function deleteMedal(id) {
     return _vapidPublicKey
   }
 
+  // Affiche/cache le bouton test selon l'état de l'abonnement
+  function _showTestBtn(show) {
+    const row = document.getElementById('push-test-row')
+    if (row) row.style.display = show ? '' : 'none'
+  }
+
   // Injecte le contenu du #push-toggle-wrap selon l'état isOn
   function _render(wrap, isOn) {
     if (!wrap) return
@@ -11014,6 +11132,67 @@ async function deleteMedal(id) {
          <button class="push-action-btn unsub" onclick="pushUnsubscribe()">Désactiver</button>`
       : `<span class="push-badge off">🔕 Désactivées</span>
          <button class="push-action-btn sub" onclick="pushSubscribe()">Activer</button>`
+    _showTestBtn(isOn)
+  }
+
+  // ── Diagnostic complet dans la console ────────────────────────────────────
+  window.pushDiag = async function () {
+    console.group('🔔 [CDR Push] Diagnostic')
+    console.log('PUSH_SUPPORTED :', PUSH_SUPPORTED)
+    console.log('Notification.permission :', typeof Notification !== 'undefined' ? Notification.permission : 'API absente')
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration('/sw.js').catch(() => null)
+      console.log('SW enregistré :', !!reg)
+      if (reg) {
+        const sub = await reg.pushManager.getSubscription().catch(() => null)
+        console.log('Subscription active :', !!sub)
+        if (sub) console.log('Endpoint :', sub.endpoint.slice(0, 60) + '…')
+      }
+    }
+    const key = await getVapidKey()
+    console.log('VAPID key reçue du backend :', !!key, key ? key.slice(0, 20) + '…' : '(null)')
+    console.groupEnd()
+    return '✓ Voir les logs ci-dessus'
+  }
+
+  // ── Test push via SW local (sans serveur) ─────────────────────────────────
+  window.pushSendTest = async function () {
+    const feedback = document.getElementById('push-test-feedback')
+    if (feedback) feedback.textContent = '⏳ Envoi…'
+    try {
+      // Vérifie d'abord que la subscription existe bien en base
+      const reg = await navigator.serviceWorker.ready
+      const sub = await reg.pushManager.getSubscription()
+      if (!sub) {
+        if (feedback) feedback.textContent = '✗ Aucune subscription active'
+        return
+      }
+
+      // Envoie un push de test via le backend
+      const res = await fetch('/api/public?resource=push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ subscription: sub.toJSON(), test: true }),
+      })
+
+      if (res.ok) {
+        // Déclenche une notification locale via le SW comme fallback visible immédiatement
+        reg.showNotification('🔔 Test CDR', {
+          body: 'Les notifications push fonctionnent correctement !',
+          icon: '/icons/icon-192.png',
+          badge: '/icons/icon-192.png',
+          tag: 'cdr-test',
+        })
+        if (feedback) { feedback.textContent = '✓ Notif envoyée !'; feedback.style.color = '#6ddc6d' }
+      } else {
+        const err = await res.json().catch(() => ({}))
+        if (feedback) { feedback.textContent = '✗ Erreur : ' + (err.error || res.status); feedback.style.color = '#ff7070' }
+      }
+    } catch(e) {
+      console.error('[push test]', e)
+      if (feedback) { feedback.textContent = '✗ ' + e.message; feedback.style.color = '#ff7070' }
+    }
+    if (feedback) setTimeout(() => { feedback.textContent = ''; feedback.style.color = '' }, 5000)
   }
 
   // ── initPushToggle ─────────────────────────────────────────────────────
