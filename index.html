@@ -4335,15 +4335,19 @@ async function renderCharteWithPdfJs() {
       const scale = Math.max(0.5, targetWidth / unscaled.width)
       const viewport = page.getViewport({ scale })
       // Rendu à la résolution physique de l'écran (Retina/haute densité) :
-      // le buffer du canvas est agrandi par le devicePixelRatio, puis
-      // ré-affiché à la taille CSS d'origine, ce qui évite le flou lié
-      // à l'upscale du navigateur sur les écrans haute densité.
+      // le buffer du canvas est agrandi par le devicePixelRatio. On NE fixe
+      // PAS canvas.style.width/height en JS : un style inline aurait une
+      // priorité plus forte que la règle CSS externe "height:auto" et
+      // figerait la hauteur, ce qui déforme (et donne l'impression de flou)
+      // l'image dès que "max-width:100%" réduit la largeur affichée — donc
+      // sur mobile ou quand la fenêtre est resserrée. En laissant le CSS
+      // externe gérer l'affichage à partir de la taille native du canvas
+      // (attributs width/height ci-dessous), le ratio est toujours respecté,
+      // y compris si l'utilisateur redimensionne la fenêtre après coup.
       const dpr = Math.min(window.devicePixelRatio || 1, 2.5)
       const canvas = document.createElement('canvas')
       canvas.width = Math.ceil(viewport.width * dpr)
       canvas.height = Math.ceil(viewport.height * dpr)
-      canvas.style.width = Math.ceil(viewport.width) + 'px'
-      canvas.style.height = Math.ceil(viewport.height) + 'px'
       canvas.oncontextmenu = () => false
       container.appendChild(canvas)
       const ctx = canvas.getContext('2d')
@@ -5789,12 +5793,11 @@ async function loadClassement() {
     if (hasGroups) {
       html += `<div id="class-groups" class="phase-content${defaultTab === 'groups' ? ' active' : ''}">`
       for (const g of phase2Groups) {
-        const gMembers = (g.members || []).map(m => {
-          const pl = classementPlayers.find(p => p.id === (m.userId || m.id))
-          return pl || { ...m.user, points: 0, wins: 0, losses: 0, played: 0, setDiff: 0 }
-        })
+        // g.members arrive déjà triés et avec des stats calculées côté
+        // serveur à partir des seuls matchs de la phase 2 (voir /api/matches) :
+        // pas de re-tri ni de lookup sur les stats globales de la saison ici.
         html += `<div class="poule-title">🦊 ${esc(g.name)}</div>`
-        html += renderRankingTable(sortPlayersForDisplay(gMembers))
+        html += renderRankingTable(g.members || [])
       }
       html += `</div>`
     }

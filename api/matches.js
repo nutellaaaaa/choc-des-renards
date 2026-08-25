@@ -28,6 +28,15 @@ function computeStats(matches) {
   return { played, wins, losses, setDiff, points }
 }
 
+// Stats limitées aux matchs d'une phase donnée. Le classement (poules /
+// rondes suisses) doit repartir de zéro à chaque phase : un match joué en
+// PHASE1 ne doit pas compter dans le classement de la PHASE2, contrairement
+// aux stats "Performances" (computeStats ci-dessus) qui restent cumulées
+// sur toute la saison.
+function computeStatsForPhase(matches, phase) {
+  return computeStats((matches || []).filter(m => m.phase === phase))
+}
+
 // Ordre : victoires DESC, matchs joués ASC, points DESC, createdAt ASC
 function sortPlayers(players) {
   return [...players].sort((a, b) => {
@@ -225,7 +234,7 @@ module.exports = async function handler(req, res) {
       include: {
         members: {
           where: { user: { active: true, accepted: true, banned: false } },
-          include: { user: { select: { id: true, firstName: true, lastName: true, username: true } } },
+          include: { user: { select: { id: true, firstName: true, lastName: true, username: true, category: true, createdAt: true } } },
         },
       },
     })
@@ -274,9 +283,20 @@ module.exports = async function handler(req, res) {
       orderedPlayers = sortPlayers(livePlayers)
     }
 
+    // Table de recherche user.id -> matchs bruts, pour recalculer des stats
+    // propres à une phase donnée (le classement ne doit pas mélanger les
+    // matchs des différentes phases, contrairement aux stats "Performances").
+    const matchesByUserId = {}
+    for (const u of users) matchesByUserId[u.id] = u.matches
+
+    // Poules (Phase 1) : classement basé uniquement sur les matchs de PHASE1
+    // de chaque poule (une Poule peut en théorie porter une autre phase via
+    // son propre champ `phase`, on s'y aligne plutôt que de forcer PHASE1).
     const poulesWithStats = poules.map(p => {
       const memberIds = new Set(p.members.map(m => m.userId))
-      const poulePlayers = livePlayers.filter(pl => memberIds.has(pl.id))
+      const poulePlayers = livePlayers
+        .filter(pl => memberIds.has(pl.id))
+        .map(pl => ({ ...pl, ...computeStatsForPhase(matchesByUserId[pl.id], p.phase) }))
       return {
         id: p.id, name: p.name, phase: p.phase,
         totalPoints: poulePlayers.reduce((a, pl) => a + pl.points, 0),
@@ -287,6 +307,25 @@ module.exports = async function handler(req, res) {
           points: pl.points, wins: pl.wins, losses: pl.losses,
           played: pl.played, setDiff: pl.setDiff,
         })),
+      }
+    })
+
+    // Rondes suisses (Phase 2) : même principe, classement basé uniquement
+    // sur les matchs de PHASE2. On calcule les stats ici côté serveur (au
+    // lieu de laisser le client retomber sur les stats globales de
+    // `players`, qui mélangeaient à tort tous les matchs de la saison).
+    const phase2GroupsWithStats = phase2Groups.map(g => {
+      const groupPlayers = (g.members || []).map(m => {
+        const u = m.user
+        return {
+          id: u.id, firstName: u.firstName, lastName: u.lastName,
+          username: u.username, category: u.category, createdAt: u.createdAt,
+          ...computeStatsForPhase(matchesByUserId[u.id], 'PHASE2'),
+        }
+      })
+      return {
+        id: g.id, name: g.name,
+        members: sortPlayers(groupPlayers),
       }
     })
 
@@ -302,7 +341,7 @@ module.exports = async function handler(req, res) {
       round: state.currentRound,
       players: orderedPlayers,
       poules: poulesWithStats,
-      phase2Groups,
+      phase2Groups: phase2GroupsWithStats,
       rankingFrozen: !!state.rankingSnapshot,
       hiddenTabs: hiddenTabsArr,
       tabOrder: tabOrderArr,

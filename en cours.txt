@@ -137,12 +137,10 @@ a.fillon257 --> PWA DONE
 a.fillon657 --> Notifs push DONE 
 a.fillon2008 DONE
 
-modifs : index, admin, public
+modifs : index, matches
 
-- Appli
 - Beugs
 - Bye
-- Classement ronde 2 
 - Forfait joueur
 
 Intégration d'une version app mobile de CDR (PWA). 
@@ -156,3 +154,4 @@ un potentiel badge dans performances. L'utilisateur peut activer/désactiver les
 recevoir en temps réel les notifs admin, de match planifié, de chat éphémère, etc. 
 
 Notifs tel: toutes notifs reçus dans messages + nouveau match disponible dans score du match + passage d'une phase à une autre + obtention d'un nouveau badge dans performances + score du match rempli (par soi ou par l'adversaire) + obtention d'une médaille dans vitrine + ouverture d'un chat éphémère avec un joueur + fermeture du chat aphémère avec ce joueur
+
