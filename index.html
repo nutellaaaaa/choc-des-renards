@@ -3631,7 +3631,7 @@
     <span class="nav-logo-label">Le Choc des <em>Renards</em></span>
   </a>
   <div class="nav-user-info" id="nav-user">
-    <span class="nav-user-greeting">Salut, <strong id="nav-user-name"></strong> <span id="nav-user-badge" class="player-level level-NC"></span></span>
+    <span class="nav-user-greeting">Salut, <strong id="nav-user-name"></strong></span>
     <button class="nav-switch-btn" id="nav-switch-btn" onclick="switchAccount()" style="display:none"></button>
     <button class="nav-logout-btn" onclick="logout()">Déconnexion</button>
   </div>
@@ -4334,13 +4334,21 @@ async function renderCharteWithPdfJs() {
       const unscaled = page.getViewport({ scale: 1 })
       const scale = Math.max(0.5, targetWidth / unscaled.width)
       const viewport = page.getViewport({ scale })
+      // Rendu à la résolution physique de l'écran (Retina/haute densité) :
+      // le buffer du canvas est agrandi par le devicePixelRatio, puis
+      // ré-affiché à la taille CSS d'origine, ce qui évite le flou lié
+      // à l'upscale du navigateur sur les écrans haute densité.
+      const dpr = Math.min(window.devicePixelRatio || 1, 2.5)
       const canvas = document.createElement('canvas')
-      canvas.width = Math.ceil(viewport.width)
-      canvas.height = Math.ceil(viewport.height)
+      canvas.width = Math.ceil(viewport.width * dpr)
+      canvas.height = Math.ceil(viewport.height * dpr)
+      canvas.style.width = Math.ceil(viewport.width) + 'px'
+      canvas.style.height = Math.ceil(viewport.height) + 'px'
       canvas.oncontextmenu = () => false
       container.appendChild(canvas)
       const ctx = canvas.getContext('2d')
-      await page.render({ canvasContext: ctx, viewport }).promise
+      const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined
+      await page.render({ canvasContext: ctx, viewport, transform }).promise
     }
     _charteLoaded = true
   } catch (e) {
@@ -4432,13 +4440,6 @@ function showApp() {
   document.getElementById('nav-user').style.display = 'flex'
   if (currentUser) {
     document.getElementById('nav-user-name').textContent = capName(currentUser.firstName) || currentUser.username
-    const badge = document.getElementById('nav-user-badge')
-    if (currentUser.role === 'ADMIN') {
-      badge.textContent = 'ADMIN'; badge.className = 'player-level level-N'
-    } else {
-      badge.textContent = currentUser.category || 'NC'
-      badge.className = 'player-level level-' + (currentUser.category || 'NC')
-    }
     const switchBtn = document.getElementById('nav-switch-btn')
     if (switchBtn) {
       const uname = (currentUser.username || '').toLowerCase()
@@ -5793,7 +5794,7 @@ async function loadClassement() {
           return pl || { ...m.user, points: 0, wins: 0, losses: 0, played: 0, setDiff: 0 }
         })
         html += `<div class="poule-title">🦊 ${esc(g.name)}</div>`
-        html += renderGroupList(gMembers)
+        html += renderRankingTable(sortPlayersForDisplay(gMembers))
       }
       html += `</div>`
     }
