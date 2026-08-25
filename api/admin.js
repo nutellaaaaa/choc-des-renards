@@ -698,7 +698,9 @@ async function handleNotifications(req, res) {
         })
         created.push(notif)
         // Push téléphone — onglet "messages" toujours visible
-        sendPushToUser(prisma, uid, { title: title.trim(), body: message.trim(), tab: 'notifications' }).catch(() => {})
+        // ⚠️ DOIT être await-é : Vercel termine la fonction dès que res.json() est appelé,
+        // un fire-and-forget (.catch seul) serait tué avant que le push ne parte.
+        await sendPushToUser(prisma, uid, { title: title.trim(), body: message.trim(), tab: 'notifications' }).catch(() => {})
       }
       return res.status(201).json({ ok: true, count: created.length, notifications: created })
     } catch (err) {
@@ -2543,7 +2545,7 @@ async function handleMatch(req, res) {
           },
         })
         // Push téléphone — onglet "score" (score du match)
-        sendPushToUser(prisma, t.userId, {
+        await sendPushToUser(prisma, t.userId, {
           title: '🏸 Nouveau match disponible',
           body: message,
           tab: 'score',

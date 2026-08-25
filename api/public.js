@@ -618,17 +618,19 @@ async function handleConvocations(req, res) {
             content: `🏸 Score renseigné par ${winner.firstName} ${winner.lastName} : ${winnerScoreSummary} (du point de vue de ${winner.firstName}). En attente de publication par l'administrateur.`,
           },
         })
-        // Push fermeture du chat (rencontre spéciale)
-        sendPushToUser(prisma, specialChat.player1Id, {
-          title: '💬 Conversation clôturée',
-          body: `La conversation avec ${specialChat.player1Id === winner.id ? loser.firstName : winner.firstName} ${specialChat.player1Id === winner.id ? loser.lastName : winner.lastName} est terminée — le score a été soumis.`,
-          tab: 'messages',
-        }).catch(() => {})
-        sendPushToUser(prisma, specialChat.player2Id, {
-          title: '💬 Conversation clôturée',
-          body: `La conversation avec ${specialChat.player2Id === winner.id ? loser.firstName : winner.firstName} ${specialChat.player2Id === winner.id ? loser.lastName : winner.lastName} est terminée — le score a été soumis.`,
-          tab: 'messages',
-        }).catch(() => {})
+        // Push fermeture du chat (rencontre spéciale) — await obligatoire (Vercel)
+        await Promise.allSettled([
+          sendPushToUser(prisma, specialChat.player1Id, {
+            title: '💬 Conversation clôturée',
+            body: `La conversation avec ${specialChat.player1Id === winner.id ? loser.firstName : winner.firstName} ${specialChat.player1Id === winner.id ? loser.lastName : winner.lastName} est terminée — le score a été soumis.`,
+            tab: 'messages',
+          }),
+          sendPushToUser(prisma, specialChat.player2Id, {
+            title: '💬 Conversation clôturée',
+            body: `La conversation avec ${specialChat.player2Id === winner.id ? loser.firstName : winner.firstName} ${specialChat.player2Id === winner.id ? loser.lastName : winner.lastName} est terminée — le score a été soumis.`,
+            tab: 'messages',
+          }),
+        ])
       }
 
       return res.status(201).json({ ok: true, match1: m1, match2: m2 })
@@ -734,17 +736,19 @@ async function handleConvocations(req, res) {
           content: `🏸 Score renseigné par ${winner.firstName} ${winner.lastName} : ${winnerScoreSummary} (du point de vue de ${winner.firstName}). En attente de publication par l'administrateur.`,
         },
       })
-      // Push fermeture du chat — la conversation se clôture automatiquement avec la soumission du score
-      sendPushToUser(prisma, pm.player1Id, {
-        title: '💬 Conversation clôturée',
-        body: `La conversation avec ${pm.player2.firstName} ${pm.player2.lastName} est terminée — le score a été soumis.`,
-        tab: 'messages',
-      }).catch(() => {})
-      sendPushToUser(prisma, pm.player2Id, {
-        title: '💬 Conversation clôturée',
-        body: `La conversation avec ${pm.player1.firstName} ${pm.player1.lastName} est terminée — le score a été soumis.`,
-        tab: 'messages',
-      }).catch(() => {})
+      // Push fermeture du chat — await obligatoire (Vercel)
+      await Promise.allSettled([
+        sendPushToUser(prisma, pm.player1Id, {
+          title: '💬 Conversation clôturée',
+          body: `La conversation avec ${pm.player2.firstName} ${pm.player2.lastName} est terminée — le score a été soumis.`,
+          tab: 'messages',
+        }),
+        sendPushToUser(prisma, pm.player2Id, {
+          title: '💬 Conversation clôturée',
+          body: `La conversation avec ${pm.player1.firstName} ${pm.player1.lastName} est terminée — le score a été soumis.`,
+          tab: 'messages',
+        }),
+      ])
     }
 
     return res.status(201).json({ ok: true, match1: m1, match2: m2 })
@@ -994,7 +998,7 @@ async function handleChat(req, res) {
       const opponentId = player1Id === uid ? player2Id : player1Id
       const myData = await prisma.user.findUnique({ where: { id: uid }, select: { firstName: true, lastName: true } })
       const myName = myData ? `${myData.firstName} ${myData.lastName}` : 'Un joueur'
-      sendPushToUser(prisma, opponentId, {
+      await sendPushToUser(prisma, opponentId, {
         title: '💬 Conversation ouverte',
         body: `${myName} a ouvert la discussion pour organiser votre match.`,
         tab: 'messages',
@@ -1036,10 +1040,10 @@ async function handleChat(req, res) {
           sender: { select: { id: true, firstName: true, lastName: true } },
         },
       })
-      // Push téléphone à l'autre joueur
+      // Push téléphone à l'autre joueur — await obligatoire (Vercel)
       const recipientId = chat.player1Id === uid ? chat.player2Id : chat.player1Id
       const senderName = `${msg.sender.firstName} ${msg.sender.lastName}`
-      sendPushToUser(prisma, recipientId, {
+      await sendPushToUser(prisma, recipientId, {
         title: `💬 ${senderName}`,
         body: text.length > 80 ? text.slice(0, 77) + '…' : text,
         tab: 'messages',

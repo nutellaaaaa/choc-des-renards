@@ -133,8 +133,9 @@ Voici un petit récapitulatif des statuts des matchs si jamais ce n'était pas t
 - Médaille en ligne 
 
 a.fillon256 --> Analyse complète du site
-a.fillon257 --> PWA 
+a.fillon257 --> PWA DONE
 a.fillon657 --> Notifs push DONE 
+a.fillon2008
 
 modifs : index, admin, public
 
