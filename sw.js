@@ -153,3 +153,54 @@ self.addEventListener('message', event => {
     self.skipWaiting()
   }
 })
+
+// ─────────────────────────────────────────
+// PUSH — réception d'une notification push
+// ─────────────────────────────────────────
+// Payload JSON attendu : { title, body, tab }
+// « tab » correspond à un onglet CDR (ex : 'notifications', 'convocations', …)
+self.addEventListener('push', event => {
+  let data = {}
+  try { data = event.data?.json() ?? {} } catch {}
+
+  const {
+    title = 'Le Choc des Renards 🏸',
+    body  = '',
+    tab   = '',
+    icon  = '/icons/icon-192.png',
+  } = data
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon,
+      badge:     '/icons/icon-192.png',
+      tag:       tab || 'cdr-push',   // même tag = remplace la précédente (pas d'empilement)
+      renotify:  true,                // vibre même si même tag
+      data:      { tab },             // transmis à notificationclick
+    })
+  )
+})
+
+// ─────────────────────────────────────────
+// NOTIFICATIONCLICK — navigation à l'onglet cible
+// ─────────────────────────────────────────
+self.addEventListener('notificationclick', event => {
+  event.notification.close()
+  const tab = event.notification.data?.tab || ''
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then(clientList => {
+        // Fenêtre CDR déjà ouverte → focus + signal OPEN_TAB
+        for (const client of clientList) {
+          if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+            if (tab) client.postMessage({ type: 'OPEN_TAB', tab })
+            return client.focus()
+          }
+        }
+        // Pas de fenêtre ouverte → en ouvrir une
+        return clients.openWindow(tab ? `/?tab=${tab}` : '/')
+      })
+  )
+})

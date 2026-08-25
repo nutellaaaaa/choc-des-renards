@@ -133,10 +133,22 @@ Voici un petit récapitulatif des statuts des matchs si jamais ce n'était pas t
 - Médaille en ligne 
 
 a.fillon256 --> Analyse complète du site
-a.fillon2008 --> PWA (modifs faites sur index.html)
+a.fillon257 --> PWA (modifs faites sur index.html) Ajout badge
+a.fillon657 --> Notifs push DONE (modifs faites sur public.js)
 
 - Appli
 - Beugs
 - Bye
 - Classement ronde 2 
 - Forfait joueur
+
+Intégration d'une version app mobile de CDR (PWA). 
+Cette appli se télécharge depuis l'onget Mon Profil ou depuis l'accueil, grâce à une petite
+bannière qui apparaît pour proposer le téléchargement si celui-ci n'a pas été fait. 
+Néanmoins, dans le respect du potentiel non-consentement de l'utilisateur (chose très importante dans la vie), 
+le refus de cette proposition offre une semaine de répis à l'utilisateur avant que cette bannière
+réapparaisse. L'utilisation de cette app offre nottament : une icône sur l'écran d'accueil, 
+un lancement de l'application plus rapide, un statut utilisateur de l'app dans mon profil, 
+un potentiel badge dans performances. 
+
+Notifs tel: toutes notifs reçus dans messages + nouveau match disponible dans score du match + passage d'une phase à une autre + obtention d'un nouveau badge dans performances + score du match rempli (par soi ou par l'adversaire) + obtention d'une médaille dans vitrine + ouverture d'un chat éphémère avec un joueur + fermeture du chat aphémère avec ce joueur

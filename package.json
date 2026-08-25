@@ -10,7 +10,8 @@
     "jsonwebtoken": "^9.0.2",
     "prisma": "^6.19.3",
     "puppeteer": "^24.43.1",
-    "resend": "^6.12.4"
+    "resend": "^6.12.4",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "tsx": "^4.22.4"

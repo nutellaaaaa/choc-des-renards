@@ -35,7 +35,7 @@ function requireAuth(req, res) {
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
   if (req.method === 'OPTIONS') return res.status(200).end()
 
@@ -52,9 +52,78 @@ module.exports = async function handler(req, res) {
       return handleConvocations(req, res)
     case 'chat':
       return handleChat(req, res)
+    case 'push':
+      return handlePush(req, res)
     default:
       return res.status(400).json({ error: 'resource invalide ou manquant.' })
   }
+}
+
+/* ============================================================
+ * PUSH — gestion des abonnements push web
+ *
+ *   GET    → renvoie la VAPID public key (côté frontend pour subscribe)
+ *   POST   → enregistre un PushSubscription en base (upsert par endpoint)
+ *   DELETE → supprime le PushSubscription de la base + révoque le token
+ *
+ * L'envoi réel (webpush.sendNotification) se fait depuis lib/sendPush.js,
+ * appelé par admin.js lors de la création d'une Notification in-app.
+ * ============================================================ */
+async function handlePush(req, res) {
+  const auth = requireAuth(req, res)
+  if (!auth) return
+
+  // ── GET : renvoie la clé publique VAPID ──────────────────────────────────
+  if (req.method === 'GET') {
+    const publicKey = process.env.VAPID_PUBLIC_KEY
+    if (!publicKey) return res.status(503).json({ error: 'Push non configuré côté serveur.' })
+    return res.status(200).json({ publicKey })
+  }
+
+  // ── POST : abonnement ─────────────────────────────────────────────────────
+  if (req.method === 'POST') {
+    const { subscription } = req.body || {}
+    if (!subscription?.endpoint)
+      return res.status(400).json({ error: 'subscription invalide.' })
+
+    try {
+      await prisma.pushSubscription.upsert({
+        where:  { endpoint: subscription.endpoint },
+        update: {
+          userId:       auth.userId,
+          subscription: JSON.stringify(subscription),
+          updatedAt:    new Date(),
+        },
+        create: {
+          userId:       auth.userId,
+          endpoint:     subscription.endpoint,
+          subscription: JSON.stringify(subscription),
+        },
+      })
+      return res.status(201).json({ ok: true })
+    } catch (err) {
+      console.error('[push POST]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  // ── DELETE : désabonnement ────────────────────────────────────────────────
+  if (req.method === 'DELETE') {
+    const { endpoint } = req.body || {}
+    if (!endpoint) return res.status(400).json({ error: 'endpoint requis.' })
+
+    try {
+      await prisma.pushSubscription.deleteMany({
+        where: { endpoint, userId: auth.userId },
+      })
+      return res.status(200).json({ ok: true })
+    } catch (err) {
+      console.error('[push DELETE]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  return res.status(405).json({ error: 'Méthode non autorisée.' })
 }
 
 /* ============================================================

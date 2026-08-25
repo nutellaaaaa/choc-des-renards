@@ -438,6 +438,16 @@
   .profil-pwa-badge { display: inline-flex; align-items: center; gap: 0.4rem; font-family: var(--font-heading); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.25rem 0.7rem; border-radius: 20px; }
   .profil-pwa-badge.pwa-yes { background: rgba(255,109,0,0.15); color: var(--orange); border: 1px solid rgba(255,109,0,0.4); }
   .profil-pwa-badge.pwa-no  { background: rgba(136,136,136,0.12); color: #aaa; border: 1px solid rgba(136,136,136,0.3); }
+  /* ── Push notifications (profil) ──────────────────────────────────────────── */
+  .push-badge { display:inline-flex; align-items:center; gap:0.35rem; font-family:var(--font-heading); font-size:0.78rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; padding:0.25rem 0.7rem; border-radius:20px; }
+  .push-badge.on      { background:rgba(68,204,102,0.15); color:#44CC66; border:1px solid rgba(68,204,102,0.35); }
+  .push-badge.off     { background:rgba(136,136,136,0.12); color:#aaa; border:1px solid rgba(136,136,136,0.3); }
+  .push-badge.blocked { background:rgba(255,68,68,0.12); color:#ff6464; border:1px solid rgba(255,68,68,0.3); }
+  .push-action-btn { font-family:var(--font-heading); font-size:0.72rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; padding:0.22rem 0.65rem; border-radius:6px; cursor:pointer; transition:all 0.2s; border:1px solid; margin-left:0.5rem; }
+  .push-action-btn.sub   { background:rgba(255,109,0,0.1); color:var(--orange); border-color:rgba(255,109,0,0.35); }
+  .push-action-btn.sub:hover { background:var(--orange); color:var(--dark); }
+  .push-action-btn.unsub { background:rgba(136,136,136,0.08); color:var(--gray); border-color:rgba(136,136,136,0.25); }
+  .push-action-btn.unsub:hover { background:rgba(255,68,68,0.12); color:#ff6464; border-color:rgba(255,68,68,0.35); }
   .btn-get-app { display: inline-flex; align-items: center; gap: 0.5rem; background: var(--orange); color: #000; border: none; cursor: pointer; font-family: var(--font-heading); font-size: 0.88rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.6rem 1.4rem; border-radius: 8px; transition: all 0.2s; text-decoration: none; }
   .btn-get-app:hover { background: var(--orange-light); transform: translateY(-1px); }
   .btn-get-app svg { flex-shrink: 0; }
@@ -5126,6 +5136,12 @@ async function loadMonProfil() {
                 : '<span class="profil-pwa-badge pwa-no">🌐 NON</span>'}
             </span>
           </div>
+          <div class="profil-row">
+            <span class="profil-label">Notifications push</span>
+            <span class="profil-value" id="push-toggle-wrap">
+              <span style="color:var(--gray);font-style:italic;font-size:0.85rem">…</span>
+            </span>
+          </div>
         </div>
       </div>
 
@@ -5168,6 +5184,8 @@ async function loadMonProfil() {
         </div>
       </div>
     `
+    // Initialise le toggle push maintenant que le DOM est prêt
+    if (typeof initPushToggle === 'function') initPushToggle()
   } catch(e) {
     console.error('[loadMonProfil]', e)
     container.innerHTML = '<div class="admin-empty">Erreur de chargement.</div>'
@@ -10946,6 +10964,161 @@ async function deleteMedal(id) {
 </div>
 
 <script>
+/* ═══════════════════════════════════════════════════════════════════════════
+ * PUSH NOTIFICATIONS — Le Choc des Renards
+ *
+ * Flux :
+ *   1. loadMonProfil() → initPushToggle() détecte l'état de l'abonnement
+ *   2. Joueur clique « Activer » → pushSubscribe() :
+ *        requestPermission → pushManager.subscribe(VAPID) → POST /api/public?resource=push
+ *   3. Joueur clique « Désactiver » → pushUnsubscribe() :
+ *        DELETE /api/public?resource=push → sub.unsubscribe()
+ *   4. Notif reçue côté SW → showNotification()
+ *   5. Clic sur la notif → SW envoie OPEN_TAB → la page navigue au bon onglet
+ * ═══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  'use strict'
+
+  // Convertit une VAPID key base64url → Uint8Array (requis par pushManager.subscribe)
+  function urlBase64ToUint8Array(b64) {
+    const padding = '='.repeat((4 - b64.length % 4) % 4)
+    const base64  = (b64 + padding).replace(/-/g, '+').replace(/_/g, '/')
+    const raw     = atob(base64)
+    return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
+  }
+
+  const PUSH_SUPPORTED =
+    'serviceWorker' in navigator &&
+    'PushManager'   in window    &&
+    'Notification'  in window
+
+  let _vapidPublicKey = null
+
+  // Récupère la VAPID public key depuis le backend (mis en cache localement)
+  async function getVapidKey() {
+    if (_vapidPublicKey) return _vapidPublicKey
+    try {
+      const res = await fetch('/api/public?resource=push', { headers: authHeaders() })
+      if (!res.ok) return null
+      const { publicKey } = await res.json()
+      _vapidPublicKey = publicKey || null
+    } catch {}
+    return _vapidPublicKey
+  }
+
+  // Injecte le contenu du #push-toggle-wrap selon l'état isOn
+  function _render(wrap, isOn) {
+    if (!wrap) return
+    wrap.innerHTML = isOn
+      ? `<span class="push-badge on">🔔 Activées</span>
+         <button class="push-action-btn unsub" onclick="pushUnsubscribe()">Désactiver</button>`
+      : `<span class="push-badge off">🔕 Désactivées</span>
+         <button class="push-action-btn sub" onclick="pushSubscribe()">Activer</button>`
+  }
+
+  // ── initPushToggle ─────────────────────────────────────────────────────
+  // Appelé par loadMonProfil() dès que le DOM du profil est prêt.
+  // Lit l'état de l'abonnement et affiche le bon état/bouton.
+  window.initPushToggle = async function () {
+    const wrap = document.getElementById('push-toggle-wrap')
+    if (!wrap) return
+
+    if (!PUSH_SUPPORTED) {
+      wrap.innerHTML = '<span class="push-badge off">Non supporté</span>'
+      return
+    }
+    if (Notification.permission === 'denied') {
+      wrap.innerHTML = '<span class="push-badge blocked">🔕 Bloquées</span>'
+      return
+    }
+
+    try {
+      const reg = await navigator.serviceWorker.ready
+      const sub = await reg.pushManager.getSubscription()
+      _render(wrap, !!sub)
+    } catch {
+      wrap.innerHTML = '<span class="push-badge off">Indisponible</span>'
+    }
+  }
+
+  // ── pushSubscribe ──────────────────────────────────────────────────────
+  window.pushSubscribe = async function () {
+    const wrap = document.getElementById('push-toggle-wrap')
+    if (wrap) wrap.innerHTML = '<span style="color:var(--gray);font-style:italic;font-size:0.85rem">Activation…</span>'
+
+    try {
+      // 1. Demander la permission navigateur
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') {
+        if (wrap) wrap.innerHTML = '<span class="push-badge blocked">🔕 Refusé</span>'
+        return
+      }
+
+      // 2. Récupérer la VAPID public key
+      const key = await getVapidKey()
+      if (!key) {
+        if (wrap) _render(wrap, false)
+        return
+      }
+
+      // 3. Souscrire auprès du navigateur
+      const reg = await navigator.serviceWorker.ready
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly:      true,
+        applicationServerKey: urlBase64ToUint8Array(key),
+      })
+
+      // 4. Envoyer la subscription au backend pour la persister
+      const res = await fetch('/api/public?resource=push', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body:    JSON.stringify({ subscription: sub.toJSON() }),
+      })
+
+      if (res.ok) {
+        _render(wrap, true)
+      } else {
+        await sub.unsubscribe() // annuler si le backend rejette
+        _render(wrap, false)
+      }
+    } catch (e) {
+      console.error('[push] subscribe:', e)
+      if (wrap) _render(wrap, false)
+    }
+  }
+
+  // ── pushUnsubscribe ────────────────────────────────────────────────────
+  window.pushUnsubscribe = async function () {
+    const wrap = document.getElementById('push-toggle-wrap')
+    if (wrap) wrap.innerHTML = '<span style="color:var(--gray);font-style:italic;font-size:0.85rem">Désactivation…</span>'
+
+    try {
+      const reg      = await navigator.serviceWorker.ready
+      const sub      = await reg.pushManager.getSubscription()
+      if (!sub) { _render(wrap, false); return }
+
+      const endpoint = sub.endpoint
+
+      // 1. Supprimer du backend en premier (si le sub.unsubscribe réussit on peut pas récupérer l'endpoint)
+      await fetch('/api/public?resource=push', {
+        method:  'DELETE',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body:    JSON.stringify({ endpoint }),
+      })
+
+      // 2. Révoquer auprès du navigateur
+      await sub.unsubscribe()
+      _render(wrap, false)
+    } catch (e) {
+      console.error('[push] unsubscribe:', e)
+      window.initPushToggle() // resync l'état réel
+    }
+  }
+
+})()
+</script>
+
+<script>
 (function () {
   // ─────────────────────────────────────────────────────────────────────────
   // 1. ENREGISTREMENT DU SERVICE WORKER
@@ -10971,6 +11144,15 @@ async function deleteMedal(id) {
 
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       window.location.reload()
+    })
+
+    // Reçu depuis notificationclick dans sw.js → naviguer vers l'onglet cible
+    navigator.serviceWorker.addEventListener('message', event => {
+      if (event.data?.type === 'OPEN_TAB') {
+        const tab = event.data.tab
+        const btn = document.querySelector(`.nav-btn[data-tab="${tab}"]`)
+        if (btn && typeof showPage === 'function') showPage(tab, btn)
+      }
     })
   }
 
