@@ -4398,7 +4398,27 @@ function initAuth() {
   const token = localStorage.getItem('cdr_token')
   const userStr = localStorage.getItem('cdr_user')
   if (isTokenValid(token) && userStr) {
-    try { currentUser = JSON.parse(userStr); showApp(); return } catch {}
+    try {
+      currentUser = JSON.parse(userStr)
+      showApp()
+      // Recharger les notifications non lues depuis le serveur.
+      // Nécessaire au rechargement de la page ou à la réouverture de l'app
+      // sur mobile : pendingNotifications n'est renseigné que lors d'un
+      // vrai login (handleLogin / switchAccount), pas quand on restaure la
+      // session depuis le localStorage.
+      if (currentUser.role !== 'ADMIN') {
+        fetch('/api/notifications', { headers: authHeaders() })
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            if (data?.notifications?.length) {
+              pendingNotifications = data.notifications
+              currentNotifIndex = 0
+              showNotifOverlay()
+            }
+          }).catch(() => {})
+      }
+      return
+    } catch {}
   }
   localStorage.removeItem('cdr_token')
   localStorage.removeItem('cdr_user')
@@ -11155,20 +11175,24 @@ async function deleteMedal(id) {
     return '✓ Voir les logs ci-dessus'
   }
 
-  // ── Test push via SW local (sans serveur) ─────────────────────────────────
+  // ── Test push réel (passe par webpush.sendNotification côté serveur) ──────
+  // Avant ce fix, le test utilisait reg.showNotification() côté client :
+  // une notif LOCALE qui bypass entièrement le service push du navigateur,
+  // VAPID, et le SW push event — exactement le même chemin que les vraies notifs admin.
+  // Maintenant le backend appelle sendPushToUser → webpush.sendNotification,
+  // ce qui teste la chaîne complète. La notif devrait arriver après quelques secondes.
   window.pushSendTest = async function () {
     const feedback = document.getElementById('push-test-feedback')
-    if (feedback) feedback.textContent = '⏳ Envoi…'
+    if (feedback) feedback.textContent = '⏳ Envoi en cours…'
     try {
-      // Vérifie d'abord que la subscription existe bien en base
       const reg = await navigator.serviceWorker.ready
       const sub = await reg.pushManager.getSubscription()
       if (!sub) {
-        if (feedback) feedback.textContent = '✗ Aucune subscription active'
+        if (feedback) { feedback.textContent = '✗ Aucune subscription active — activez d\'abord les notifications.'; feedback.style.color = '#ff7070' }
         return
       }
 
-      // Envoie un push de test via le backend
+      // Le backend upserte la subscription PUIS appelle sendPushToUser (webpush réel)
       const res = await fetch('/api/public?resource=push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -11176,23 +11200,16 @@ async function deleteMedal(id) {
       })
 
       if (res.ok) {
-        // Déclenche une notification locale via le SW comme fallback visible immédiatement
-        reg.showNotification('🔔 Test CDR', {
-          body: 'Les notifications push fonctionnent correctement !',
-          icon: '/icons/icon-192.png',
-          badge: '/icons/icon-192.png',
-          tag: 'cdr-test',
-        })
-        if (feedback) { feedback.textContent = '✓ Notif envoyée !'; feedback.style.color = '#6ddc6d' }
+        if (feedback) { feedback.textContent = '✓ Push envoyé ! La notification devrait apparaître dans quelques secondes.'; feedback.style.color = '#6ddc6d' }
       } else {
         const err = await res.json().catch(() => ({}))
-        if (feedback) { feedback.textContent = '✗ Erreur : ' + (err.error || res.status); feedback.style.color = '#ff7070' }
+        if (feedback) { feedback.textContent = '✗ Erreur serveur : ' + (err.error || res.status); feedback.style.color = '#ff7070' }
       }
     } catch(e) {
       console.error('[push test]', e)
       if (feedback) { feedback.textContent = '✗ ' + e.message; feedback.style.color = '#ff7070' }
     }
-    if (feedback) setTimeout(() => { feedback.textContent = ''; feedback.style.color = '' }, 5000)
+    if (feedback) setTimeout(() => { feedback.textContent = ''; feedback.style.color = '' }, 6000)
   }
 
   // ── initPushToggle ─────────────────────────────────────────────────────

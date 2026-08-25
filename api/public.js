@@ -92,9 +92,9 @@ async function handlePush(req, res) {
     return res.status(200).json({ publicKey })
   }
 
-  // ── POST : abonnement ─────────────────────────────────────────────────────
+  // ── POST : abonnement (+ test réel via webpush si test:true) ────────────
   if (req.method === 'POST') {
-    const { subscription } = req.body || {}
+    const { subscription, test } = req.body || {}
     if (!subscription?.endpoint)
       return res.status(400).json({ error: 'subscription invalide.' })
 
@@ -112,6 +112,19 @@ async function handlePush(req, res) {
           subscription: JSON.stringify(subscription),
         },
       })
+
+      // Quand test:true, on envoie un VRAI push via webpush (serveur push → SW → OS).
+      // Contrairement à reg.showNotification() côté client, ceci teste l'intégralité
+      // de la chaîne : VAPID, endpoint, service push du navigateur, SW push event.
+      if (test) {
+        await sendPushToUser(prisma, auth.userId, {
+          title: '🔔 Test CDR',
+          body:  'Les notifications push fonctionnent correctement !',
+          tab:   'notifications',
+        })
+        return res.status(200).json({ ok: true, tested: true })
+      }
+
       return res.status(201).json({ ok: true })
     } catch (err) {
       console.error('[push POST]', err)
