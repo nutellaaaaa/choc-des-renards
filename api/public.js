@@ -11,9 +11,19 @@
  */
 const { PrismaClient } = require('@prisma/client')
 const jwt = require('jsonwebtoken')
+const { sendPushToUser } = require('./lib/sendPush')
 
 if (!global._prisma) global._prisma = new PrismaClient()
 const prisma = global._prisma
+
+/** Vérifie si un onglet est visible pour les utilisateurs. */
+async function isTabVisible(tabKey) {
+  try {
+    const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
+    const hiddenTabs = JSON.parse(state?.hiddenTabs || '[]')
+    return !hiddenTabs.includes(tabKey)
+  } catch { return true }
+}
 
 const VALID_NATURES = [
   "Informer d'un score",
@@ -54,6 +64,8 @@ module.exports = async function handler(req, res) {
       return handleChat(req, res)
     case 'push':
       return handlePush(req, res)
+    case 'badge_push':
+      return handleBadgePush(req, res)
     default:
       return res.status(400).json({ error: 'resource invalide ou manquant.' })
   }
@@ -556,6 +568,30 @@ async function handleConvocations(req, res) {
           opponentName: `${winner.firstName} ${winner.lastName}`,
         },
       })
+      // Push téléphone au perdant
+      ;(async () => {
+        try {
+          if (await isTabVisible('score')) {
+            await sendPushToUser(prisma, loser.id, {
+              title: '🏸 Score renseigné par votre adversaire',
+              body: `${winner.firstName} ${winner.lastName} a saisi le score : ${loserScoreSummary} (votre côté). En attente de publication.`,
+              tab: 'score',
+            })
+          }
+        } catch {}
+      })()
+      // Push au gagnant également (confirmation)
+      ;(async () => {
+        try {
+          if (await isTabVisible('score')) {
+            await sendPushToUser(prisma, winner.id, {
+              title: '✅ Score soumis avec succès',
+              body: `Le score de votre rencontre spéciale contre ${loser.firstName} ${loser.lastName} a été soumis. En attente de publication par l'admin.`,
+              tab: 'score',
+            })
+          }
+        } catch {}
+      })()
 
       // Message automatique dans la conversation du match (si elle existe)
       const winnerScoreSummary = sets.map(s => `${s.playerScore}–${s.opponentScore}`).join(', ')
@@ -569,6 +605,17 @@ async function handleConvocations(req, res) {
             content: `🏸 Score renseigné par ${winner.firstName} ${winner.lastName} : ${winnerScoreSummary} (du point de vue de ${winner.firstName}). En attente de publication par l'administrateur.`,
           },
         })
+        // Push fermeture du chat (rencontre spéciale)
+        sendPushToUser(prisma, specialChat.player1Id, {
+          title: '💬 Conversation clôturée',
+          body: `La conversation avec ${specialChat.player1Id === winner.id ? loser.firstName : winner.firstName} ${specialChat.player1Id === winner.id ? loser.lastName : winner.lastName} est terminée — le score a été soumis.`,
+          tab: 'messages',
+        }).catch(() => {})
+        sendPushToUser(prisma, specialChat.player2Id, {
+          title: '💬 Conversation clôturée',
+          body: `La conversation avec ${specialChat.player2Id === winner.id ? loser.firstName : winner.firstName} ${specialChat.player2Id === winner.id ? loser.lastName : winner.lastName} est terminée — le score a été soumis.`,
+          tab: 'messages',
+        }).catch(() => {})
       }
 
       return res.status(201).json({ ok: true, match1: m1, match2: m2 })
@@ -636,6 +683,23 @@ async function handleConvocations(req, res) {
         opponentName: `${winner.firstName} ${winner.lastName}`,
       },
     })
+    // Push téléphone — score renseigné (perdant + gagnant)
+    ;(async () => {
+      try {
+        if (await isTabVisible('score')) {
+          await sendPushToUser(prisma, loser.id, {
+            title: '🏸 Score renseigné par votre adversaire',
+            body: `${winner.firstName} ${winner.lastName} a saisi le score : ${loserScoreSummary} (votre côté). En attente de publication.`,
+            tab: 'score',
+          })
+          await sendPushToUser(prisma, winner.id, {
+            title: '✅ Score soumis avec succès',
+            body: `Score contre ${loser.firstName} ${loser.lastName} soumis. En attente de publication par l'admin.`,
+            tab: 'score',
+          })
+        }
+      } catch {}
+    })()
 
     // Message automatique dans la conversation du match.
     // Le plannedMatch vient d'être supprimé (delete ci-dessus) → on recherche
@@ -657,6 +721,17 @@ async function handleConvocations(req, res) {
           content: `🏸 Score renseigné par ${winner.firstName} ${winner.lastName} : ${winnerScoreSummary} (du point de vue de ${winner.firstName}). En attente de publication par l'administrateur.`,
         },
       })
+      // Push fermeture du chat — la conversation se clôture automatiquement avec la soumission du score
+      sendPushToUser(prisma, pm.player1Id, {
+        title: '💬 Conversation clôturée',
+        body: `La conversation avec ${pm.player2.firstName} ${pm.player2.lastName} est terminée — le score a été soumis.`,
+        tab: 'messages',
+      }).catch(() => {})
+      sendPushToUser(prisma, pm.player2Id, {
+        title: '💬 Conversation clôturée',
+        body: `La conversation avec ${pm.player1.firstName} ${pm.player1.lastName} est terminée — le score a été soumis.`,
+        tab: 'messages',
+      }).catch(() => {})
     }
 
     return res.status(201).json({ ok: true, match1: m1, match2: m2 })
@@ -902,6 +977,15 @@ async function handleChat(req, res) {
         },
       })
 
+      // Push à l'adversaire pour l'informer de l'ouverture du chat
+      const opponentId = player1Id === uid ? player2Id : player1Id
+      const myData = await prisma.user.findUnique({ where: { id: uid }, select: { firstName: true, lastName: true } })
+      const myName = myData ? `${myData.firstName} ${myData.lastName}` : 'Un joueur'
+      sendPushToUser(prisma, opponentId, {
+        title: '💬 Conversation ouverte',
+        body: `${myName} a ouvert la discussion pour organiser votre match.`,
+        tab: 'messages',
+      }).catch(() => {})
       return res.status(201).json({ ok: true, chatId: newChat.id, created: true })
     } catch (err) {
       console.error('[chat create]', err)
@@ -939,6 +1023,14 @@ async function handleChat(req, res) {
           sender: { select: { id: true, firstName: true, lastName: true } },
         },
       })
+      // Push téléphone à l'autre joueur
+      const recipientId = chat.player1Id === uid ? chat.player2Id : chat.player1Id
+      const senderName = `${msg.sender.firstName} ${msg.sender.lastName}`
+      sendPushToUser(prisma, recipientId, {
+        title: `💬 ${senderName}`,
+        body: text.length > 80 ? text.slice(0, 77) + '…' : text,
+        tab: 'messages',
+      }).catch(() => {})
       return res.status(201).json({ ok: true, message: msg })
     } catch (err) {
       console.error('[chat send]', err)
@@ -947,4 +1039,68 @@ async function handleChat(req, res) {
   }
 
   return res.status(400).json({ error: 'Action invalide.' })
+}
+
+/* ============================================================
+ * BADGE_PUSH — le client signale qu'un badge a été obtenu pour
+ * la première fois (calculé côté JS) et demande l'envoi d'un
+ * push téléphone. Anti-spam : un push par badge par joueur
+ * par période de 24h (vérifié via Notification en base).
+ *
+ * POST ?resource=badge_push { badgeKey, badgeLabel, badgeEmoji }
+ * ============================================================ */
+async function handleBadgePush(req, res) {
+  const auth = requireAuth(req, res)
+  if (!auth) return
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée.' })
+
+  const { badgeKey, badgeLabel, badgeEmoji } = req.body || {}
+  if (!badgeKey || typeof badgeKey !== 'string' || badgeKey.length > 50)
+    return res.status(400).json({ error: 'badgeKey invalide.' })
+
+  try {
+    // Anti-spam : si un push de ce badge a déjà été envoyé dans les 24h, on ignore
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const alreadySent = await prisma.notification.findFirst({
+      where: {
+        userId: auth.userId,
+        type: 'badge',
+        title: { contains: badgeKey },
+        createdAt: { gte: cutoff },
+      },
+    })
+    if (alreadySent) return res.status(200).json({ ok: true, skipped: true })
+
+    // Vérifier que l'onglet performances est visible avant de notifier
+    const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
+    const hiddenTabs = JSON.parse(state?.hiddenTabs || '[]')
+    if (hiddenTabs.includes('performances')) return res.status(200).json({ ok: true, skipped: true })
+
+    const emoji = (badgeEmoji || '🏅').trim().slice(0, 10)
+    const label = (badgeLabel || badgeKey).trim().slice(0, 60)
+
+    // Créer une notification in-app légère (pour l'historique anti-spam)
+    await prisma.notification.create({
+      data: {
+        userId: auth.userId,
+        type: 'badge',
+        title: `badge:${badgeKey}`,
+        message: `Vous venez d'obtenir le badge "${label}" dans l'onglet Performances !`,
+        read: true, // déjà visible dans l'appli, pas besoin de pop-up in-app
+        readAt: new Date(),
+      },
+    })
+
+    // Push téléphone
+    await sendPushToUser(prisma, auth.userId, {
+      title: `${emoji} Nouveau badge !`,
+      body: `Vous venez de décrocher le badge "${label}". Consultez vos performances.`,
+      tab: 'performances',
+    })
+
+    return res.status(200).json({ ok: true })
+  } catch (err) {
+    console.error('[badge_push]', err)
+    return res.status(500).json({ error: 'Erreur serveur.' })
+  }
 }

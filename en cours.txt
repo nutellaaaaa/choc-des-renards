@@ -133,8 +133,10 @@ Voici un petit récapitulatif des statuts des matchs si jamais ce n'était pas t
 - Médaille en ligne 
 
 a.fillon256 --> Analyse complète du site
-a.fillon257 --> PWA (modifs faites sur index.html) Ajout badge
-a.fillon657 --> Notifs push DONE (modifs faites sur public.js)
+a.fillon257 --> PWA 
+a.fillon657 --> Notifs push DONE 
+
+modifs : index, admin, public
 
 - Appli
 - Beugs

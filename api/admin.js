@@ -22,6 +22,7 @@
 const { PrismaClient } = require('@prisma/client')
 const { requireAdmin } = require('./_auth')
 const { logDeletion, restoreVersion } = require('./lib/dataVersion')
+const { sendPushToUser } = require('./lib/sendPush')
 const cheerio = require('cheerio')
 const argon2 = require('argon2')
 
@@ -55,6 +56,20 @@ const DEFAULT_MALUS_LIST = [
 ]
 // Alias rétrocompatible (utilisé dans les endroits qui lisent MALUS_LIST statiquement)
 let MALUS_LIST = [...DEFAULT_MALUS_LIST]
+
+/**
+ * Vérifie si un onglet est visible pour les utilisateurs (non masqué par l'admin).
+ * Utilisé pour conditionner l'envoi de notifications push liées à des onglets
+ * cachés : si la vitrine, les performances, etc. sont masqués, on ne notifie pas.
+ * @param {string} tabKey — clé de l'onglet (ex: 'vitrine', 'performances', 'score')
+ */
+async function isTabVisible(tabKey) {
+  try {
+    const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
+    const hiddenTabs = JSON.parse(state?.hiddenTabs || '[]')
+    return !hiddenTabs.includes(tabKey)
+  } catch { return true } // en cas d'erreur, on notifie quand même
+}
 
 /** Charge la liste des malus depuis la DB (malusConfig). Retourne DEFAULT_MALUS_LIST si vide.
  *  Le format stocké peut être un tableau de strings (ancien) ou d'objets {text, enabled, maxConcurrent}.
@@ -682,6 +697,8 @@ async function handleNotifications(req, res) {
           data: { userId: uid, type: 'message', title: title.trim(), message: message.trim() },
         })
         created.push(notif)
+        // Push téléphone — onglet "messages" toujours visible
+        sendPushToUser(prisma, uid, { title: title.trim(), body: message.trim(), tab: 'notifications' }).catch(() => {})
       }
       return res.status(201).json({ ok: true, count: created.length, notifications: created })
     } catch (err) {
@@ -1132,6 +1149,29 @@ async function handlePhase(req, res) {
         currentRound: phase === 'PHASE2' ? parseInt(round, 10) : null,
       },
     })
+
+    // Push téléphone à tous les joueurs actifs pour annoncer le passage de phase
+    const phaseLabels = { PHASE0: 'Hors saison', PHASE1: 'Phase de poules', PHASE2: 'Phase finale' }
+    const phaseLabel  = phaseLabels[phase] || phase
+    const pushBody = phase === 'PHASE2'
+      ? `La Phase finale commence — ronde ${parseInt(round, 10)} ! Consultez le classement.`
+      : `Le tournoi passe en ${phaseLabel}. Consultez les nouveautés sur CDR.`
+    ;(async () => {
+      try {
+        const players = await prisma.user.findMany({
+          where: { accepted: true, banned: false, active: true, NOT: { username: { in: ADMIN_USERNAMES } } },
+          select: { id: true },
+        })
+        await Promise.allSettled(
+          players.map(u => sendPushToUser(prisma, u.id, {
+            title: `🏆 Nouveau chapitre : ${phaseLabel}`,
+            body: pushBody,
+            tab: 'accueil',
+          }))
+        )
+      } catch {}
+    })()
+
     return res.status(200).json({ ok: true, phase: state.currentPhase, round: state.currentRound })
   } catch (err) {
     console.error('[admin/phase POST]', err)
@@ -2502,6 +2542,12 @@ async function handleMatch(req, res) {
             plannedMatchId: pm.id,
           },
         })
+        // Push téléphone — onglet "score" (score du match)
+        sendPushToUser(prisma, t.userId, {
+          title: '🏸 Nouveau match disponible',
+          body: message,
+          tab: 'score',
+        }).catch(() => {})
         count++
 
         await prisma.schedulingLog.create({
@@ -4739,6 +4785,23 @@ async function handleMedals(req, res) {
           animations: animJson,
         },
       })
+      // Push téléphone — seulement si l'onglet vitrine est visible
+      ;(async () => {
+        try {
+          if (!await isTabVisible('vitrine')) return
+          const targetUser = await prisma.user.findFirst({
+            where: { username: { equals: String(username).trim(), mode: 'insensitive' } },
+            select: { id: true },
+          })
+          if (targetUser) {
+            await sendPushToUser(prisma, targetUser.id, {
+              title: `${String(symbol).trim()} Nouvelle médaille !`,
+              body: `Vous avez reçu la médaille "${String(title).trim()}" (${rarity}). Consultez votre vitrine.`,
+              tab: 'vitrine',
+            })
+          }
+        } catch {}
+      })()
       return res.status(200).json({ ok: true, medal, message: 'Médaille créée.' })
     }
 
@@ -4773,6 +4836,23 @@ async function handleMedals(req, res) {
         animations: animJson,
       }))
       const result = await prisma.medal.createMany({ data, skipDuplicates: false })
+      // Push téléphone à chaque joueur — seulement si la vitrine est visible
+      ;(async () => {
+        try {
+          if (!await isTabVisible('vitrine')) return
+          const targetUsers = await prisma.user.findMany({
+            where: { username: { in: activeUsers.map(u => u.username) } },
+            select: { id: true },
+          })
+          await Promise.allSettled(
+            targetUsers.map(u => sendPushToUser(prisma, u.id, {
+              title: `${String(symbol).trim()} Nouvelle médaille !`,
+              body: `Vous avez reçu la médaille "${String(title).trim()}" (${rarity}). Consultez votre vitrine.`,
+              tab: 'vitrine',
+            }))
+          )
+        } catch {}
+      })()
       return res.status(200).json({ ok: true, created: result.count, message: result.count + ' médaille(s) créée(s) pour tous les joueurs actifs.' })
     }
 
