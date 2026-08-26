@@ -1163,7 +1163,7 @@ function buildWhatsappVars(user, pm, opponent) {
     'prénom': user.firstName,
     'pseudo': user.username,
     'tel': user.phone || '—',
-    'opponent_tel': opponent?.phone || '—',
+    'tel adversaire': opponent?.phone || '—',
     "date du prochain match de l'utilisateur": pm?.scheduledDate ? fmtDate(pm.scheduledDate) : '—',
     "nom et prénom et classement de l'adversaire du prochain match de l'utilisateur": opponent ? `${opponent.firstName} ${opponent.lastName} (${opponent.category || 'NC'})` : '—',
     'date de début du duel': pm?.scheduledDate ? fmtDate(pm.scheduledDate) : '—',
@@ -1333,8 +1333,8 @@ async function handleWhatsapp(req, res) {
           where: { forfeited: false, scheduledDate: { not: null }, OR: [{ player1Id: uid }, { player2Id: uid }] },
           orderBy: { scheduledDate: 'asc' },
           include: {
-            player1: { select: { id: true, firstName: true, lastName: true, category: true } },
-            player2: { select: { id: true, firstName: true, lastName: true, category: true } },
+            player1: { select: { id: true, firstName: true, lastName: true, phone: true, category: true } },
+            player2: { select: { id: true, firstName: true, lastName: true, phone: true, category: true } },
           },
         })
         const opponent = pm ? (pm.player1Id === uid ? pm.player2 : pm.player1) : null
