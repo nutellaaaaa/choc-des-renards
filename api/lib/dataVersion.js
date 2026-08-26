@@ -22,7 +22,7 @@ const TYPES_WITHOUT_IDS = new Set(['RESET_TOURNOI', 'FAQ_STATS'])
  * réelle juste après (idéalement dans la même transaction Prisma).
  *
  * @param {import('@prisma/client').Prisma.TransactionClient} tx
- * @param {string} entityType - 'POULE' | 'USER' | 'NOTIFICATION' | 'PLANNED_MATCH' | 'PHASE2_GROUP' | 'SPECIAL_MATCH' | 'RESET_TOURNOI'
+ * @param {string} entityType - 'POULE' | 'USER' | 'NOTIFICATION' | 'PLANNED_MATCH' | 'PHASE2_GROUP' | 'SPECIAL_MATCH' | 'MATCH' | 'PHOTO' | 'BLACKOUT' | 'FAQ_TOPIC' | 'FAQ_STATS' | 'CHARTE_ARTICLE' | 'SITE_UPDATE' | 'MEDAL' | 'MALUS' | 'RESET_TOURNOI'
  * @param {number[]} [ids] - identifiants des lignes principales à supprimer (non requis pour RESET_TOURNOI)
  * @param {string} [customLabel] - si fourni, utilisé à la place du label auto-généré
  * @returns {Promise<{ id: number, label: string } | null>}
@@ -158,6 +158,45 @@ async function captureSnapshot(tx, entityType, ids) {
       if (topics.length === 0) return { payload: null, label: '' }
       const label = `Suppression de ${topics.length} sujet(s) FAQ : ${topics.map(t => t.question).join(', ')}`
       return { payload: { topics }, label }
+    }
+
+    case 'CHARTE_ARTICLE': {
+      const articles = await tx.charteArticle.findMany({
+        where: { id: { in: ids } },
+        include: { items: true },
+      })
+      if (articles.length === 0) return { payload: null, label: '' }
+      const label = `Suppression de ${articles.length} article(s) de charte : ${articles.map(a => a.title).join(', ')}`
+      return { payload: { articles }, label }
+    }
+
+    case 'SITE_UPDATE': {
+      const updates = await tx.siteUpdate.findMany({
+        where: { id: { in: ids } },
+        include: { items: true, installs: true },
+      })
+      if (updates.length === 0) return { payload: null, label: '' }
+      const label = `Suppression de ${updates.length} mise(s) à jour du site : ${updates.map(u => u.title).join(', ')}`
+      return { payload: { updates }, label }
+    }
+
+    case 'MEDAL': {
+      const medals = await tx.medal.findMany({ where: { id: { in: ids } } })
+      if (medals.length === 0) return { payload: null, label: '' }
+      const label = `Suppression de ${medals.length} médaille(s) : ${medals.map(m => m.title).join(', ')}`
+      return { payload: { medals }, label }
+    }
+
+    // Cas particulier : la configuration des malus vit dans un champ JSON
+    // unique (TournamentState.malusConfig), pas de ligne DB par malus.
+    // L'appelant passe directement dans `ids` les objets malus
+    // {text, enabled, maxConcurrent} qu'il vient de retirer de la config
+    // (et non des identifiants numériques).
+    case 'MALUS': {
+      const removed = ids
+      if (!removed || removed.length === 0) return { payload: null, label: '' }
+      const label = `Suppression de ${removed.length} malus : ${removed.map(m => m.text).join(', ')}`
+      return { payload: { malus: removed }, label }
     }
 
     case 'FAQ_STATS': {
@@ -358,6 +397,52 @@ async function restoreVersion(tx, versionId) {
           }
         }
       }
+      break
+    }
+
+    case 'CHARTE_ARTICLE': {
+      for (const a of payload.articles) {
+        const { items, ...aFields } = a
+        await tryCreate(`Article de charte "${a.title}"`, () => tx.charteArticle.create({ data: aFields }))
+        for (const it of items || [])
+          await tryCreate(`Item de charte #${it.id}`, () => tx.charteArticleItem.create({ data: it }))
+      }
+      break
+    }
+
+    case 'SITE_UPDATE': {
+      for (const u of payload.updates) {
+        const { items, installs, ...uFields } = u
+        await tryCreate(`Mise à jour du site "${u.title}"`, () => tx.siteUpdate.create({ data: uFields }))
+        for (const it of items || [])
+          await tryCreate(`Item de mise à jour #${it.id}`, () => tx.siteUpdateItem.create({ data: it }))
+        for (const inst of installs || [])
+          await tryCreate(`Installation #${inst.id}`, () => tx.siteUpdateInstall.create({ data: inst }))
+      }
+      break
+    }
+
+    case 'MEDAL': {
+      for (const m of payload.medals)
+        await tryCreate(`Médaille "${m.title}"`, () => tx.medal.create({ data: m }))
+      break
+    }
+
+    // Réinjecte les malus retirés dans la config JSON actuelle (fusion,
+    // pas d'écrasement) — un malus déjà réajouté manuellement entre-temps
+    // (même `text`) est laissé tel quel et signalé en avertissement.
+    case 'MALUS': {
+      const state = await tx.tournamentState.findUnique({ where: { id: 1 } })
+      let current = []
+      try { current = JSON.parse(state?.malusConfig || '[]') } catch {}
+      const currentTexts = current.map(m => m.text)
+      const toRestore = (payload.malus || []).filter(m => !currentTexts.includes(m.text))
+      const skipped = (payload.malus || []).length - toRestore.length
+      await tryCreate('Configuration des malus', () => tx.tournamentState.update({
+        where: { id: 1 },
+        data: { malusConfig: JSON.stringify([...current, ...toRestore]) },
+      }))
+      if (skipped > 0) warnings.push(`${skipped} malus déjà présent(s) dans la configuration actuelle, ignoré(s).`)
       break
     }
 

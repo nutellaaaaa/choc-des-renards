@@ -512,16 +512,17 @@ async function handleFaq(req, res) {
       const existing = await prisma.faqTopic.findUnique({ where: { id: tid } })
       if (!existing) return res.status(404).json({ error: 'Sujet introuvable.' })
 
-      await prisma.$transaction([
-        prisma.faqItem.deleteMany({ where: { topicId: tid } }),
-        prisma.faqTopic.update({
+      await prisma.$transaction(async (tx) => {
+        await logDeletion(tx, 'FAQ_TOPIC', [tid], `Modification du sujet FAQ : ${existing.question}`)
+        await tx.faqItem.deleteMany({ where: { topicId: tid } })
+        await tx.faqTopic.update({
           where: { id: tid },
           data: {
             question: question.trim(),
             items: { create: items.map((it, i) => ({ subtitle: it.subtitle, content: it.content, order: i })) },
           },
-        }),
-      ])
+        })
+      })
 
       const topic = await prisma.faqTopic.findUnique({
         where: { id: tid },
@@ -716,16 +717,17 @@ async function handleCharte(req, res) {
       const existing = await prisma.charteArticle.findUnique({ where: { id: aid } })
       if (!existing) return res.status(404).json({ error: 'Article introuvable.' })
 
-      await prisma.$transaction([
-        prisma.charteArticleItem.deleteMany({ where: { articleId: aid } }),
-        prisma.charteArticle.update({
+      await prisma.$transaction(async (tx) => {
+        await logDeletion(tx, 'CHARTE_ARTICLE', [aid], `Modification de l'article de charte : ${existing.title}`)
+        await tx.charteArticleItem.deleteMany({ where: { articleId: aid } })
+        await tx.charteArticle.update({
           where: { id: aid },
           data: {
             title: title.trim(),
             items: { create: items.map((it, i) => ({ subtitle: it.subtitle, content: it.content, order: i })) },
           },
-        }),
-      ])
+        })
+      })
 
       const article = await prisma.charteArticle.findUnique({
         where: { id: aid },
@@ -901,9 +903,10 @@ async function handleSiteUpdate(req, res) {
       const existing = await prisma.siteUpdate.findUnique({ where: { id: uid } })
       if (!existing) return res.status(404).json({ error: 'Mise à jour introuvable.' })
 
-      await prisma.$transaction([
-        prisma.siteUpdateItem.deleteMany({ where: { updateId: uid } }),
-        prisma.siteUpdate.update({
+      await prisma.$transaction(async (tx) => {
+        await logDeletion(tx, 'SITE_UPDATE', [uid], `Modification de la mise à jour du site : ${existing.title}`)
+        await tx.siteUpdateItem.deleteMany({ where: { updateId: uid } })
+        await tx.siteUpdate.update({
           where: { id: uid },
           data: {
             title: title.trim(),
@@ -911,8 +914,8 @@ async function handleSiteUpdate(req, res) {
             scheduledAt: timing.scheduledAt,
             items: { create: items.map((it, i) => ({ subtitle: it.subtitle, content: it.content, order: i })) },
           },
-        }),
-      ])
+        })
+      })
 
       const update = await prisma.siteUpdate.findUnique({
         where: { id: uid },
@@ -2157,10 +2160,20 @@ async function handleAction(req, res) {
             await prisma.schedulingLog.createMany({ data: concurrencyResult.logMessages })
           }
 
-          await prisma.tournamentState.upsert({
-            where: { id: 1 },
-            update: { malusConfig: JSON.stringify(cleaned) },
-            create: { id: 1, currentPhase: 'PHASE0', malusConfig: JSON.stringify(cleaned) },
+          // Snapshot des malus réellement supprimés (absents de la nouvelle
+          // liste, pas seulement désactivés) — pour restauration éventuelle
+          // via logDeletion() (cas particulier 'MALUS', voir lib/dataVersion.js).
+          const previousFull = await loadMalusConfigFull()
+          const newTexts = cleaned.map(m => m.text)
+          const deletedMalus = previousFull.filter(m => !newTexts.includes(m.text))
+
+          await prisma.$transaction(async (tx) => {
+            if (deletedMalus.length > 0) await logDeletion(tx, 'MALUS', deletedMalus)
+            await tx.tournamentState.upsert({
+              where: { id: 1 },
+              update: { malusConfig: JSON.stringify(cleaned) },
+              create: { id: 1, currentPhase: 'PHASE0', malusConfig: JSON.stringify(cleaned) },
+            })
           })
 
           return res.status(200).json({
@@ -5373,8 +5386,12 @@ async function handleMedals(req, res) {
       const { id } = req.body || {}
       const medalId = parseInt(id, 10)
       if (isNaN(medalId)) return res.status(400).json({ error: 'id requis.' })
-      await prisma.medal.delete({ where: { id: medalId } })
-      return res.status(200).json({ ok: true, message: 'Médaille supprimée.' })
+      const version = await prisma.$transaction(async (tx) => {
+        const v = await logDeletion(tx, 'MEDAL', [medalId])
+        await tx.medal.delete({ where: { id: medalId } })
+        return v
+      })
+      return res.status(200).json({ ok: true, dataVersion: version, message: 'Médaille supprimée.' })
     }
 
     return res.status(400).json({ error: 'action inconnue pour les médailles.' })

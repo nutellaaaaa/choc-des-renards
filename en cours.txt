@@ -147,10 +147,10 @@ modifs : index, matches
 - éditer la charte done
 - Création auto groupe renard choquant/choqués : moitié meilleurs poules done 
 - forfait joueur done
+- barre de chargement joueurs ayant installé la mise à jour / joueur totaux + historique d'installation (date, heure, adresse ip de la même manière que pour les connexions et les suivis de notifications) done
+- beug clique matchs joueurs done
 
-- barre de chargement joueurs ayant installé la mise à jour / joueur totaux + historique d'installation (date, heure, adresse ip de la même manière que pour les connexions et les suivis de notifications)
-- snapshot base de donnée à vérifier (stats faq, malus supprimés, médaille supprimée, article faq modifiée ou supprimée, article charte modifiée ou supprimée, mise à jour modifiée ou supprimée)
-- beug clique matchs joueurs
+- snapshot base de donnée à vérifier (stats faq, malus supprimés, médaille supprimée, article faq modifiée ou supprimée, article charte modifiée ou supprimée, mise à jour modifiée ou supprimée, utilisateurs supprimés, utilisateurs dont l'inscription a été refusée)
 
 - maj PWA
 - livraison version finale
