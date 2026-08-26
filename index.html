@@ -7461,7 +7461,7 @@ function renderUsersTable() {
                 <button onclick="openMatchModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">+ Match</button>
                 <button onclick="quickNotify(${u.id},'${esc(capName(u.firstName))} ${esc(capName(u.lastName))}')">✉ Notifier</button>
                 ${u.withdrawnAt
-                  ? `<span style="display:block;padding:0.4rem 0.7rem;font-size:0.78rem;color:var(--gray)">🚩 Forfait déclaré</span>`
+                  ? `<button onclick="adminAction('unwithdraw',${u.id})">↩ Annuler le forfait</button>`
                   : `<button class="danger" onclick="declareWithdrawal(${u.id},'${esc(capName(u.firstName))} ${esc(capName(u.lastName))}')">🚩 Déclarer forfait</button>`}
                 ${u.banned
                   ? `<button onclick="adminAction('unban',${u.id})">Débannir</button>
@@ -7554,14 +7554,14 @@ async function toggleActive(userId, currentlyActive) {
 
 /* ── Forfait saison (irréversible) ── */
 async function declareWithdrawal(userId, name) {
-  if (!confirm(`Déclarer ${name} forfait pour la saison ? Cette action est irréversible.`)) return
+  if (!confirm(`Déclarer ${name} forfait pour la saison ?`)) return
   const reason = prompt('Motif du forfait (optionnel) :') || ''
   try {
     const res  = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'withdraw', userId, data:{ reason } }) })
     const data = await res.json()
     if (!res.ok) { alert(data.error||'Erreur.'); return }
     if (data.affectedPlannedMatches?.length) {
-      alert(`${name} est forfait.\n\n${data.affectedPlannedMatches.length} match(s) planifié(s) à traiter (onglet Matchs planifiés) :\n` +
+      alert(`${name} est forfait.\n\n${data.affectedPlannedMatches.length} match(s) planifié(s) à traiter — ils sont maintenant signalés en tête de l'onglet "Matchs planifiés" :\n` +
         data.affectedPlannedMatches.map(m => `- ${capName(m.player1.firstName)} ${capName(m.player1.lastName)} vs ${capName(m.player2.firstName)} ${capName(m.player2.lastName)}`).join('\n'))
     } else {
       alert(`${name} est forfait.`)
@@ -7572,7 +7572,7 @@ async function declareWithdrawal(userId, name) {
 
 /* ── Actions admin ── */
 async function adminAction(action, userId) {
-  const labels = { accept:'Accepter', refuse:'Refuser et supprimer', ban:'Bannir', unban:'Débannir', delete_banned:'Supprimer définitivement ce joueur banni', activate:'Activer', deactivate:'Désactiver' }
+  const labels = { accept:'Accepter', refuse:'Refuser et supprimer', ban:'Bannir', unban:'Débannir', delete_banned:'Supprimer définitivement ce joueur banni', activate:'Activer', deactivate:'Désactiver', unwithdraw:'Annuler le forfait de' }
   if (!confirm(`${labels[action]||action} cet utilisateur ?`)) return
   try {
     const res  = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({action, userId}) })
@@ -9603,12 +9603,23 @@ async function loadPlannedMatches() {
       list.innerHTML = '<div class="admin-empty">Aucun match planifié. Cliquez sur "+ Planifier un match".</div>'
       return
     }
-    list.innerHTML = plannedData.map(pm => {
+    // Un match impliquant un joueur forfait n'est jamais résolu automatiquement
+    // (décision : cas par cas) — on le signale ici en permanence, pas seulement
+    // au moment de la déclaration, pour qu'il ne se perde pas dans la liste.
+    const isAffected = pm => !!(pm.player1.withdrawnAt || pm.player2.withdrawnAt)
+    const affected = plannedData.filter(isAffected)
+    const sorted = [...affected, ...plannedData.filter(pm => !isAffected(pm))]
+    const banner = affected.length
+      ? `<div class="admin-empty" style="background:rgba(255,90,90,0.1);border:1px solid rgba(255,90,90,0.35);color:#ff8080;text-align:left;padding:0.7rem 1rem;margin-bottom:0.8rem">
+          🚩 ${affected.length} match(s) planifié(s) impliquent un joueur forfait — à annuler ou à clôturer manuellement (voir ci-dessous, en tête de liste).
+         </div>`
+      : ''
+    list.innerHTML = banner + sorted.map(pm => {
       const p1 = pm.player1, p2 = pm.player2
       const malusText = pm.malus ? `♡ <strong>${esc(pm.malus)}</strong> → ${pm.malusTarget === 1 ? esc(p1.firstName) : esc(p2.firstName)}` : 'Aucun malus'
-      return `<div class="pending-match-card">
+      return `<div class="pending-match-card"${isAffected(pm) ? ' style="border-color:rgba(255,90,90,0.5)"' : ''}>
         <div class="pending-match-info">
-          <div class="pending-match-player">${esc(p1.firstName)} ${esc(p1.lastName)} <span class="player-level level-${p1.category||'NC'}">${p1.category||'NC'}</span> <span style="color:var(--gray)">vs</span> ${esc(p2.firstName)} ${esc(p2.lastName)} <span class="player-level level-${p2.category||'NC'}">${p2.category||'NC'}</span></div>
+          <div class="pending-match-player">${esc(p1.firstName)} ${esc(p1.lastName)}${p1.withdrawnAt ? ' <span class="status-badge status-banned" style="font-size:0.68rem">🚩 Forfait</span>' : ''} <span class="player-level level-${p1.category||'NC'}">${p1.category||'NC'}</span> <span style="color:var(--gray)">vs</span> ${esc(p2.firstName)} ${esc(p2.lastName)}${p2.withdrawnAt ? ' <span class="status-badge status-banned" style="font-size:0.68rem">🚩 Forfait</span>' : ''} <span class="player-level level-${p2.category||'NC'}">${p2.category||'NC'}</span></div>
           <div class="pending-match-detail">${pm.scheduledDate ? '📅 ' + fmtDateOnly(pm.scheduledDate) : '📅 Date non définie'} · ${pm.phase === 'PHASE0' ? 'Phase 0' : pm.phase === 'PHASE1' ? 'Phase 1' : 'Phase 2 R'+(pm.roundNumber||'?')}</div>
           <div style="font-size:0.82rem;color:var(--gray);margin-top:0.2rem">🎯 ${malusText}</div>
           ${pm.note ? `<div style="font-size:0.82rem;color:var(--gray);margin-top:0.2rem;font-style:italic">📝 ${esc(pm.note)}</div>` : ''}

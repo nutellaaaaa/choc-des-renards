@@ -2275,10 +2275,8 @@ async function handleAction(req, res) {
         return res.status(200).json({ ok: true, message: 'Utilisateur désactivé.' })
       }
 
-      // Forfait pour la saison en cours — irréversible (pas de case 'un-withdraw').
-      // Ne touche pas aux PlannedMatch existants : ils sont listés ici pour que
-      // l'admin les résolve un par un (annulation ou saisie de score) via les
-      // actions planned_edit/planned_delete/planned_convert déjà en place.
+      // Forfait pour la saison en cours. Réversible via 'unwithdraw' (retour sur
+      // la décision initiale — Alex a demandé à pouvoir revenir en arrière).
       case 'withdraw': {
         if (user.withdrawnAt) return res.status(400).json({ error: 'Ce joueur est déjà déclaré forfait.' })
         const reason = (data?.reason || '').trim() || null
@@ -2295,6 +2293,12 @@ async function handleAction(req, res) {
           message: `Joueur déclaré forfait pour la saison.${affected.length ? ` ${affected.length} match(s) planifié(s) restent à traiter.` : ''}`,
           affectedPlannedMatches: affected,
         })
+      }
+
+      case 'unwithdraw': {
+        if (!user.withdrawnAt) return res.status(400).json({ error: "Ce joueur n'est pas déclaré forfait." })
+        await prisma.user.update({ where: { id }, data: { withdrawnAt: null, withdrawnReason: null } })
+        return res.status(200).json({ ok: true, message: 'Forfait annulé, le joueur est réintégré.' })
       }
 
       // ── reset_password : remplace le mot de passe par un hash déjà calculé
@@ -2527,8 +2531,8 @@ async function handleMatch(req, res) {
         prisma.plannedMatch.findMany({
           orderBy: { scheduledDate: 'asc' },
           include: {
-            player1: { select: { id: true, firstName: true, lastName: true, username: true, category: true, phone: true } },
-            player2: { select: { id: true, firstName: true, lastName: true, username: true, category: true, phone: true } },
+            player1: { select: { id: true, firstName: true, lastName: true, username: true, category: true, phone: true, withdrawnAt: true } },
+            player2: { select: { id: true, firstName: true, lastName: true, username: true, category: true, phone: true, withdrawnAt: true } },
           },
         }),
       ])
