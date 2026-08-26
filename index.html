@@ -8962,7 +8962,7 @@ async function loadSiteUpdateAdmin() {
   const list = document.getElementById('site-update-admin-list')
   const empty = document.getElementById('site-update-admin-empty')
   try {
-    const res = await fetch('/api/admin/site_update', { headers: authHeaders() })
+    const res = await fetch('/api/admin?resource=site_update', { headers: authHeaders() })
     if (!res.ok) return
     const { updates } = await res.json()
     siteUpdateAdminList = updates || []
@@ -9129,7 +9129,7 @@ async function saveSiteUpdate() {
   if (updateId) body.updateId = parseInt(updateId, 10)
 
   try {
-    const res = await fetch('/api/admin/site_update', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) })
+    const res = await fetch('/api/admin?resource=site_update', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) })
     const data = await res.json()
     if (!res.ok) { errorEl.textContent = data.error || 'Erreur serveur.'; return }
     closeModal('site-update-edit-modal')
@@ -9142,7 +9142,7 @@ async function saveSiteUpdate() {
 async function deleteSiteUpdate(updateId) {
   if (!confirm('Supprimer définitivement cette mise à jour ? Si elle est programmée, elle ne sera jamais déployée.')) return
   try {
-    await fetch('/api/admin/site_update', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'delete', updateId }) })
+    await fetch('/api/admin?resource=site_update', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'delete', updateId }) })
     await loadSiteUpdateAdmin()
   } catch (e) { console.error('[deleteSiteUpdate]', e) }
 }
