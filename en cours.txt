@@ -136,7 +136,7 @@ a.fillon256 DONE
 a.fillon258 DONE
 a.fillon257 DONE
 a.fillon657 DONE
-a.fillon2008 
+a.fillon2008 DONE
 
 
 modifs : index, matches
@@ -151,14 +151,18 @@ modifs : index, matches
 - beug clique matchs joueurs done
 
 - snapshot base de donnée à vérifier (stats faq, malus supprimés, médaille supprimée, article faq modifiée ou supprimée, article charte modifiée ou supprimée, mise à jour modifiée ou supprimée, utilisateurs supprimés, utilisateurs dont l'inscription a été refusée)
-
+- option suppression badges gris 
 - maj PWA
 - livraison version finale
 
 
 Correction de 20 bugs mineurs dans le but de renforcer le bon fonctionnement du site
 Possibilité de générer un pdf récapitulatif de fin de saison dans actions et autres
-
+Article FAQ modifié — FAQ_TOPIC snapshoté avant écrasement (en plus de la suppression déjà couverte)
+Article de charte modifié — CHARTE_ARTICLE snapshoté avant écrasement
+Mise à jour du site modifiée — SITE_UPDATE snapshoté avant écrasement
+Médaille supprimée — nouveau logDeletion(tx, 'MEDAL', [medalId]) avant delete
+Malus supprimés — cas particulier : la config malus vit dans un unique champ JSON (TournamentState.malusConfig), pas de ligne par malus. J'ai comparé l'ancienne liste complète à la nouvelle pour détecter les entrées réellement retirées (pas juste désactivées), et j'écris directement une ligne DataVersion (entityType: 'MALUS') avec le payload des malus supprimés, rétention 30 jours comme le reste.
 
 
 

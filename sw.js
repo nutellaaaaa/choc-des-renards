@@ -10,7 +10,7 @@
  *     le cache et forcer le rechargement des assets mis à jour.
  */
 
-const CACHE_VERSION = 'v5'
+const CACHE_VERSION = 'v6'
 const CACHE_STATIC  = `cdr-static-${CACHE_VERSION}`
 const CACHE_FONTS   = 'cdr-fonts'   // cache permanent, version non incrémentée
 

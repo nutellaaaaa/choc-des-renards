@@ -815,12 +815,28 @@
   .k-view-toggle .k-vt-label-const { display: inline; }
   #kingdom-hub.k-mode-stack .k-view-toggle .k-vt-label-stack { display: inline; }
   #kingdom-hub.k-mode-stack .k-view-toggle .k-vt-label-const { display: none; }
+  .k-notif-toggle {
+    position: absolute; top: 4.55rem; right: 1.4rem; z-index: 20;
+    display: none; align-items: center; gap: 0.45rem;
+    background: rgba(21,21,21,0.72); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--dark4); color: var(--gray);
+    font-family: var(--font-heading); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase;
+    padding: 0.34rem 0.7rem; border-radius: 18px; cursor: pointer;
+    transition: border-color 0.2s, color 0.2s, background 0.2s;
+  }
+  .k-notif-toggle:hover { border-color: var(--orange); color: var(--orange); }
+  .k-notif-toggle svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+  .k-notif-toggle .k-nt-label-show { display: inline; }
+  .k-notif-toggle .k-nt-label-hide { display: none; }
+  #kingdom-hub.k-hide-info-badges .k-badge.info { display: none !important; }
+  #kingdom-hub.k-hide-info-badges .k-notif-toggle .k-nt-label-show { display: none; }
+  #kingdom-hub.k-hide-info-badges .k-notif-toggle .k-nt-label-hide { display: inline; }
 
   /* Sur desktop, la bascule est visible. Quand l'utilisateur a choisi la vue carte,
      on inverse l'affichage constellation/stack (qui normalement ne dépend que du
      breakpoint ≤980px). */
   @media (min-width: 981px) {
-    .k-view-toggle { display: inline-flex; }
+    .k-view-toggle, .k-notif-toggle { display: inline-flex; }
     /* Vue "carte" volontaire sur desktop : on masque la constellation et l'emblème,
        on affiche la stack en l'élargissant un peu pour profiter de l'espace desktop. */
     #kingdom-hub.k-mode-stack .k-constellation { display: none !important; }
@@ -832,7 +848,7 @@
   }
   @media (max-width: 980px) {
     /* Sur mobile, la bascule n'a pas lieu d'être : la stack est déjà le modèle imposé. */
-    .k-view-toggle { display: none !important; }
+    .k-view-toggle, .k-notif-toggle { display: none !important; }
   }
 
   .kingdom-intro { position: relative; z-index: 5; text-align: center; margin-bottom: 0.5rem; }
@@ -2445,6 +2461,12 @@
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
       <span class="k-vt-label-const">Vue carte</span>
       <span class="k-vt-label-stack">Vue constellation</span>
+    </button>
+
+    <button class="k-notif-toggle" id="k-notif-toggle" type="button" title="Afficher ou masquer les notifications grises" aria-pressed="false">
+      <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+      <span class="k-nt-label-show">Masquer notifs grises</span>
+      <span class="k-nt-label-hide">Afficher notifs grises</span>
     </button>
 
     <!-- Carte constellation (desktop ≥ 980px) -->
@@ -11276,6 +11298,17 @@ function placeAdminTabs() {}
     if (localStorage.getItem('kingdomView') === 'stack') {
       hub.classList.add('k-mode-stack')
     }
+    const notifToggle = document.getElementById('k-notif-toggle')
+    const storedHideInfo = localStorage.getItem('kingdomHideInfoBadges') === '1'
+    if (storedHideInfo) {
+      hub.classList.add('k-hide-info-badges')
+      if (notifToggle) notifToggle.setAttribute('aria-pressed', 'true')
+    }
+    notifToggle?.addEventListener('click', () => {
+      const hidden = hub.classList.toggle('k-hide-info-badges')
+      try { localStorage.setItem('kingdomHideInfoBadges', hidden ? '1' : '0') } catch (e) {}
+      notifToggle.setAttribute('aria-pressed', hidden ? 'true' : 'false')
+    })
     toggle.addEventListener('click', () => {
       const isStack = hub.classList.toggle('k-mode-stack')
       try { localStorage.setItem('kingdomView', isStack ? 'stack' : 'constellation') } catch (e) {}
