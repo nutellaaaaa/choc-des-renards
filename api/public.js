@@ -16,6 +16,13 @@ const { sendPushToUser } = require('./lib/sendPush')
 if (!global._prisma) global._prisma = new PrismaClient()
 const prisma = global._prisma
 
+/** Extrait l'IP réelle du client derrière le proxy Vercel. */
+function getClientIp(req) {
+  const fwd = req.headers['x-forwarded-for']
+  if (fwd) return fwd.split(',')[0].trim()
+  return req.socket?.remoteAddress || null
+}
+
 /** Vérifie si un onglet est visible pour les utilisateurs. */
 async function isTabVisible(tabKey) {
   try {
@@ -1203,10 +1210,24 @@ async function handleSiteUpdate(req, res) {
     const update = await prisma.siteUpdate.findUnique({ where: { id: uid } })
     if (!update) return res.status(404).json({ error: 'Mise à jour introuvable.' })
 
-    await prisma.user.update({
-      where: { id: auth.userId },
-      data: { lastSeenSiteUpdateId: uid },
-    })
+    const ip = getClientIp(req)
+    const userAgent = req.headers['user-agent'] || null
+
+    // On garde une trace de CHAQUE installation (date, heure, IP), de la même
+    // manière que pour l'historique des connexions — on écrase l'entrée
+    // existante (upsert) si l'utilisateur ré-acquitte la même mise à jour,
+    // pour toujours refléter la dernière installation réelle.
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: auth.userId },
+        data: { lastSeenSiteUpdateId: uid },
+      }),
+      prisma.siteUpdateInstall.upsert({
+        where: { updateId_userId: { updateId: uid, userId: auth.userId } },
+        create: { updateId: uid, userId: auth.userId, ip, userAgent },
+        update: { ip, userAgent, createdAt: new Date() },
+      }),
+    ])
     return res.status(200).json({ ok: true })
   } catch (err) {
     console.error('[site_update acknowledge]', err)

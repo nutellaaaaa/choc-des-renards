@@ -1213,6 +1213,19 @@
   .myffbad-progress-track { width: 100%; height: 8px; background: #1c1f21; border: 1px solid #2a2e30; border-radius: 5px; overflow: hidden; }
   .myffbad-progress-fill { width: 0%; height: 100%; background: linear-gradient(90deg, var(--orange), #6ddc6d); transition: width 1.4s ease; }
 
+  /* Site update — barre d'installation + historique */
+  .su-install-wrap { margin-top: 0.6rem; }
+  .su-install-label { display: flex; justify-content: space-between; gap: 0.6rem; color: var(--gray-light); font-size: 0.78rem; margin-bottom: 0.3rem; }
+  .su-install-label strong { color: var(--white); }
+  .su-install-track { width: 100%; height: 7px; background: #1c1f21; border: 1px solid #2a2e30; border-radius: 5px; overflow: hidden; }
+  .su-install-fill { height: 100%; background: linear-gradient(90deg, var(--orange), #6ddc6d); border-radius: 5px; transition: width 0.5s ease; }
+  .su-install-entry { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.6rem 0; border-bottom: 1px solid var(--dark4); font-size: 0.85rem; color: var(--gray-light); }
+  .su-install-entry:last-child { border-bottom: none; }
+  .su-install-entry .si-user { color: var(--white); font-weight: 600; }
+  .su-install-entry .si-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 0.15rem; flex-shrink: 0; text-align: right; }
+  .su-install-entry .si-date { color: var(--gray-light); font-size: 0.82rem; }
+  .su-install-entry .si-ip { color: var(--gray); font-size: 0.76rem; font-family: monospace; }
+
   /* Filtre historique */
   .history-filter { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
   .history-filter select { background: var(--dark2); border: 1px solid var(--dark4); border-radius: 6px; color: var(--white); font-family: var(--font-body); font-size: 0.88rem; padding: 0.4rem 0.75rem; outline: none; cursor: pointer; min-width: 200px; }
@@ -3345,6 +3358,17 @@
     <div id="faq-history-list" style="max-height:420px;overflow-y:auto"></div>
     <div class="modal-actions">
       <button class="btn-modal-cancel" style="width:100%" onclick="closeModal('faq-history-modal')">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL HISTORIQUE D'INSTALLATION D'UNE MISE À JOUR -->
+<div id="site-update-history-modal" class="admin-modal-bg">
+  <div class="admin-modal" style="max-width:560px">
+    <h3>Historique d'installation — <span id="site-update-history-title"></span></h3>
+    <div id="site-update-history-list" style="max-height:420px;overflow-y:auto"></div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" style="width:100%" onclick="closeModal('site-update-history-modal')">Fermer</button>
     </div>
   </div>
 </div>
@@ -9223,11 +9247,25 @@ function renderSiteUpdateAdminList() {
     const activeTag = u.id === activeId
       ? `<span style="margin-left:0.4rem;font-size:0.75rem;font-weight:600;padding:0.18rem 0.55rem;border-radius:20px;background:rgba(255,109,0,0.15);color:var(--orange);border:1px solid var(--orange)">🟢 Actuellement montrée aux joueurs</span>`
       : ''
+
+    const installed = u.installedCount || 0
+    const total = u.totalPlayers || 0
+    const pct = total > 0 ? Math.round((installed / total) * 100) : 0
+    const installBarHtml = `
+      <div class="su-install-wrap">
+        <div class="su-install-label">
+          <span><strong>${installed}</strong> / ${total} joueurs ont installé cette mise à jour (${pct}%)</span>
+          <a href="javascript:void(0)" onclick="viewSiteUpdateInstallHistory(${u.id})" style="color:var(--orange-light);font-size:0.78rem;white-space:nowrap">Historique d'installation…</a>
+        </div>
+        <div class="su-install-track"><div class="su-install-fill" style="width:${pct}%"></div></div>
+      </div>`
+
     return `
     <div class="faq-admin-row" data-id="${u.id}">
       <div class="faq-admin-row-main">
         <div class="faq-admin-row-title">${esc(u.title)}</div>
         <div class="faq-admin-row-stats">${statusHtml}${activeTag}</div>
+        ${installBarHtml}
       </div>
       <div class="faq-admin-row-actions">
         <button class="btn-sm btn-edit" onclick="openSiteUpdateEditModal(${u.id})">Modifier</button>
@@ -9235,6 +9273,36 @@ function renderSiteUpdateAdminList() {
       </div>
     </div>
   `}).join('')
+}
+
+/* ── Historique d'installation (date, heure, IP) ── */
+async function viewSiteUpdateInstallHistory(updateId) {
+  const update = siteUpdateAdminList.find(u => u.id === updateId)
+  document.getElementById('site-update-history-title').textContent = update ? update.title : ''
+  const list = document.getElementById('site-update-history-list')
+  list.innerHTML = '<div class="admin-empty">Chargement…</div>'
+  document.getElementById('site-update-history-modal').classList.add('open')
+
+  try {
+    const res = await fetch(`/api/admin?resource=site_update&history=1&updateId=${updateId}`, { headers: authHeaders() })
+    if (!res.ok) { list.innerHTML = '<div class="admin-empty">Erreur de chargement.</div>'; return }
+    const { installs } = await res.json()
+    if (!installs || installs.length === 0) {
+      list.innerHTML = '<div class="admin-empty">Aucune installation pour l\'instant.</div>'
+      return
+    }
+    list.innerHTML = installs.map(i => `
+      <div class="su-install-entry">
+        <span class="si-user">${i.user ? esc(i.user.firstName + ' ' + i.user.lastName) + ' (@' + esc(i.user.username) + ')' : 'Utilisateur supprimé'}</span>
+        <span class="si-meta">
+          <span class="si-date">${fmtDate(i.createdAt)}</span>
+          <span class="si-ip">${esc(i.ip || 'IP inconnue')}</span>
+        </span>
+      </div>
+    `).join('')
+  } catch (e) {
+    list.innerHTML = '<div class="admin-empty">Erreur de chargement.</div>'
+  }
 }
 
 /* ── Paragraphes (identique au système FAQ) ── */

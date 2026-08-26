@@ -29,27 +29,27 @@ enum Phase {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  username     String   @unique
-  passwordHash String
-  firstName    String
-  lastName     String
-  phone        String
-  category     Category @default(NC)
-  role         Role     @default(USER)
-  accepted     Boolean  @default(false)
-  banned       Boolean  @default(false)
-  active       Boolean  @default(true)
+  id                   Int       @id @default(autoincrement())
+  username             String    @unique
+  passwordHash         String
+  firstName            String
+  lastName             String
+  phone                String
+  category             Category  @default(NC)
+  role                 Role      @default(USER)
+  accepted             Boolean   @default(false)
+  banned               Boolean   @default(false)
+  active               Boolean   @default(true)
   // Forfait déclaré pour la saison en cours (irréversible) — non-null = joueur forfait.
   // Distinct de PlannedMatch.forfeited, qui marque un forfait ponctuel sur un seul match.
-  withdrawnAt     DateTime?
-  withdrawnReason String?
-  forceLogout  Boolean  @default(false)
-  isBot        Boolean  @default(false)
+  withdrawnAt          DateTime?
+  withdrawnReason      String?
+  forceLogout          Boolean   @default(false)
+  isBot                Boolean   @default(false)
   // "Mode élève parfait" : bot qui ne fait que saisir ses scores de match
   // (0% d'oubli, délai quasi nul), sans connexion, FAQ ni contact.
-  isPerfectBot Boolean  @default(false)
-  createdAt    DateTime @default(now())
+  isPerfectBot         Boolean   @default(false)
+  createdAt            DateTime  @default(now())
   // Id de la dernière "Mise à jour du site" (SiteUpdate) que ce joueur a
   // validée via le bouton "Installer la mise à jour". Comparé à l'update
   // actuellement déployée pour savoir s'il faut lui montrer la page de
@@ -75,6 +75,8 @@ model User {
   chatMessages     MatchChatMessage[]  @relation("ChatMessageSender")
 
   pushSubscriptions PushSubscription[]
+
+  siteUpdateInstalls SiteUpdateInstall[]
 }
 
 model LoginEvent {
@@ -365,11 +367,11 @@ model CharteArticle {
 }
 
 model CharteArticleItem {
-  id        Int    @id @default(autoincrement())
+  id        Int     @id @default(autoincrement())
   articleId Int
   subtitle  String?
   content   String
-  order     Int    @default(0)
+  order     Int     @default(0)
 
   article CharteArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
 }
@@ -391,6 +393,8 @@ model SiteUpdate {
   updatedAt   DateTime  @updatedAt
 
   items SiteUpdateItem[]
+
+  installs SiteUpdateInstall[]
 }
 
 model SiteUpdateItem {
@@ -545,4 +549,18 @@ model PushSubscription {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SiteUpdateInstall {
+  id        Int        @id @default(autoincrement())
+  updateId  Int
+  update    SiteUpdate @relation(fields: [updateId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ip        String?
+  userAgent String?
+  createdAt DateTime   @default(now())
+
+  @@unique([updateId, userId])
+  @@index([updateId])
 }

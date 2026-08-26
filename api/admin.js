@@ -785,11 +785,46 @@ async function handleSiteUpdate(req, res) {
 
   if (req.method === 'GET') {
     try {
+      // Historique d'installation détaillé d'UNE mise à jour (date, heure, IP),
+      // même principe que l'historique de consultation de la FAQ.
+      if (req.query.history === '1') {
+        const uid = parseInt(req.query.updateId, 10)
+        if (isNaN(uid)) return res.status(400).json({ error: 'updateId invalide.' })
+
+        const limit = Math.min(parseInt(req.query.limit || '300', 10), 500)
+        const installs = await prisma.siteUpdateInstall.findMany({
+          where: { updateId: uid },
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+          include: { user: { select: { id: true, username: true, firstName: true, lastName: true } } },
+        })
+        return res.status(200).json({ installs })
+      }
+
+      // Nombre total de joueurs concernés par la mise à jour (comptes réels,
+      // acceptés, non bannis, non admin) — sert de dénominateur à la barre
+      // de progression d'installation.
+      const totalPlayers = await prisma.user.count({
+        where: {
+          accepted: true, banned: false, active: true, withdrawnAt: null,
+          isBot: false, username: { notIn: ADMIN_USERNAMES },
+        },
+      })
+
       const updates = await prisma.siteUpdate.findMany({
         orderBy: { createdAt: 'desc' },
-        include: { items: { orderBy: { order: 'asc' } } },
+        include: {
+          items: { orderBy: { order: 'asc' } },
+          _count: { select: { installs: true } },
+        },
       })
-      return res.status(200).json({ updates })
+      const withStats = updates.map(u => ({
+        ...u,
+        installedCount: u._count.installs,
+        totalPlayers,
+      }))
+
+      return res.status(200).json({ updates: withStats })
     } catch (err) {
       console.error('[admin/site_update GET]', err)
       return res.status(500).json({ error: 'Erreur serveur.' })

@@ -135,8 +135,7 @@ Voici un petit récapitulatif des statuts des matchs si jamais ce n'était pas t
 a.fillon256 DONE
 a.fillon258 DONE
 a.fillon257 DONE
-a.fillon657 
-
+a.fillon657 DONE
 a.fillon2008 
 
 
@@ -147,11 +146,12 @@ modifs : index, matches
 - mise à jour auto de l'app done
 - éditer la charte done
 - Création auto groupe renard choquant/choqués : moitié meilleurs poules done 
+- forfait joueur done
 
-- forfait joueur
 - barre de chargement joueurs ayant installé la mise à jour / joueur totaux + historique d'installation (date, heure, adresse ip de la même manière que pour les connexions et les suivis de notifications)
-- snapshot base de donnée à vérifier 
+- snapshot base de donnée à vérifier (stats faq, malus supprimés, médaille supprimée, article faq modifiée ou supprimée, article charte modifiée ou supprimée, mise à jour modifiée ou supprimée)
 - beug clique matchs joueurs
+
 - maj PWA
 - livraison version finale
 
