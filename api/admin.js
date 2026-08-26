@@ -1450,7 +1450,7 @@ async function handlePhase(req, res) {
     ;(async () => {
       try {
         const players = await prisma.user.findMany({
-          where: { accepted: true, banned: false, active: true, NOT: { username: { in: ADMIN_USERNAMES } } },
+          where: { accepted: true, banned: false, active: true, withdrawnAt: null, NOT: { username: { in: ADMIN_USERNAMES } } },
           select: { id: true },
         })
         await Promise.allSettled(
@@ -1501,7 +1501,7 @@ async function handlePoules(req, res) {
           },
         }),
         prisma.user.findMany({
-          where: { accepted: true, banned: false, active: true, username: { notIn: ADMIN_USERNAMES } },
+          where: { accepted: true, banned: false, active: true, withdrawnAt: null, username: { notIn: ADMIN_USERNAMES } },
           select: { id: true, firstName: true, lastName: true, username: true, category: true, isBot: true },
           orderBy: { lastName: 'asc' },
         }),
@@ -1607,7 +1607,7 @@ async function handlePoules(req, res) {
       const allAssigned = await prisma.pouleMember.findMany({ select: { userId: true } })
       const assignedIds = new Set(allAssigned.map(m => m.userId))
       const eligible = await prisma.user.findMany({
-        where: { accepted: true, banned: false, active: true, username: { notIn: ADMIN_USERNAMES } },
+        where: { accepted: true, banned: false, active: true, withdrawnAt: null, username: { notIn: ADMIN_USERNAMES } },
         select: { id: true },
       })
       const pool = eligible.filter(u => !assignedIds.has(u.id))
@@ -1638,26 +1638,43 @@ async function handlePoules(req, res) {
   }
 
   // Crée "Renards Choquants" et "Renards Choqués" et y répartit les joueurs
-  // selon le classement courant : première moitié (les plus forts) → Choquants,
-  // seconde moitié → Choqués.
+  // poule par poule : dans CHAQUE poule, la moitié la mieux classée (au sein
+  // de cette poule) va chez les Choquants, l'autre moitié chez les Choqués.
+  // (Auparavant : classement global toutes poules confondues — désormais
+  // chaque poule contribue équitablement aux deux groupes.)
   if (action === 'init_default_groups') {
     try {
-      // Récupérer tous les joueurs actifs avec leurs matchs publiés
-      const users = await prisma.user.findMany({
-        where: { accepted: true, banned: false, active: true, username: { notIn: ADMIN_USERNAMES } },
-        orderBy: { createdAt: 'asc' },
-        select: {
-          id: true, createdAt: true,
-          matches: { where: { published: true }, include: { sets: { orderBy: { setNumber: 'asc' } } } },
+      const poules = await prisma.poule.findMany({
+        where: { phase: 'PHASE1' },
+        include: {
+          members: {
+            include: {
+              user: {
+                select: {
+                  id: true, createdAt: true, category: true,
+                  accepted: true, banned: true, active: true, withdrawnAt: true, username: true,
+                  matches: { where: { published: true }, include: { sets: { orderBy: { setNumber: 'asc' } } } },
+                },
+              },
+            },
+          },
         },
       })
 
-      // Classer selon le même critère que le classement affiché
-      const ranked = sortPlayers(users.map(u => ({ id: u.id, createdAt: u.createdAt, ...computeStats(u.matches) })))
+      const topHalf = []
+      const bottomHalf = []
 
-      const half = Math.ceil(ranked.length / 2)
-      const topHalf    = ranked.slice(0, half)   // joueurs les plus forts
-      const bottomHalf = ranked.slice(half)       // joueurs les moins forts
+      for (const poule of poules) {
+        // Même filtre d'éligibilité qu'auparavant (au cas où un membre de poule
+        // serait devenu banni/inactif depuis sa répartition en poule).
+        const players = poule.members
+          .map(m => m.user)
+          .filter(u => u.accepted && !u.banned && u.active && !u.withdrawnAt && !ADMIN_USERNAMES.includes(u.username))
+        const ranked = sortPlayers(players.map(u => ({ id: u.id, createdAt: u.createdAt, category: u.category, ...computeStats(u.matches) })))
+        const half = Math.ceil(ranked.length / 2)
+        topHalf.push(...ranked.slice(0, half))
+        bottomHalf.push(...ranked.slice(half))
+      }
 
       await prisma.$transaction(async tx => {
         const g1 = await tx.phase2Group.create({ data: { name: 'Renards Choquants' } })
@@ -1763,6 +1780,7 @@ async function handleAction(req, res) {
           id: true, username: true, firstName: true, lastName: true,
           phone: true, category: true, role: true,
           accepted: true, banned: true, active: true, createdAt: true, isBot: true,
+          withdrawnAt: true, withdrawnReason: true,
         },
       })
       return res.status(200).json({ users })
@@ -2257,6 +2275,28 @@ async function handleAction(req, res) {
         return res.status(200).json({ ok: true, message: 'Utilisateur désactivé.' })
       }
 
+      // Forfait pour la saison en cours — irréversible (pas de case 'un-withdraw').
+      // Ne touche pas aux PlannedMatch existants : ils sont listés ici pour que
+      // l'admin les résolve un par un (annulation ou saisie de score) via les
+      // actions planned_edit/planned_delete/planned_convert déjà en place.
+      case 'withdraw': {
+        if (user.withdrawnAt) return res.status(400).json({ error: 'Ce joueur est déjà déclaré forfait.' })
+        const reason = (data?.reason || '').trim() || null
+        await prisma.user.update({ where: { id }, data: { withdrawnAt: new Date(), withdrawnReason: reason } })
+        const affected = await prisma.plannedMatch.findMany({
+          where: { OR: [{ player1Id: id }, { player2Id: id }] },
+          include: {
+            player1: { select: { firstName: true, lastName: true } },
+            player2: { select: { firstName: true, lastName: true } },
+          },
+        })
+        return res.status(200).json({
+          ok: true,
+          message: `Joueur déclaré forfait pour la saison.${affected.length ? ` ${affected.length} match(s) planifié(s) restent à traiter.` : ''}`,
+          affectedPlannedMatches: affected,
+        })
+      }
+
       // ── reset_password : remplace le mot de passe par un hash déjà calculé
       // par le joueur (l'admin n'a jamais connaissance du mot de passe en clair) ──
       case 'reset_password': {
@@ -2467,8 +2507,13 @@ async function handleMatch(req, res) {
           },
         }),
         prisma.user.findMany({
+          // Pas de filtre withdrawnAt ici : cette liste alimente à la fois le
+          // dropdown "adversaire" d'un match déjà joué (un forfait doit rester
+          // sélectionnable pour un enregistrement rétroactif) et les selects
+          // Joueur 1/2 d'un nouveau match planifié (où on veut l'exclure —
+          // filtré côté front, voir renderPlannedForm()).
           where: { accepted: true, banned: false, active: true, username: { notIn: ADMIN_USERNAMES } },
-          select: { id: true, firstName: true, lastName: true, username: true, category: true, isBot: true },
+          select: { id: true, firstName: true, lastName: true, username: true, category: true, isBot: true, withdrawnAt: true },
           orderBy: { lastName: 'asc' },
         }),
         prisma.specialMatch.findMany({
@@ -3343,7 +3388,7 @@ async function handleScheduling(req, res) {
           orderBy: { createdAt: 'asc' },
           include: {
             members: {
-              where: { user: { active: true, accepted: true, banned: false } },
+              where: { user: { active: true, accepted: true, banned: false, withdrawnAt: null } },
               include: { user: { select: { id: true, firstName: true, lastName: true, username: true, category: true } } },
             },
           },
@@ -3352,7 +3397,7 @@ async function handleScheduling(req, res) {
           orderBy: { createdAt: 'asc' },
           include: {
             members: {
-              where: { user: { active: true, accepted: true, banned: false } },
+              where: { user: { active: true, accepted: true, banned: false, withdrawnAt: null } },
               include: { user: { select: { id: true, firstName: true, lastName: true, username: true, category: true } } },
             },
           },
@@ -3544,7 +3589,7 @@ async function computePhase1(req, res, answers) {
         orderBy: { createdAt: 'asc' },
         include: {
           members: {
-            where: { user: { active: true, accepted: true, banned: false } },
+            where: { user: { active: true, accepted: true, banned: false, withdrawnAt: null } },
             include: { user: { select: { id: true, firstName: true, lastName: true, username: true, category: true } } },
           },
         },
@@ -3758,11 +3803,11 @@ async function getGroupingsForPhase(ph) {
   if (ph === 'PHASE1') {
     return prisma.poule.findMany({
       where: { phase: 'PHASE1' },
-      include: { members: { where: { user: { active: true, accepted: true, banned: false } }, include: { user: { select: { id: true, firstName: true, lastName: true, username: true, category: true } } } } },
+      include: { members: { where: { user: { active: true, accepted: true, banned: false, withdrawnAt: null } }, include: { user: { select: { id: true, firstName: true, lastName: true, username: true, category: true } } } } },
     })
   }
   return prisma.phase2Group.findMany({
-    include: { members: { where: { user: { active: true, accepted: true, banned: false } }, include: { user: { select: { id: true, firstName: true, lastName: true, username: true, category: true } } } } },
+    include: { members: { where: { user: { active: true, accepted: true, banned: false, withdrawnAt: null } }, include: { user: { select: { id: true, firstName: true, lastName: true, username: true, category: true } } } } },
   })
 }
 
@@ -4155,7 +4200,7 @@ async function computePhase2Round(req, res, answers, roundOverride) {
       orderBy: { createdAt: 'asc' },
       include: {
         members: {
-          where: { user: { active: true, accepted: true, banned: false } },
+          where: { user: { active: true, accepted: true, banned: false, withdrawnAt: null } },
           include: { user: { select: { id: true, firstName: true, lastName: true, username: true, category: true } } },
         },
       },

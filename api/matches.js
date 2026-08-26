@@ -175,6 +175,7 @@ module.exports = async function handler(req, res) {
         select: {
           id: true, username: true, firstName: true, lastName: true,
           category: true, accepted: true, banned: true, active: true, createdAt: true,
+          withdrawnAt: true, withdrawnReason: true,
           phone: true,
           matches: {
             where: { published: true },
@@ -197,6 +198,7 @@ module.exports = async function handler(req, res) {
           firstName: user.firstName, lastName: user.lastName,
           category: user.category, active: user.active,
           createdAt: user.createdAt,
+          withdrawnAt: user.withdrawnAt, withdrawnReason: user.withdrawnReason,
           phone: canSeePhone ? user.phone : undefined,
           ...computeStats(user.matches),
           matches: user.matches,
@@ -222,7 +224,7 @@ module.exports = async function handler(req, res) {
       orderBy: { createdAt: 'asc' },
       select: {
         id: true, username: true, firstName: true, lastName: true,
-        category: true, createdAt: true, isBot: true,
+        category: true, createdAt: true, isBot: true, withdrawnAt: true,
         matches: {
           where: { published: true },
           orderBy: { matchDate: 'desc' },
@@ -254,6 +256,7 @@ module.exports = async function handler(req, res) {
       id: u.id, username: u.username,
       firstName: u.firstName, lastName: u.lastName,
       category: u.category, createdAt: u.createdAt,
+      withdrawnAt: u.withdrawnAt,
       pouleId: userPouleMap[u.id] || null,
       ...computeStats(u.matches),
       matches: u.matches,

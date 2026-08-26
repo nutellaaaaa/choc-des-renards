@@ -134,9 +134,9 @@ Voici un petit récapitulatif des statuts des matchs si jamais ce n'était pas t
 
 a.fillon256 DONE
 a.fillon258 DONE
-a.fillon257 
-
+a.fillon257 DONE
 a.fillon657 
+
 a.fillon2008 
 
 
@@ -145,14 +145,19 @@ modifs : index, matches
 - Beugs done
 - Générer pdf de fin de saison done
 - mise à jour auto de l'app done
+- éditer la charte done
+- Création auto groupe renard choquant/choqués : moitié meilleurs poules done 
 
-- Création auto groupe renard choquant/choqués : moitié meilleurs poules 
+- forfait joueur
+- barre de chargement joueurs ayant installé la mise à jour / joueur totaux + historique d'installation (date, heure, adresse ip de la même manière que pour les connexions et les suivis de notifications)
+- snapshot base de donnée à vérifier 
 - beug clique matchs joueurs
-- éditer la charte
+- maj PWA
 - livraison version finale
 
 
-
+Correction de 20 bugs mineurs dans le but de renforcer le bon fonctionnement du site
+Possibilité de générer un pdf récapitulatif de fin de saison dans actions et autres
 
 
 

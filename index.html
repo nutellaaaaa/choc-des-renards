@@ -6056,7 +6056,7 @@ function renderRankingTable(sorted) {
     const netMatches = p.wins - p.losses
     html += `<tr class="clickable-row ${winnerClass}" data-player-id="${p.id}">
       <td class="rank ${rankClass}">${i+1}</td>
-      <td class="player-name">${esc(p.username)}</td>
+      <td class="player-name">${esc(p.username)}${p.withdrawnAt ? ' <span class="status-badge status-banned" style="font-size:0.68rem;vertical-align:middle" title="Forfait déclaré pour la saison">🚩 Forfait</span>' : ''}</td>
       <td><span class="player-level level-${p.category || 'NC'}">${p.category || 'NC'}</span></td>
       <td>${netMatches > 0 ? '+' : ''}${netMatches}</td>
       <td>${p.setDiff > 0 ? '+' : ''}${p.setDiff}</td>
@@ -7460,6 +7460,9 @@ function renderUsersTable() {
                 <button onclick="openPasswordModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">🔑 Mot de passe</button>
                 <button onclick="openMatchModal(${JSON.stringify(u).replace(/"/g,'&quot;')})">+ Match</button>
                 <button onclick="quickNotify(${u.id},'${esc(capName(u.firstName))} ${esc(capName(u.lastName))}')">✉ Notifier</button>
+                ${u.withdrawnAt
+                  ? `<span style="display:block;padding:0.4rem 0.7rem;font-size:0.78rem;color:var(--gray)">🚩 Forfait déclaré</span>`
+                  : `<button class="danger" onclick="declareWithdrawal(${u.id},'${esc(capName(u.firstName))} ${esc(capName(u.lastName))}')">🚩 Déclarer forfait</button>`}
                 ${u.banned
                   ? `<button onclick="adminAction('unban',${u.id})">Débannir</button>
                      <button class="danger" onclick="adminAction('delete_banned',${u.id})">🗑 Supprimer définitivement</button>`
@@ -7545,6 +7548,24 @@ async function toggleActive(userId, currentlyActive) {
     const res  = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({action, userId}) })
     const data = await res.json()
     if (!res.ok) { alert(data.error||'Erreur.'); return }
+    await loadUsers()
+  } catch { alert('Erreur réseau.') }
+}
+
+/* ── Forfait saison (irréversible) ── */
+async function declareWithdrawal(userId, name) {
+  if (!confirm(`Déclarer ${name} forfait pour la saison ? Cette action est irréversible.`)) return
+  const reason = prompt('Motif du forfait (optionnel) :') || ''
+  try {
+    const res  = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'withdraw', userId, data:{ reason } }) })
+    const data = await res.json()
+    if (!res.ok) { alert(data.error||'Erreur.'); return }
+    if (data.affectedPlannedMatches?.length) {
+      alert(`${name} est forfait.\n\n${data.affectedPlannedMatches.length} match(s) planifié(s) à traiter (onglet Matchs planifiés) :\n` +
+        data.affectedPlannedMatches.map(m => `- ${capName(m.player1.firstName)} ${capName(m.player1.lastName)} vs ${capName(m.player2.firstName)} ${capName(m.player2.lastName)}`).join('\n'))
+    } else {
+      alert(`${name} est forfait.`)
+    }
     await loadUsers()
   } catch { alert('Erreur réseau.') }
 }
@@ -9603,8 +9624,11 @@ async function loadPlannedMatches() {
 }
 
 function populatePlannedPlayerSelects() {
+  // Un joueur forfait ne doit pas pouvoir être planifié pour un nouveau match
+  // (contrairement au dropdown "adversaire" d'un match déjà joué, qui reste
+  // ouvert aux forfaits pour permettre une saisie rétroactive).
   const opts = '<option value="">— Sélectionner —</option>' +
-    activeUsers.map(u => `<option value="${u.id}">${esc(u.firstName)} ${esc(u.lastName)} (@${esc(u.username)}) — ${u.category||'NC'}</option>`).join('')
+    activeUsers.filter(u => !u.withdrawnAt).map(u => `<option value="${u.id}">${esc(u.firstName)} ${esc(u.lastName)} (@${esc(u.username)}) — ${u.category||'NC'}</option>`).join('')
   ;['planned-p1','planned-p2'].forEach(id => {
     const el = document.getElementById(id); if (el) el.innerHTML = opts
   })

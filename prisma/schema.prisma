@@ -40,6 +40,10 @@ model User {
   accepted     Boolean  @default(false)
   banned       Boolean  @default(false)
   active       Boolean  @default(true)
+  // Forfait déclaré pour la saison en cours (irréversible) — non-null = joueur forfait.
+  // Distinct de PlannedMatch.forfeited, qui marque un forfait ponctuel sur un seul match.
+  withdrawnAt     DateTime?
+  withdrawnReason String?
   forceLogout  Boolean  @default(false)
   isBot        Boolean  @default(false)
   // "Mode élève parfait" : bot qui ne fait que saisir ses scores de match
