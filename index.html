@@ -1255,6 +1255,9 @@
   /* Admin miniatures */
   .admin-match-photos { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.4rem; }
   .admin-photo-thumb { width: 42px; height: 42px; border-radius: 5px; object-fit: cover; cursor: pointer; border: 1px solid var(--dark4); transition: border-color 0.15s; }
+  .admin-photo-thumb-wrap { position: relative; display: inline-block; }
+  .admin-photo-thumb-remove { position: absolute; top: -4px; right: -4px; background: rgba(0,0,0,0.78); color: #fff; border: none; border-radius: 50%; width: 16px; height: 16px; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
+  .admin-photo-thumb-remove:hover { background: #ff5c5c; }
   .admin-photo-thumb:hover { border-color: var(--orange); }
   /* Lightbox */
   .lightbox-bg { position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: rgba(0,0,0,0.93); z-index: 9999; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
@@ -2971,6 +2974,14 @@
             <span id="badges-config-feedback" style="font-size:0.85rem;font-weight:600"></span>
           </div>
         </div>
+        <div class="other-action-card" style="grid-column:1/-1">
+          <h4>📄 Bilan de fin de saison (PDF)</h4>
+          <p>Génère un document PDF complet : classement final avec podium, résultats par poule et groupe, palmarès et statistiques de la saison. S'ouvre dans un nouvel onglet — utilisez Ctrl+P ou le menu d'impression du navigateur pour enregistrer en PDF.</p>
+          <div style="display:flex;align-items:center;gap:0.9rem;margin-top:0.9rem;flex-wrap:wrap">
+            <button class="btn-sm btn-accept" onclick="generateSeasonPdf()" id="btn-gen-pdf">📄 Générer le PDF</button>
+            <span id="pdf-gen-feedback" style="font-size:0.85rem;font-weight:600;color:var(--orange)"></span>
+          </div>
+        </div>
       </div>
       <div id="other-actions-feedback" class="modal-success" style="margin-top:1rem"></div>
 
@@ -4270,8 +4281,22 @@ window.addEventListener('pageshow', () => {
 
 // Ferme tous les articles lorsque l'utilisateur quitte la page
 window.addEventListener('pagehide', () => {
-  document.querySelectorAll('.article.open').forEach(closeArticle);
-});
+  document.querySelectorAll('.article.open').forEach(closeArticle)
+  // BUG FIX : signaler la fermeture de l'onglet (logoutReason='page_closed').
+  // Ce mécanisme était documenté dans le cron mais jamais câblé côté client.
+  // Sur un simple refresh, initAuth() appelle action=resume pour l'annuler.
+  const eid = localStorage.getItem('cdr_login_event_id')
+  const token = localStorage.getItem('cdr_token')
+  if (!eid || !token) return
+  const payload = JSON.stringify({ loginEventId: parseInt(eid, 10), reason: 'page_closed' })
+  try {
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('/api/login?action=logout', new Blob([payload], { type: 'application/json' }))
+    } else {
+      fetch('/api/login?action=logout', { method:'POST', headers:{'Content-Type':'application/json'}, body: payload, keepalive: true })
+    }
+  } catch (e) {}
+})
 
 /* ===== PDF VIEWER (Charte) — rendu via PDF.js sur <canvas> =====
    Pourquoi pas un simple <iframe src="fichier.pdf"> ? Parce qu'un iframe
@@ -4408,12 +4433,16 @@ function initAuth() {
   if (isTokenValid(token) && userStr) {
     try {
       currentUser = JSON.parse(userStr)
+      // BUG FIX : annuler un éventuel marquage 'page_closed' si c'est juste un refresh.
+      const eid = localStorage.getItem('cdr_login_event_id')
+      if (eid) {
+        fetch('/api/login?action=resume', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ loginEventId: parseInt(eid, 10) }),
+        }).catch(() => {})
+      }
       showApp()
       // Recharger les notifications non lues depuis le serveur.
-      // Nécessaire au rechargement de la page ou à la réouverture de l'app
-      // sur mobile : pendingNotifications n'est renseigné que lors d'un
-      // vrai login (handleLogin / switchAccount), pas quand on restaure la
-      // session depuis le localStorage.
       if (currentUser.role !== 'ADMIN') {
         fetch('/api/notifications', { headers: authHeaders() })
           .then(r => r.ok ? r.json() : null)
@@ -7538,10 +7567,13 @@ async function saveMatch() {
       // Upload photos if any were added
       const uploadedPhotos = await uploadPhotosToCloudinary('match-photo')
       if (uploadedPhotos.length > 0) {
+        // BUG FIX : utiliser le mirrorMatchId renvoyé par le backend (désormais
+        // synchronisé) au lieu de null — les photos ajoutées lors d'une correction
+        // atteignent maintenant aussi la perspective de l'adversaire.
         await fetch('/api/admin/match', { method:'POST', headers: authHeaders(), body: JSON.stringify({
           action: 'add_photos',
           matchId,
-          mirrorMatchId: null,
+          mirrorMatchId: data.mirrorMatchId || null,
           photos: uploadedPhotos,
         })})
       }
@@ -8858,10 +8890,15 @@ function renderMatchCard(m, isPublished) {
   const ow = m.sets.filter(s => s.opponentScore > s.playerScore).length
   const won = pw > ow
   const chips = m.sets.map(s => `<span class="set-chip ${s.playerScore > s.opponentScore ? 'set-win':'set-loss'}">${s.playerScore}–${s.opponentScore}</span>`).join('')
+  const photoLbArr = (m.photos || []).map(x => ({ url: x.url, caption: x.caption || '' }))
   const adminPhotoHtml = (m.photos && m.photos.length > 0)
     ? `<div class="admin-match-photos">${m.photos.map((p,i) =>
-        `<img class="admin-photo-thumb" src="${p.url}" title="${esc(p.caption||'')}"
-          onclick="openLightbox(${JSON.stringify(m.photos.map(x=>({url:x.url,caption:x.caption||''})))},${i})">`
+        `<span class="admin-photo-thumb-wrap">
+          <img class="admin-photo-thumb" src="${esc(p.url)}" title="${esc(p.caption||'')}"
+            onclick="openLightbox(${JSON.stringify(photoLbArr).replace(/"/g,'&quot;')},${i})">
+          <button type="button" class="admin-photo-thumb-remove" title="Supprimer cette photo"
+            onclick="event.stopPropagation();deleteMatchPhoto(${p.id})">✕</button>
+        </span>`
       ).join('')}</div>` : ''
   return `<div class="pending-match-card">
     <div class="pending-match-info">
@@ -8893,6 +8930,17 @@ async function deleteMatch(matchId) {
   if (!confirm('Supprimer ce match définitivement ?')) return
   await fetch('/api/admin/match', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'delete', matchId }) })
   await loadPendingMatches()
+}
+// BUG FIX : delete_photo existait en backend mais n'avait aucun point d'entrée UI.
+// Le bouton ✕ sur chaque miniature (renderMatchCard) appelle cette fonction.
+async function deleteMatchPhoto(photoId) {
+  if (!confirm('Supprimer cette photo ? (Restaurable 30 j depuis "Actions et autres")')) return
+  try {
+    const res = await fetch('/api/admin/match', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'delete_photo', photoId }) })
+    const data = await res.json()
+    if (!res.ok) { alert(data.error || 'Erreur lors de la suppression.'); return }
+    await loadPendingMatches()
+  } catch { alert('Erreur réseau.') }
 }
 async function refreshRanking(freeze) {
   if (!confirm(freeze ? 'Figer le classement ?' : 'Remettre le classement en live ?')) return
@@ -9413,28 +9461,6 @@ async function otherAction(action, confirmMsg) {
   setTimeout(() => { feedback.textContent = ''; feedback.style.color = '' }, 5000)
 }
 
-async function otherAction(action, confirmMsg) {
-  if (!confirm(confirmMsg)) return
-  const feedback = document.getElementById('other-actions-feedback')
-  feedback.textContent = 'Traitement…'; feedback.style.color = 'var(--orange)'
-  try {
-    const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action }) })
-    const data = await res.json()
-    if (res.ok) {
-      feedback.textContent = '✓ ' + (data.message || 'Opération effectuée.')
-      feedback.style.color = '#6ddc6d'
-      await loadUsers()
-    } else {
-      feedback.textContent = '✗ ' + (data.error || 'Erreur.')
-      feedback.style.color = '#ff7070'
-    }
-  } catch {
-    feedback.textContent = '✗ Erreur réseau.'
-    feedback.style.color = '#ff7070'
-  }
-  setTimeout(() => { feedback.textContent = ''; feedback.style.color = '' }, 5000)
-}
-
 /* ── Rappels automatiques ── */
 let _autoRemindersEnabled = true
 async function toggleAutoReminders() {
@@ -9634,6 +9660,199 @@ function applyDockOrder() {
     const btn = dock.querySelector(`.dock-item[data-tab="${key}"]`)
     if (btn) dock.appendChild(btn)
   })
+}
+
+/* ── Génération du PDF de fin de saison ── */
+async function generateSeasonPdf() {
+  const btn = document.getElementById('btn-gen-pdf')
+  const fb  = document.getElementById('pdf-gen-feedback')
+  btn.disabled = true
+  fb.style.color = 'var(--orange)'; fb.textContent = '⏳ Récupération des données…'
+  try {
+    const res = await fetch('/api/admin/action', {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ action: 'generate_season_pdf' }),
+    })
+    const data = await res.json()
+    if (!res.ok || !data.pdfData) {
+      fb.style.color = '#ff7070'; fb.textContent = '✗ ' + (data.error || 'Erreur.')
+      return
+    }
+    fb.textContent = '⏳ Génération…'
+    buildAndOpenSeasonPdf(data.pdfData)
+    fb.style.color = '#6ddc6d'; fb.textContent = '✓ PDF ouvert dans un nouvel onglet.'
+    setTimeout(() => { fb.textContent = '' }, 5000)
+  } catch { fb.style.color = '#ff7070'; fb.textContent = '✗ Erreur réseau.' }
+  finally { btn.disabled = false }
+}
+
+function buildAndOpenSeasonPdf(d) {
+  const CAT_FULL = { NC:'Non classé', P:'Promotion', D:'Départemental', R:'Régional', N:'National' }
+  const fmtDiff = n => n > 0 ? `+${n}` : String(n)
+  const podiumEmojis = ['🥇','🥈','🥉']
+  const podiumColors = ['#f5c842','#c0c0c0','#cd7f32']
+  const podiumClasses = ['gold','silver','bronze']
+
+  const rankingRows = d.players.map((p,i) => {
+    const rank = i+1
+    const c = rank===1?'#f5c842':rank===2?'#c0c0c0':rank===3?'#cd7f32':'#f0f0f0'
+    const b = rank<=3?'font-weight:700':''
+    return `<tr style="${b}"><td style="color:${c}">${rank}</td><td style="color:${c};text-align:left;padding-left:8px">${esc(p.firstName)} ${esc(p.lastName)}</td><td>${esc(p.category)}</td><td>${p.played}</td><td>${p.wins}</td><td>${p.losses}</td><td style="color:${p.setDiff>=0?'#6ddc6d':'#ff7070'}">${fmtDiff(p.setDiff)}</td><td style="color:#e8710a;font-weight:700">${p.points}</td></tr>`
+  }).join('')
+
+  const poulesHtml = d.poules.map(po => {
+    const rows = po.members.map((p,i) => `<tr><td>${i+1}</td><td style="text-align:left;padding-left:8px">${esc(p.firstName)} ${esc(p.lastName)}</td><td>${esc(p.category)}</td><td>${p.played}</td><td>${p.wins}</td><td>${p.losses}</td><td style="color:#e8710a;font-weight:700">${p.points}</td></tr>`).join('')
+    return `<div class="section"><h2 class="section-title">${esc(po.name)}</h2><table class="data-table"><thead><tr><th>#</th><th>Joueur</th><th>Cat.</th><th>J</th><th>V</th><th>D</th><th>Pts</th></tr></thead><tbody>${rows}</tbody></table></div>`
+  }).join('')
+
+  const groupsHtml = d.phase2Groups.map(g => {
+    const rows = g.members.map((p,i) => `<tr><td>${i+1}</td><td style="text-align:left;padding-left:8px">${esc(p.firstName)} ${esc(p.lastName)}</td><td>${esc(p.category)}</td><td>${p.played}</td><td>${p.wins}</td><td>${p.losses}</td><td style="color:#e8710a;font-weight:700">${p.points}</td></tr>`).join('')
+    return `<div class="section"><h2 class="section-title">${esc(g.name)}</h2><table class="data-table"><thead><tr><th>#</th><th>Joueur</th><th>Cat.</th><th>J</th><th>V</th><th>D</th><th>Pts</th></tr></thead><tbody>${rows}</tbody></table></div>`
+  }).join('')
+
+  const medalsHtml = d.medals.length === 0
+    ? '<p style="color:#8a8a8a;font-style:italic">Aucune médaille attribuée cette saison.</p>'
+    : `<table class="data-table"><thead><tr><th>🏅</th><th>Récompense</th><th>Joueur</th><th>Saison</th></tr></thead><tbody>${d.medals.map(m=>`<tr><td style="font-size:1.4rem">${esc(m.symbol||'🎖️')}</td><td style="text-align:left;padding-left:8px;font-weight:600">${esc(m.title)}</td><td style="color:#e8710a">@${esc(m.username)}</td><td style="color:#8a8a8a">${esc(String(m.seasonYear||'—'))}</td></tr>`).join('')}</tbody></table>`
+
+  const indivHtml = d.players.map((p,i) => {
+    const rank = i+1; const wr = p.played>0?Math.round(p.wins/p.played*100):0
+    const medal = rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':`#${rank}`
+    return `<div class="player-card"><div class="player-card-header"><span class="player-rank">${medal}</span><span class="player-name">${esc(p.firstName)} ${esc(p.lastName)}</span><span class="player-meta">@${esc(p.username)} · ${esc(CAT_FULL[p.category]||p.category)}</span></div><div class="player-stats-row"><div class="pstat"><div class="pstat-v">${p.played}</div><div class="pstat-l">Joués</div></div><div class="pstat"><div class="pstat-v" style="color:#6ddc6d">${p.wins}</div><div class="pstat-l">Victoires</div></div><div class="pstat"><div class="pstat-v" style="color:#ff7070">${p.losses}</div><div class="pstat-l">Défaites</div></div><div class="pstat"><div class="pstat-v">${wr}%</div><div class="pstat-l">% Vic.</div></div><div class="pstat"><div class="pstat-v" style="color:${p.setDiff>=0?'#6ddc6d':'#ff7070'}">${fmtDiff(p.setDiff)}</div><div class="pstat-l">Diff. sets</div></div><div class="pstat"><div class="pstat-v" style="color:#e8710a;font-weight:700">${p.points}</div><div class="pstat-l">Points</div></div></div></div>`
+  }).join('')
+
+  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+<title>CDR — Bilan ${d.seasonYear}</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#141414;color:#f0f0f0;font-family:system-ui,sans-serif;padding:0}
+.cover{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#141414;page-break-after:always;position:relative;overflow:hidden}
+.cover::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(-45deg,transparent,transparent 18px,rgba(232,113,10,.04) 18px,rgba(232,113,10,.04) 19px)}
+.cover-bar-top{position:absolute;top:0;left:0;right:0;height:10px;background:#e8710a}
+.cover-bar-bot{position:absolute;bottom:0;left:0;right:0;height:10px;background:#e8710a}
+.cover-logo{width:96px;height:96px;background:#e8710a;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:2.2rem;font-weight:900;color:#141414;margin-bottom:1.4rem;position:relative}
+.cover-title{font-size:2rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase;margin-bottom:.4rem}
+.cover-sub{font-size:.95rem;color:#8a8a8a;margin-bottom:2rem}
+.cover-year{font-size:5.5rem;font-weight:900;line-height:1;margin-bottom:.4rem}
+.cover-label{font-size:1.2rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e8710a;margin-bottom:2rem}
+.cover-divider{width:180px;height:2px;background:#e8710a;margin-bottom:2rem}
+.cover-stats{display:flex;gap:1.2rem;flex-wrap:wrap;justify-content:center}
+.cstat{background:#252525;border-radius:10px;padding:.9rem 1.3rem;text-align:center;min-width:90px;border-top:3px solid #e8710a}
+.cstat-v{font-size:1.5rem;font-weight:800;color:#e8710a}
+.cstat-l{font-size:.72rem;color:#8a8a8a;margin-top:.2rem}
+.page{padding:36px;page-break-after:always}
+.page:last-child{page-break-after:auto}
+.page-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:2px solid #e8710a;margin-bottom:1.8rem}
+.page-header-l{font-size:.72rem;color:#e8710a;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.page-header-r{font-size:.72rem;color:#8a8a8a}
+.section{margin-bottom:2.2rem}
+.section-title{font-size:1.15rem;font-weight:700;color:#e8710a;margin-bottom:.9rem;padding-left:.5rem;border-left:4px solid #e8710a}
+h1{font-size:1.8rem;font-weight:900;color:#f0f0f0;margin-bottom:.4rem}
+h1 span{color:#e8710a}
+.podium{display:grid;grid-template-columns:repeat(3,1fr);gap:.9rem;margin-bottom:1.3rem}
+.podium-card{padding:.9rem;border-radius:10px;text-align:center}
+.podium-card.gold{background:#2a2500;border-top:4px solid #f5c842}
+.podium-card.silver{background:#222;border-top:4px solid #c0c0c0}
+.podium-card.bronze{background:#271800;border-top:4px solid #cd7f32}
+.podium-emoji{font-size:1.6rem;margin-bottom:.2rem}
+.podium-name{font-weight:700;font-size:1rem}
+.podium-meta{font-size:.78rem;color:#8a8a8a;margin-top:.2rem}
+.data-table{width:100%;border-collapse:collapse;font-size:.86rem}
+.data-table thead tr{background:#252525}
+.data-table thead th{padding:7px 9px;text-align:center;color:#e8710a;font-weight:700;font-size:.8rem;border-bottom:2px solid #e8710a}
+.data-table tbody tr:nth-child(odd){background:#1e1e1e}
+.data-table tbody tr:nth-child(even){background:#252525}
+.data-table tbody td{padding:6px 9px;text-align:center}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.9rem;margin-bottom:1.8rem}
+.stat-card{background:#252525;border-radius:10px;padding:.9rem;text-align:center;border-top:3px solid #e8710a}
+.stat-card-v{font-size:1.9rem;font-weight:800;color:#e8710a}
+.stat-card-l{font-size:.76rem;color:#8a8a8a;margin-top:.25rem}
+.player-card{background:#1e1e1e;border-radius:10px;padding:.9rem;margin-bottom:.9rem;border-left:4px solid #e8710a}
+.player-card-header{display:flex;align-items:baseline;gap:.65rem;margin-bottom:.65rem;flex-wrap:wrap}
+.player-rank{font-size:1.1rem}
+.player-name{font-size:1rem;font-weight:700}
+.player-meta{font-size:.78rem;color:#8a8a8a}
+.player-stats-row{display:flex;gap:.4rem;flex-wrap:wrap}
+.pstat{background:#252525;border-radius:8px;padding:.45rem .7rem;text-align:center;min-width:72px;flex:1}
+.pstat-v{font-size:1rem;font-weight:700}
+.pstat-l{font-size:.68rem;color:#8a8a8a;margin-top:.15rem}
+.final-page{min-height:60vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.final-title{font-size:2rem;font-weight:900;color:#e8710a;margin-bottom:.4rem}
+.final-sub{font-size:1rem;color:#f0f0f0;margin-bottom:1.8rem}
+.final-line{width:180px;height:2px;background:#e8710a;margin:0 auto 1.3rem}
+.final-url{font-size:.82rem;color:#8a8a8a}
+@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.cover{min-height:100vh}}
+</style></head><body>
+
+<div class="cover">
+  <div class="cover-bar-top"></div>
+  <div class="cover-logo">CDR</div>
+  <div class="cover-title">Choc des Renards</div>
+  <div class="cover-sub">Tournoi interne de badminton</div>
+  <div class="cover-year">${d.seasonYear}</div>
+  <div class="cover-label">Bilan de fin de saison</div>
+  <div class="cover-divider"></div>
+  <div class="cover-stats">
+    <div class="cstat"><div class="cstat-v">${d.stats.playerCount}</div><div class="cstat-l">joueurs</div></div>
+    <div class="cstat"><div class="cstat-v">${d.stats.totalMatches}</div><div class="cstat-l">matchs joués</div></div>
+    <div class="cstat"><div class="cstat-v">${d.stats.totalSets}</div><div class="cstat-l">sets disputés</div></div>
+    <div class="cstat"><div class="cstat-v">${d.stats.medalCount}</div><div class="cstat-l">récompenses</div></div>
+  </div>
+  <div class="cover-bar-bot"></div>
+</div>
+
+<div class="page">
+  <div class="page-header"><span class="page-header-l">🏸 Choc des Renards ${d.seasonYear}</span><span class="page-header-r">Classement général final</span></div>
+  <h1 style="margin-bottom:1.2rem">1. Classement <span>général final</span></h1>
+  <p style="font-size:.82rem;color:#8a8a8a;margin-bottom:1.2rem">J = matchs joués · V = victoires · D = défaites · Diff. = différence de sets · Pts = points</p>
+  <div class="podium">${d.players.slice(0,3).map((p,i)=>`<div class="podium-card ${podiumClasses[i]}"><div class="podium-emoji">${podiumEmojis[i]}</div><div class="podium-name" style="color:${podiumColors[i]}">${esc(p.firstName)} ${esc(p.lastName)}</div><div class="podium-meta">${p.wins}V · ${p.points} pts · ${esc(p.category)}</div></div>`).join('')}</div>
+  <table class="data-table"><thead><tr><th>#</th><th>Joueur</th><th>Cat.</th><th>J</th><th>V</th><th>D</th><th>Diff.</th><th>Pts</th></tr></thead><tbody>${rankingRows}</tbody></table>
+</div>
+
+${d.poules.length>0?`<div class="page"><div class="page-header"><span class="page-header-l">🏸 Choc des Renards ${d.seasonYear}</span><span class="page-header-r">Phase 1 — Poules</span></div><h1 style="margin-bottom:1.2rem">2. Résultats Phase 1 — <span>Poules</span></h1>${poulesHtml}</div>`:''}
+
+${d.phase2Groups.length>0?`<div class="page"><div class="page-header"><span class="page-header-l">🏸 Choc des Renards ${d.seasonYear}</span><span class="page-header-r">Phase 2 — Groupes</span></div><h1 style="margin-bottom:1.2rem">3. Résultats Phase 2 — <span>Groupes</span></h1>${groupsHtml}</div>`:''}
+
+<div class="page">
+  <div class="page-header"><span class="page-header-l">🏸 Choc des Renards ${d.seasonYear}</span><span class="page-header-r">Palmarès</span></div>
+  <h1 style="margin-bottom:1.2rem">4. Palmarès &amp; <span>récompenses</span></h1>
+  ${medalsHtml}
+</div>
+
+<div class="page">
+  <div class="page-header"><span class="page-header-l">🏸 Choc des Renards ${d.seasonYear}</span><span class="page-header-r">Statistiques</span></div>
+  <h1 style="margin-bottom:1.2rem">5. Statistiques <span>de la saison</span></h1>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-card-v">${d.stats.totalMatches}</div><div class="stat-card-l">Matchs joués</div></div>
+    <div class="stat-card"><div class="stat-card-v">${d.stats.totalSets}</div><div class="stat-card-l">Sets disputés</div></div>
+    <div class="stat-card"><div class="stat-card-v">${d.stats.playerCount}</div><div class="stat-card-l">Joueurs actifs</div></div>
+    <div class="stat-card"><div class="stat-card-v">${d.stats.pouleCount}</div><div class="stat-card-l">Poules Phase 1</div></div>
+    <div class="stat-card"><div class="stat-card-v">${d.stats.groupCount}</div><div class="stat-card-l">Groupes Phase 2</div></div>
+    <div class="stat-card"><div class="stat-card-v">${d.stats.medalCount}</div><div class="stat-card-l">Récompenses</div></div>
+  </div>
+</div>
+
+<div class="page">
+  <div class="page-header"><span class="page-header-l">🏸 Choc des Renards ${d.seasonYear}</span><span class="page-header-r">Bilan individuel</span></div>
+  <h1 style="margin-bottom:1.2rem">6. Bilan <span>individuel</span></h1>
+  ${indivHtml}
+</div>
+
+<div class="page">
+  <div class="final-page">
+    <div class="final-title">Merci à tous les participants !</div>
+    <div class="final-sub">Rendez-vous pour la saison ${d.seasonYear+1} 🏸</div>
+    <div class="final-line"></div>
+    <div class="final-url">Document généré automatiquement · cdn-renards.vercel.app</div>
+  </div>
+</div>
+
+<script>window.onload=()=>window.print()</script>
+</body></html>`
+
+  const win = window.open('','_blank')
+  if (!win) { alert("Votre navigateur a bloqué l'ouverture. Autorisez les popups pour ce site."); return }
+  win.document.write(html)
+  win.document.close()
 }
 
 /* ── Gestion des malus ── */

@@ -7,6 +7,9 @@ const prisma = global._prisma
 
 const ADMIN_USERNAMES = ['admin', 'root']
 
+// Rang de classement du moins fort au plus fort — utilisé comme tiebreak final.
+const CATEGORY_RANK = { NC: 0, P: 1, D: 2, R: 3, N: 4 }
+
 function requireAuth(req, res) {
   const authHeader = req.headers['authorization'] || ''
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
@@ -16,33 +19,37 @@ function requireAuth(req, res) {
 }
 
 function computeStats(matches) {
-  let played = 0, wins = 0, losses = 0, setDiff = 0
+  let played = 0, wins = 0, losses = 0, setDiff = 0, points = 0
   for (const m of matches) {
     const pw = m.sets.filter(s => s.playerScore > s.opponentScore).length
     const ow = m.sets.filter(s => s.opponentScore > s.playerScore).length
     played++
-    if (pw > ow) wins++; else losses++
     setDiff += pw - ow
+    // BUG FIX : un bye "comptabilisé comme une défaite" doit valoir 0 point
+    // (c'est ce que l'UI annonce), pas 1 comme une défaite normale.
+    const isByeLoss = m.opponentFirstName === 'Exempt' && m.opponentLastName === '(bye)' && !(pw > ow)
+    if (pw > ow) { wins++; points += 3 }
+    else { losses++; points += isByeLoss ? 0 : 1 }
   }
-  const points = wins * 3 + losses * 1
   return { played, wins, losses, setDiff, points }
 }
 
-// Stats limitées aux matchs d'une phase donnée. Le classement (poules /
-// rondes suisses) doit repartir de zéro à chaque phase : un match joué en
-// PHASE1 ne doit pas compter dans le classement de la PHASE2, contrairement
-// aux stats "Performances" (computeStats ci-dessus) qui restent cumulées
-// sur toute la saison.
+// Stats limitées aux matchs d'une phase donnée.
 function computeStatsForPhase(matches, phase) {
   return computeStats((matches || []).filter(m => m.phase === phase))
 }
 
-// Ordre : victoires DESC, matchs joués ASC, points DESC, createdAt ASC
+// Ordre : victoires DESC, matchs joués ASC, points DESC, catégorie ASC, createdAt ASC
 function sortPlayers(players) {
   return [...players].sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins
     if (a.played !== b.played) return a.played - b.played
     if (b.points !== a.points) return b.points - a.points
+    // BUG FIX : tiebreak final par catégorie (le moins bien classé d'abord,
+    // règle documentée du site), pas par date d'inscription.
+    const rankA = CATEGORY_RANK[a.category] ?? 0
+    const rankB = CATEGORY_RANK[b.category] ?? 0
+    if (rankA !== rankB) return rankA - rankB
     return new Date(a.createdAt || 0) - new Date(b.createdAt || 0)
   })
 }

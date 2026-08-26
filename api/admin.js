@@ -117,92 +117,53 @@ async function loadMalusConfigFull() {
  * le surplus vers d'autres malus actifs sans limite (ou dont la limite n'est pas atteinte).
  * Retourne le nombre de matchs réassignés.
  */
+// BUG FIX : retourne logMessages au lieu d'écrire en DB directement —
+// le flushLogs() de computePhase1/2 effaçait aussitôt les messages écrits ici.
 async function enforceMalusConcurrency(malusConfig) {
-  if (!Array.isArray(malusConfig)) return 0
+  const logMessages = []
+  if (!Array.isArray(malusConfig)) return { reassigned: 0, logMessages }
   const limited = malusConfig.filter(m => m.enabled !== false && m.maxConcurrent && m.maxConcurrent > 0)
-  if (limited.length === 0) return 0
-
+  if (limited.length === 0) return { reassigned: 0, logMessages }
   const activeTexts = malusConfig.filter(m => m.enabled !== false).map(m => m.text)
-  if (activeTexts.length === 0) return 0
-
-  // Récupérer tous les matchs planifiés actifs qui ont un malus
+  if (activeTexts.length === 0) return { reassigned: 0, logMessages }
   const activeMatches = await prisma.plannedMatch.findMany({
     where: { forfeited: false, malus: { not: null } },
     include: { player1: { select: { firstName: true, lastName: true } }, player2: { select: { firstName: true, lastName: true } } },
-    orderBy: { createdAt: 'asc' }, // les plus anciens gardent leur malus
+    orderBy: { createdAt: 'asc' },
   })
-
   let reassigned = 0
-
   for (const malus of limited) {
-    // Matchs utilisant ce malus, triés par date de création (les plus anciens en premier)
     const usingThis = activeMatches.filter(m => m.malus === malus.text)
     if (usingThis.length <= malus.maxConcurrent) continue
-
-    // Le surplus : les matchs les plus récents qui dépassent la limite
     const surplus = usingThis.slice(malus.maxConcurrent)
-
-    // Malus de remplacement : malus actifs différents, sans limite ou dont la limite n'est pas atteinte
     const replacementPool = activeTexts.filter(t => {
       if (t === malus.text) return false
       const cfg = malusConfig.find(m => m.text === t)
       if (!cfg || cfg.enabled === false) return false
       if (cfg.maxConcurrent && cfg.maxConcurrent > 0) {
-        const currentCount = activeMatches.filter(m => m.malus === t).length
-        return currentCount < cfg.maxConcurrent
+        return activeMatches.filter(m => m.malus === t).length < cfg.maxConcurrent
       }
-      return true // pas de limite = toujours disponible
+      return true
     })
-
     if (replacementPool.length === 0) {
-      // Aucun malus de remplacement disponible — logger un avertissement
       for (const pm of surplus) {
-        await prisma.schedulingLog.create({
-          data: {
-            phase: pm.phase,
-            type: 'avertissement',
-            message: `Limite de concurrence atteinte pour le malus « ${malus.text} » (${malus.maxConcurrent} max) — impossible de réassigner le match #${pm.id} (${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}) : aucun malus de remplacement disponible.`,
-          },
-        })
-        await createAdminAlert(
-          'malus_reassign_failed',
-          `Limite atteinte pour le malus « ${malus.text} » (${malus.maxConcurrent} max) — impossible de réassigner le match #${pm.id} (${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}) : aucun malus de remplacement disponible.`,
-          { plannedMatchId: pm.id, malus: malus.text }
-        )
+        logMessages.push({ phase: pm.phase, type: 'avertissement', message: `Limite de concurrence atteinte pour le malus « ${malus.text} » (${malus.maxConcurrent} max) — impossible de réassigner le match #${pm.id} : aucun malus de remplacement disponible.` })
+        await createAdminAlert('malus_reassign_failed', `Limite atteinte pour le malus « ${malus.text} » (${malus.maxConcurrent} max) — impossible de réassigner le match #${pm.id}.`, { plannedMatchId: pm.id, malus: malus.text })
       }
       continue
     }
-
     for (const pm of surplus) {
-      // Choisir un malus de remplacement (celui le moins utilisé)
-      const counts = replacementPool.map(t => ({
-        text: t,
-        count: activeMatches.filter(m => m.malus === t).length,
-      }))
+      const counts = replacementPool.map(t => ({ text: t, count: activeMatches.filter(m => m.malus === t).length }))
       counts.sort((a, b) => a.count - b.count)
       const newMalus = counts[0].text
-
       await prisma.plannedMatch.update({ where: { id: pm.id }, data: { malus: newMalus } })
-      // Mettre à jour le cache local
       pm.malus = newMalus
-
-      await prisma.schedulingLog.create({
-        data: {
-          phase: pm.phase,
-          type: 'avertissement',
-          message: `Malus réassigné pour le match #${pm.id} (${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}) : limite d'utilisation simultanée du malus « ${malus.text} » atteinte (${malus.maxConcurrent} max). Nouveau malus attribué : « ${newMalus} ».`,
-        },
-      })
-      await createAdminAlert(
-        'malus_reassigned',
-        `Malus réassigné pour le match #${pm.id} (${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}) : limite « ${malus.text} » (${malus.maxConcurrent} max) atteinte. Nouveau malus : « ${newMalus} ».`,
-        { plannedMatchId: pm.id, oldMalus: malus.text, newMalus }
-      )
+      logMessages.push({ phase: pm.phase, type: 'avertissement', message: `Malus réassigné pour le match #${pm.id} (${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}) : limite « ${malus.text} » (${malus.maxConcurrent} max) atteinte. Nouveau malus : « ${newMalus} ».` })
+      await createAdminAlert('malus_reassigned', `Malus réassigné pour le match #${pm.id} : « ${malus.text} » → « ${newMalus} ».`, { plannedMatchId: pm.id, oldMalus: malus.text, newMalus })
       reassigned++
     }
   }
-
-  return reassigned
+  return { reassigned, logMessages }
 }
 
 /**
@@ -296,14 +257,16 @@ function validateSetScores(sets) {
 }
 
 function computeStats(matches) {
-  let played = 0, wins = 0, losses = 0, setDiff = 0
+  let played = 0, wins = 0, losses = 0, setDiff = 0, points = 0
   for (const m of matches) {
     const pw = m.sets.filter(s => s.playerScore > s.opponentScore).length
     const ow = m.sets.filter(s => s.opponentScore > s.playerScore).length
-    played++; if (pw > ow) wins++; else losses++
-    setDiff += pw - ow
+    played++; setDiff += pw - ow
+    // BUG FIX : bye "comptabilisé comme défaite" doit valoir 0 point pas 1.
+    const isByeLoss = m.opponentFirstName === 'Exempt' && m.opponentLastName === '(bye)' && !(pw > ow)
+    if (pw > ow) { wins++; points += 3 } else { losses++; points += isByeLoss ? 0 : 1 }
   }
-  return { played, wins, losses, setDiff, points: wins * 3 + losses }
+  return { played, wins, losses, setDiff, points }
 }
 
 function sortPlayers(players) {
@@ -311,6 +274,10 @@ function sortPlayers(players) {
     if (b.wins !== a.wins) return b.wins - a.wins
     if (a.played !== b.played) return a.played - b.played
     if (b.points !== a.points) return b.points - a.points
+    // BUG FIX : tiebreak par catégorie (règle documentée), pas par date d'inscription.
+    const rankA = CATEGORY_RANK[a.category] ?? 0
+    const rankB = CATEGORY_RANK[b.category] ?? 0
+    if (rankA !== rankB) return rankA - rankB
     return new Date(a.createdAt || 0) - new Date(b.createdAt || 0)
   })
 }
@@ -1494,6 +1461,7 @@ async function handleAction(req, res) {
     'scrape_myffbad', 'apply_myffbad_changes', 'reset_faq_stats',
     'toggle_auto_reminders', 'send_reminders_manual',
     'update_hidden_tabs', 'update_malus_config',
+    'generate_season_pdf',
   ]
 
   if (globalActions.includes(action)) {
@@ -1715,11 +1683,14 @@ async function handleAction(req, res) {
               { player: pm.player2, opponent: pm.player1 },
             ]) {
               if (ADMIN_USERNAMES.includes(player.username.toLowerCase())) continue
+              // BUG FIX : utiliser 'deadline_reminder' et non 'next_match' —
+              // le mauvais type causait des doublons avec le cron ET empêchait
+              // la vraie notification "prochain match" d'être envoyée.
               const alreadySent = await prisma.notification.findFirst({
                 where: {
                   userId: player.id,
                   plannedMatchId: pm.id,
-                  type: 'next_match',
+                  type: 'deadline_reminder',
                   createdAt: { gte: new Date(now.getTime() - 12 * 60 * 60 * 1000) },
                 },
               })
@@ -1727,7 +1698,7 @@ async function handleAction(req, res) {
               await prisma.notification.create({
                 data: {
                   userId: player.id,
-                  type: 'next_match',
+                  type: 'deadline_reminder',
                   title: '⏰ Rappel : score à saisir',
                   message: `Votre match contre ${opponent.firstName} ${opponent.lastName} approche de sa deadline. Pensez à saisir votre score !`,
                   opponentName: `${opponent.firstName} ${opponent.lastName}`,
@@ -1802,8 +1773,11 @@ async function handleAction(req, res) {
           // Appliquer les limites de concurrence (maxConcurrent) :
           // pour chaque malus ayant une limite, si trop de matchs actifs l'utilisent,
           // réassigner le surplus vers d'autres malus actifs.
-          const concurrencyReassigned = await enforceMalusConcurrency(cleaned)
-          reassigned += concurrencyReassigned
+          const concurrencyResult = await enforceMalusConcurrency(cleaned)
+          reassigned += concurrencyResult.reassigned
+          if (concurrencyResult.logMessages.length > 0) {
+            await prisma.schedulingLog.createMany({ data: concurrencyResult.logMessages })
+          }
 
           await prisma.tournamentState.upsert({
             where: { id: 1 },
@@ -1816,6 +1790,46 @@ async function handleAction(req, res) {
             malusList: cleaned, // objets {text, enabled, maxConcurrent}
             reassigned,
             message: `Liste de malus mise à jour (${cleaned.length} entrée(s))${reassigned > 0 ? `. ${reassigned} match(s) planifié(s) réassigné(s) — voir la console de planification.` : '.'}`,
+          })
+        }
+
+        case 'generate_season_pdf': {
+          const [state, poules, phase2Groups, medals, allUsers] = await Promise.all([
+            prisma.tournamentState.findUnique({ where: { id: 1 } }),
+            prisma.poule.findMany({ orderBy: { createdAt: 'asc' }, include: { members: { include: { user: { select: { id: true, firstName: true, lastName: true, username: true, category: true, createdAt: true } } } } } }),
+            prisma.phase2Group.findMany({ orderBy: { createdAt: 'asc' }, include: { members: { include: { user: { select: { id: true, firstName: true, lastName: true, username: true, category: true, createdAt: true } } } } } }),
+            prisma.medal.findMany({ orderBy: [{ seasonYear: 'desc' }, { createdAt: 'desc' }] }),
+            prisma.user.findMany({
+              where: { accepted: true, banned: false, active: true, isBot: false, username: { notIn: ADMIN_USERNAMES } },
+              select: { id: true, firstName: true, lastName: true, username: true, category: true, createdAt: true, matches: { where: { published: true }, include: { sets: { orderBy: { setNumber: 'asc' } } } } },
+              orderBy: { createdAt: 'asc' },
+            }),
+          ])
+          const playersWithStats = allUsers.map(u => ({ id: u.id, firstName: u.firstName, lastName: u.lastName, username: u.username, category: u.category, createdAt: u.createdAt, ...computeStats(u.matches) }))
+          const rankedPlayers = sortPlayers(playersWithStats)
+          const totalMatchesRaw = playersWithStats.reduce((s, p) => s + p.played, 0)
+          const totalSetsRaw = allUsers.reduce((s, u) => s + u.matches.reduce((ss, m) => ss + (m.sets?.length || 0), 0), 0)
+          const poulesEnriched = poules.map(p => { const ids = new Set(p.members.map(m => m.userId)); return { id: p.id, name: p.name, members: rankedPlayers.filter(pl => ids.has(pl.id)) } })
+          const groupsEnriched = phase2Groups.map(g => { const ids = new Set(g.members.map(m => m.userId)); return { id: g.id, name: g.name, members: rankedPlayers.filter(pl => ids.has(pl.id)) } })
+          const latestMatch = await prisma.match.findFirst({ where: { published: true }, orderBy: { matchDate: 'desc' }, select: { matchDate: true } })
+          const seasonYear = latestMatch?.matchDate ? new Date(latestMatch.matchDate).getFullYear() : new Date().getFullYear()
+          return res.status(200).json({
+            ok: true,
+            pdfData: {
+              seasonYear,
+              players: rankedPlayers,
+              poules: poulesEnriched,
+              phase2Groups: groupsEnriched,
+              medals,
+              stats: {
+                totalMatches: Math.round(totalMatchesRaw / 2),
+                totalSets: Math.round(totalSetsRaw / 2),
+                playerCount: rankedPlayers.length,
+                pouleCount: poules.length,
+                groupCount: phase2Groups.length,
+                medalCount: medals.length,
+              },
+            },
           })
         }
       }
@@ -1953,7 +1967,8 @@ async function handleAction(req, res) {
         if (username && username !== user.username) {
           if (ADMIN_USERNAMES.includes(username.toLowerCase()))
             return res.status(400).json({ error: 'Ce pseudo est réservé.' })
-          const existing = await prisma.user.findUnique({ where: { username } })
+          // BUG FIX : vérification insensible à la casse, cohérente avec le login.
+          const existing = await prisma.user.findFirst({ where: { username: { equals: username, mode: 'insensitive' } } })
           if (existing) return res.status(409).json({ error: 'Ce pseudo est déjà utilisé.' })
         }
         const updateData = {}
@@ -1970,6 +1985,10 @@ async function handleAction(req, res) {
             accepted: true, banned: true, active: true, createdAt: true,
           },
         })
+        // BUG FIX : Medal.username est une chaîne brute — synchro au renommage.
+        if (username && username !== user.username) {
+          await prisma.medal.updateMany({ where: { username: { equals: user.username, mode: 'insensitive' } }, data: { username } }).catch(() => {})
+        }
         return res.status(200).json({ ok: true, user: updated })
       }
 
@@ -1988,7 +2007,10 @@ async function handleAction(req, res) {
 
 // Normalise un nom (prénom+nom) pour comparer sans tenir compte des
 // accents / casses / espaces superflus.
-function normName(s) {
+// BUG FIX : renommée normPersonName — deux function normName(){} dans le même scope
+// font que seule la DERNIÈRE survit à l'exécution (hoisting JS), ce qui cassait
+// silencieusement la comparaison des noms MYFFBAD.
+function normPersonName(s) {
   return (s || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
@@ -2009,8 +2031,8 @@ function areMirrorMatches(a, b, userById) {
   const ua = userById.get(a.userId)
   const ub = userById.get(b.userId)
   if (!ua || !ub) return false
-  const aUserMatchBOpp = normName(ua.firstName + ' ' + ua.lastName) === normName(b.opponentFirstName + ' ' + b.opponentLastName)
-  const bUserMatchAOpp = normName(ub.firstName + ' ' + ub.lastName) === normName(a.opponentFirstName + ' ' + a.opponentLastName)
+  const aUserMatchBOpp = normPersonName(ua.firstName + ' ' + ua.lastName) === normPersonName(b.opponentFirstName + ' ' + b.opponentLastName)
+  const bUserMatchAOpp = normPersonName(ub.firstName + ' ' + ub.lastName) === normPersonName(a.opponentFirstName + ' ' + a.opponentLastName)
   return aUserMatchBOpp && bUserMatchAOpp
 }
 
@@ -2244,9 +2266,24 @@ async function handleMatch(req, res) {
             })),
           },
         },
-        include: { sets: { orderBy: { setNumber: 'asc' } } },
+        include: { sets: { orderBy: { setNumber: 'asc' } }, user: { select: { firstName: true, lastName: true } } },
       })
-      return res.status(200).json({ ok: true, match: updated })
+      // BUG FIX : synchroniser le match miroir (scores inversés, même date/note).
+      let mirrorId = null
+      try {
+        mirrorId = await findMirrorMatchId(updated)
+        if (mirrorId) {
+          await prisma.matchSet.deleteMany({ where: { matchId: mirrorId } })
+          await prisma.match.update({
+            where: { id: mirrorId },
+            data: {
+              matchDate: updated.matchDate, note: updated.note,
+              sets: { create: updated.sets.map(s => ({ setNumber: s.setNumber, playerScore: s.opponentScore, opponentScore: s.playerScore })) },
+            },
+          })
+        }
+      } catch (mirrorErr) { console.error('[admin/match edit — sync miroir]', mirrorErr) }
+      return res.status(200).json({ ok: true, match: updated, mirrorMatchId: mirrorId })
     } catch (err) {
       console.error('[admin/match edit]', err)
       return res.status(500).json({ error: 'Erreur serveur ou match introuvable.' })
@@ -2484,12 +2521,17 @@ async function handleMatch(req, res) {
     const mid = parseInt(req.body.matchId, 10)
     if (isNaN(mid)) return res.status(400).json({ error: 'matchId invalide.' })
     try {
+      // BUG FIX : supprimer aussi le match miroir.
+      const match = await prisma.match.findUnique({ where: { id: mid }, include: { sets: true, user: { select: { firstName: true, lastName: true } } } })
+      if (!match) return res.status(404).json({ error: 'Match introuvable.' })
+      const mirrorId = await findMirrorMatchId(match).catch(() => null)
+      const idsToDelete = mirrorId ? [mid, mirrorId] : [mid]
       const version = await prisma.$transaction(async (tx) => {
-        const v = await logDeletion(tx, 'MATCH', [mid])
-        await tx.match.delete({ where: { id: mid } })
+        const v = await logDeletion(tx, 'MATCH', idsToDelete)
+        await tx.match.deleteMany({ where: { id: { in: idsToDelete } } })
         return v
       })
-      return res.status(200).json({ ok: true, message: 'Match supprimé.', dataVersion: version })
+      return res.status(200).json({ ok: true, message: mirrorId ? 'Match supprimé (des deux côtés).' : 'Match supprimé.', mirrorDeleted: !!mirrorId, dataVersion: version })
     } catch (err) {
       console.error('[admin/match delete]', err)
       return res.status(500).json({ error: 'Erreur serveur ou match introuvable.' })
@@ -2820,12 +2862,27 @@ async function handleMatch(req, res) {
     const pid = parseInt(req.body.photoId, 10)
     if (isNaN(pid)) return res.status(400).json({ error: 'photoId invalide.' })
     try {
+      // BUG FIX : supprimer aussi la copie miroir de la photo.
+      const photo = await prisma.matchPhoto.findUnique({ where: { id: pid } })
+      if (!photo) return res.status(404).json({ error: 'Photo introuvable.' })
+      let mirrorPhotoId = null
+      try {
+        const match = await prisma.match.findUnique({ where: { id: photo.matchId }, include: { user: { select: { firstName: true, lastName: true } } } })
+        if (match) {
+          const mirrorMatchId = await findMirrorMatchId(match)
+          if (mirrorMatchId) {
+            const mp = await prisma.matchPhoto.findFirst({ where: { matchId: mirrorMatchId, url: photo.url } })
+            if (mp) mirrorPhotoId = mp.id
+          }
+        }
+      } catch (mirrorErr) { console.error('[delete_photo — miroir]', mirrorErr) }
+      const idsToDelete = mirrorPhotoId ? [pid, mirrorPhotoId] : [pid]
       const version = await prisma.$transaction(async (tx) => {
-        const v = await logDeletion(tx, 'PHOTO', [pid])
-        await tx.matchPhoto.delete({ where: { id: pid } })
+        const v = await logDeletion(tx, 'PHOTO', idsToDelete)
+        await tx.matchPhoto.deleteMany({ where: { id: { in: idsToDelete } } })
         return v
       })
-      return res.status(200).json({ ok: true, dataVersion: version })
+      return res.status(200).json({ ok: true, mirrorDeleted: !!mirrorPhotoId, dataVersion: version })
     } catch (err) {
       console.error('[delete_photo]', err)
       return res.status(500).json({ error: 'Erreur serveur ou photo introuvable.' })
@@ -2930,7 +2987,7 @@ function generateRoundRobinRounds(playerIds) {
 // modèle Match ne stocke pas d'opponentId — cf. planned_convert plus haut).
 async function getExistingPairKeys(phase, members) {
   const idByName = new Map()
-  for (const m of members) idByName.set(normName(m.firstName) + '|' + normName(m.lastName), m.id)
+  for (const m of members) idByName.set(normPersonName(m.firstName) + '|' + normPersonName(m.lastName), m.id)
 
   const matches = await prisma.match.findMany({
     where: { phase, userId: { in: members.map(m => m.id) } },
@@ -2939,7 +2996,7 @@ async function getExistingPairKeys(phase, members) {
 
   const keys = new Set()
   for (const m of matches) {
-    const oppId = idByName.get(normName(m.opponentFirstName) + '|' + normName(m.opponentLastName))
+    const oppId = idByName.get(normPersonName(m.opponentFirstName) + '|' + normPersonName(m.opponentLastName))
     if (!oppId) continue
     const key = [m.userId, oppId].sort((a, b) => a - b).join('-')
     keys.add(key)
@@ -3284,10 +3341,14 @@ async function computePhase1(req, res, answers) {
       if (state?.malusConfig) {
         const cfg = JSON.parse(state.malusConfig)
         if (Array.isArray(cfg)) {
-          malusReassigned = await enforceMalusConcurrency(cfg)
-          if (malusReassigned > 0) {
-            log('info', `${malusReassigned} match(s) réassigné(s) pour respecter les limites d'utilisation simultanée des malus.`)
+          const r1 = await enforceMalusConcurrency(cfg)
+          malusReassigned = r1.reassigned
+          // BUG FIX : messages dans logEntries pour survivre au flushLogs().
+          for (const lm of r1.logMessages) {
+            if (lm.phase === phase) log(lm.type, lm.message)
+            else await prisma.schedulingLog.create({ data: lm }).catch(() => {})
           }
+          if (r1.reassigned > 0) log('info', `${r1.reassigned} match(s) réassigné(s) pour respecter les limites de malus (détail ci-dessus).`)
         }
       }
     } catch (e) {
@@ -3406,8 +3467,19 @@ async function movePlannedMatchCore(pmid, newDate) {
     if (inBlackout) warning = `Le ${fmtDate(target)} tombe dans la période de non-jeu « ${inBlackout.label} ».`
   }
 
-  const updated = await prisma.plannedMatch.update({ where: { id: pmid }, data: { scheduledDate: target } })
-
+  const wasNotified = !!pm.notifiedAt
+  // BUG FIX : recalculer la deadline depuis la nouvelle date + invalider notifications.
+  const newDeadlineAt = settings
+    ? addHours(addDays(target, settings.cycleLengthDays), -settings.deadlineHoursBeforeCycleEnd)
+    : pm.deadlineAt
+  const updated = await prisma.plannedMatch.update({
+    where: { id: pmid },
+    data: { scheduledDate: target, deadlineAt: newDeadlineAt, notifiedAt: null, whatsappGeneratedAt: null },
+  })
+  if (wasNotified) {
+    await prisma.notification.deleteMany({ where: { plannedMatchId: pmid, type: 'next_match' } }).catch(() => {})
+    await prisma.whatsappMessage.deleteMany({ where: { plannedMatchId: pmid, type: 'next_match', sent: false } }).catch(() => {})
+  }
   await prisma.schedulingLog.create({
     data: {
       phase: pm.phase, type: warning ? 'avertissement' : 'action',
@@ -3416,9 +3488,9 @@ async function movePlannedMatchCore(pmid, newDate) {
         : `Match #${pmid} (${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}) déplacé au ${fmtDate(target)}.`,
     },
   })
-  if (pm.notifiedAt) {
+  if (wasNotified) {
     await prisma.schedulingLog.create({
-      data: { phase: pm.phase, type: 'avertissement', message: `Ce match avait déjà été notifié aux joueurs le ${fmtDate(pm.notifiedAt)} — pensez à renotifier si nécessaire (la notification existante n'est pas resynchronisée automatiquement).` },
+      data: { phase: pm.phase, type: 'avertissement', message: `Ce match avait déjà été notifié aux joueurs le ${fmtDate(pm.notifiedAt)} — notification invalidée suite au déplacement. Pensez à renotifier (« notifier ${pmid} »).` },
     })
   }
   return { ok: true, plannedMatch: updated, warning }
@@ -3910,10 +3982,13 @@ async function computePhase2Round(req, res, answers, roundOverride) {
         if (state?.malusConfig) {
           const cfg = JSON.parse(state.malusConfig)
           if (Array.isArray(cfg)) {
-            const malusReassigned = await enforceMalusConcurrency(cfg)
-            if (malusReassigned > 0) {
-              log('info', `${malusReassigned} match(s) réassigné(s) pour respecter les limites d'utilisation simultanée des malus.`)
+            const r2 = await enforceMalusConcurrency(cfg)
+            // BUG FIX : même correctif — messages dans logEntries.
+            for (const lm of r2.logMessages) {
+              if (lm.phase === phase) log(lm.type, lm.message)
+              else await prisma.schedulingLog.create({ data: lm }).catch(() => {})
             }
+            if (r2.reassigned > 0) log('info', `${r2.reassigned} match(s) réassigné(s) pour respecter les limites de malus (détail ci-dessus).`)
           }
         }
       } catch (e) {
@@ -4039,12 +4114,14 @@ async function handleAlerts(req, res) {
       // Vérifier lesquels n'ont pas de match soumis
       const scoreMissingAlerts = []
       for (const pm of overdueMatches) {
+        // BUG FIX : comparer prénom ET nom ET phase pour éviter faux négatifs.
         const hasScore = await prisma.match.findFirst({
           where: {
             specialMatchId: null,
+            phase: pm.phase,
             OR: [
-              { userId: pm.player1Id, opponentFirstName: pm.player2.firstName },
-              { userId: pm.player2Id, opponentFirstName: pm.player1.firstName },
+              { userId: pm.player1Id, opponentFirstName: pm.player2.firstName, opponentLastName: pm.player2.lastName },
+              { userId: pm.player2Id, opponentFirstName: pm.player1.firstName, opponentLastName: pm.player1.lastName },
             ],
             matchDate: { gte: pm.scheduledDate || new Date(0), lte: pm.deadlineAt },
           },
@@ -4818,9 +4895,9 @@ async function handleMedals(req, res) {
       const yearCheck = validateSeasonYear(seasonYear)
       if (!yearCheck.ok) return res.status(400).json({ error: yearCheck.error })
       const animJson = normalizeAnimations(animations)
-      // Récupérer tous les utilisateurs acceptés et non bannis (hors admin/root)
+      // BUG FIX : le filtre active:true manquait — attribuait la médaille aux joueurs inactifs aussi.
       const users = await prisma.user.findMany({
-        where: { accepted: true, banned: false, isBot: false, NOT: { username: { in: ['admin', 'root'] } } },
+        where: { accepted: true, banned: false, active: true, isBot: false, NOT: { username: { in: ['admin', 'root'] } } },
         select: { username: true },
       })
       const activeUsers = users.filter(u => u.username && !['admin', 'root'].includes(u.username.toLowerCase()))

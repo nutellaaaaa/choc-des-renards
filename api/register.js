@@ -49,11 +49,14 @@ module.exports = async function handler(req, res) {
 
   // Vérifier unicité du pseudo, ajouter suffix si besoin
   try {
-    const existing = await prisma.user.findUnique({ where: { username } })
+    // BUG FIX : vérification insensible à la casse, cohérente avec la connexion
+    // (qui compare toujours en mode 'insensitive'). Sans ça, "Bob" et "bob"
+    // pouvaient coexister comme deux comptes distincts.
+    const existing = await prisma.user.findFirst({ where: { username: { equals: username, mode: 'insensitive' } } })
     if (existing) {
       // Essayer avec le nom aussi
       const alt = slugify(firstName + lastName)
-      const existing2 = await prisma.user.findUnique({ where: { username: alt } })
+      const existing2 = await prisma.user.findFirst({ where: { username: { equals: alt, mode: 'insensitive' } } })
       if (!existing2) {
         username = alt
       } else {

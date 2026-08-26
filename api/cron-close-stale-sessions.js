@@ -27,9 +27,14 @@ const prisma = global._prisma
 const ESTIMATED_INACTIVITY_MS = 15 * 60 * 1000
 
 module.exports = async function handler(req, res) {
-  // Vérification du secret Vercel Cron (sécurité) — optionnel
-  if (process.env.CRON_SECRET && req.headers['authorization'] !== `Bearer ${process.env.CRON_SECRET}`) {
-    // On ne bloque pas en l'absence de configuration pour rester rétrocompatible
+  // BUG FIX : ce bloc ne contenait aucun `return` — il ne bloquait donc jamais
+  // rien, même avec CRON_SECRET configuré. N'importe qui pouvait déclencher la
+  // clôture de toutes les sessions actives à n'importe quelle heure.
+  if (process.env.CRON_SECRET) {
+    const authHeader = req.headers['authorization'] || ''
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      return res.status(401).json({ error: 'Non autorisé.' })
+    }
   }
 
   try {

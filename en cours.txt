@@ -140,9 +140,26 @@ a.fillon2008 DONE
 modifs : index, matches
 
 - Beugs
+- Générer pdf de fin de saison
 - Création auto groupe renard choquant/choqués : moitié meilleurs poules 
 - beug clique matchs joueurs
-- editer la charte
+- éditer la charte
 - mise à jour auto de l'app
 - livraison version finale
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

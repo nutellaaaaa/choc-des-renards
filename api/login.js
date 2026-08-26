@@ -167,6 +167,14 @@ module.exports = async function handler(req, res) {
         return res.status(403).json({ error: 'Le compte lié n\'est pas encore validé.' })
       }
 
+      // BUG FIX : réinitialiser forceLogout comme le fait le login classique.
+      // Sans cela, après suspend_site ou force_logout_all (qui posent forceLogout=true
+      // sur tous les comptes USER), basculer vers le compte lié semblait fonctionner
+      // puis se déconnectait seul au heartbeat suivant (< 60s).
+      if (targetUser.forceLogout) {
+        await prisma.user.update({ where: { id: targetUser.id }, data: { forceLogout: false } })
+      }
+
       // Clôturer l'événement de connexion précédent (changement de compte)
       const { loginEventId } = req.body || {}
       if (loginEventId) {
