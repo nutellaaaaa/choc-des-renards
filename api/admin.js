@@ -804,9 +804,12 @@ async function handleSiteUpdate(req, res) {
       // Nombre total de joueurs concernés par la mise à jour (comptes réels,
       // acceptés, non bannis, non admin) — sert de dénominateur à la barre
       // de progression d'installation.
+      // Dénominateur de la barre d'installation : TOUS les joueurs non bannis
+      // (inactifs et forfaits inclus — ils doivent installer la mise à jour
+      // eux aussi dès qu'ils se reconnectent), hors bots et comptes admin.
       const totalPlayers = await prisma.user.count({
         where: {
-          accepted: true, banned: false, active: true, withdrawnAt: null,
+          accepted: true, banned: false,
           isBot: false, username: { notIn: ADMIN_USERNAMES },
         },
       })

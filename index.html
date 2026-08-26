@@ -6055,19 +6055,57 @@ async function loadClassement() {
     }
 
     container.innerHTML = html
-    bindPlayerRows()
+    bindPlayerRows(true)
   } catch(e) {
     console.error('[loadClassement]', e)
     container.innerHTML = '<div class="admin-empty">Erreur de chargement.</div>'
   }
 }
 
-function bindPlayerRows() {
+// Filtre un match sur la saison en cours (1er septembre → 31 août), même
+// convention que seasonLabel() / footer / mon-profil.
+function isWithinCurrentSeason(dateStr) {
+  const d = new Date(dateStr)
+  const now = new Date()
+  const y = now.getFullYear(), m = now.getMonth()
+  const seasonStartYear = m >= 8 ? y : y - 1
+  const seasonStart = new Date(seasonStartYear, 8, 1)
+  const seasonEnd = new Date(seasonStartYear + 1, 8, 1)
+  return d >= seasonStart && d < seasonEnd
+}
+
+// Recalcule played/wins/losses/setDiff/points sur un sous-ensemble de matchs
+// (même logique que computeStats côté serveur, ex-fix bye = 0 pt).
+function computeStatsClient(matches) {
+  let played = 0, wins = 0, losses = 0, setDiff = 0, points = 0
+  for (const m of matches) {
+    const pw = (m.sets || []).filter(s => s.playerScore > s.opponentScore).length
+    const ow = (m.sets || []).filter(s => s.opponentScore > s.playerScore).length
+    played++
+    setDiff += pw - ow
+    const isByeLoss = m.opponentFirstName === 'Exempt' && m.opponentLastName === '(bye)' && !(pw > ow)
+    if (pw > ow) { wins++; points += 3 }
+    else { losses++; points += isByeLoss ? 0 : 1 }
+  }
+  return { played, wins, losses, setDiff, points }
+}
+
+// seasonOnly=true (Classement) : la modale ne doit montrer que les matchs et
+// stats de la saison en cours, pas la carrière entière (réservée à
+// Performances / Mon profil). Les tableaux affichés restent inchangés (déjà
+// filtrés par phase côté serveur) — seul le contenu de la modale change.
+function bindPlayerRows(seasonOnly) {
   document.querySelectorAll('.clickable-row').forEach(row => {
     row.onclick = () => {
       const pid = parseInt(row.dataset.playerId)
       const player = classementPlayers.find(p => p.id === pid)
-      if (player) showPlayerDetail(player)
+      if (!player) return
+      if (seasonOnly) {
+        const seasonMatches = (player.matches || []).filter(m => isWithinCurrentSeason(m.matchDate))
+        showPlayerDetail({ ...player, matches: seasonMatches, ...computeStatsClient(seasonMatches) })
+      } else {
+        showPlayerDetail(player)
+      }
     }
   })
 }
@@ -6103,7 +6141,7 @@ function switchClassTab(id, btn) {
   const el = document.getElementById('class-' + id)
   if (el) el.classList.add('active')
   if (btn) btn.classList.add('active')
-  bindPlayerRows()
+  bindPlayerRows(true)
 }
 
 /* ══════════════ PERFORMANCES ══════════════ */
