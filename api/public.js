@@ -66,6 +66,8 @@ module.exports = async function handler(req, res) {
       return handlePush(req, res)
     case 'badge_push':
       return handleBadgePush(req, res)
+    case 'site_update':
+      return handleSiteUpdate(req, res)
     default:
       return res.status(400).json({ error: 'resource invalide ou manquant.' })
   }
@@ -1118,6 +1120,94 @@ async function handleBadgePush(req, res) {
     return res.status(200).json({ ok: true })
   } catch (err) {
     console.error('[badge_push]', err)
+    return res.status(500).json({ error: 'Erreur serveur.' })
+  }
+}
+
+/* ============================================================
+ * SITE_UPDATE — annonce plein écran bloquante ("Mise à jour du
+ * site") affichée aux joueurs (jamais aux admins) tant qu'ils
+ * n'ont pas cliqué "Installer la mise à jour".
+ *
+ * GET  ?resource=site_update
+ *   → calcule l'update "active" = la plus récente parmi celles
+ *     dont le déploiement est atteint (instant=true, ou
+ *     scheduledAt <= now()), et indique si CE user doit la voir
+ *     (comparaison avec user.lastSeenSiteUpdateId). Les admins
+ *     ne voient jamais rien ici (pending: false).
+ *
+ * POST ?resource=site_update  { action: 'acknowledge', updateId }
+ *   → marque l'update comme installée pour ce user
+ *     (User.lastSeenSiteUpdateId = updateId).
+ * ============================================================ */
+async function handleSiteUpdate(req, res) {
+  const auth = requireAuth(req, res)
+  if (!auth) return
+
+  if (req.method === 'GET') {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: auth.userId },
+        select: { role: true, lastSeenSiteUpdateId: true },
+      })
+      if (!user) return res.status(404).json({ error: 'Utilisateur introuvable.' })
+
+      // Les admins ne sont jamais bloqués par la page de mise à jour.
+      if (user.role === 'ADMIN') {
+        return res.status(200).json({ pending: false })
+      }
+
+      const now = new Date()
+      const candidates = await prisma.siteUpdate.findMany({
+        where: {
+          OR: [
+            { instant: true },
+            { instant: false, scheduledAt: { lte: now } },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        include: { items: { orderBy: { order: 'asc' } } },
+      })
+
+      const active = candidates[0] || null
+      const pending = !!active && active.id !== user.lastSeenSiteUpdateId
+
+      if (!pending) return res.status(200).json({ pending: false })
+
+      return res.status(200).json({
+        pending: true,
+        update: {
+          id: active.id,
+          title: active.title,
+          items: active.items.map(i => ({ id: i.id, subtitle: i.subtitle, content: i.content })),
+        },
+      })
+    } catch (err) {
+      console.error('[site_update GET]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée.' })
+
+  const { action, updateId } = req.body || {}
+  if (action !== 'acknowledge') return res.status(400).json({ error: 'Action invalide.' })
+
+  const uid = parseInt(updateId, 10)
+  if (isNaN(uid)) return res.status(400).json({ error: 'updateId invalide.' })
+
+  try {
+    const update = await prisma.siteUpdate.findUnique({ where: { id: uid } })
+    if (!update) return res.status(404).json({ error: 'Mise à jour introuvable.' })
+
+    await prisma.user.update({
+      where: { id: auth.userId },
+      data: { lastSeenSiteUpdateId: uid },
+    })
+    return res.status(200).json({ ok: true })
+  } catch (err) {
+    console.error('[site_update acknowledge]', err)
     return res.status(500).json({ error: 'Erreur serveur.' })
   }
 }

@@ -46,6 +46,11 @@ model User {
   // (0% d'oubli, délai quasi nul), sans connexion, FAQ ni contact.
   isPerfectBot Boolean  @default(false)
   createdAt    DateTime @default(now())
+  // Id de la dernière "Mise à jour du site" (SiteUpdate) que ce joueur a
+  // validée via le bouton "Installer la mise à jour". Comparé à l'update
+  // actuellement déployée pour savoir s'il faut lui montrer la page de
+  // gate à sa prochaine connexion/ouverture de session.
+  lastSeenSiteUpdateId Int?
 
   matches          Match[]
   pouleMembers     PouleMember[]
@@ -339,6 +344,35 @@ model FaqVote {
   user  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([topicId, userId])
+}
+
+// ═══════════════════ MISE À JOUR DU SITE ═══════════════════
+// Annonce plein écran affichée aux joueurs (jamais aux admins) avant
+// d'accéder au site, tant qu'ils n'ont pas cliqué "Installer la mise à
+// jour". Une seule "update" est considérée comme active à la fois : la
+// plus récente parmi celles déployées (instant = true, ou scheduledAt
+// atteint), voir /api/public?resource=site_update.
+model SiteUpdate {
+  id          Int       @id @default(autoincrement())
+  title       String
+  // true = déploiement instantané (actif dès la création) ;
+  // false = déploiement programmé, actif une fois scheduledAt atteint.
+  instant     Boolean   @default(true)
+  scheduledAt DateTime? // requis si instant = false
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  items SiteUpdateItem[]
+}
+
+model SiteUpdateItem {
+  id       Int     @id @default(autoincrement())
+  updateId Int
+  subtitle String?
+  content  String // texte avec mise en forme basique (gras/italique/listes), comme la FAQ
+  order    Int     @default(0)
+
+  update SiteUpdate @relation(fields: [updateId], references: [id], onDelete: Cascade)
 }
 
 // ═══════════════════ FORMULAIRE DE CONTACT ═══════════════════

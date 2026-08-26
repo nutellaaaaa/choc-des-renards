@@ -375,6 +375,8 @@ module.exports = async function handler(req, res) {
       return handleWhatsapp(req, res)
     case 'medals':
       return handleMedals(req, res)
+    case 'site_update':
+      return handleSiteUpdate(req, res)
     default:
       return res.status(400).json({ error: 'resource invalide ou manquant.' })
   }
@@ -579,6 +581,138 @@ async function handleFaq(req, res) {
     } catch (err) {
       console.error('[admin/faq reorder]', err)
       return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  return res.status(400).json({ error: 'Action invalide.' })
+}
+
+/* ============================================================
+ * SITE UPDATE — "Mise à jour du site" : annonce plein écran
+ * bloquante affichée aux joueurs avant accès au site.
+ * ============================================================ */
+async function handleSiteUpdate(req, res) {
+  const payload = requireAdmin(req, res)
+  if (!payload) return
+
+  if (req.method === 'GET') {
+    try {
+      const updates = await prisma.siteUpdate.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: { items: { orderBy: { order: 'asc' } } },
+      })
+      return res.status(200).json({ updates })
+    } catch (err) {
+      console.error('[admin/site_update GET]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' })
+
+  const { action } = req.body || {}
+
+  function sanitizeItems(items) {
+    if (!Array.isArray(items)) return null
+    const cleaned = items
+      .map(it => ({
+        subtitle: it?.subtitle && String(it.subtitle).trim() ? String(it.subtitle).trim() : null,
+        content: it?.content ? String(it.content).trim() : '',
+      }))
+      .filter(it => it.content.length > 0)
+    return cleaned
+  }
+
+  // Valide/normalise le couple (instant, scheduledAt) envoyé par le client.
+  // Retourne { ok:false, error } ou { ok:true, instant, scheduledAt }.
+  function resolveDeployTiming(body) {
+    const instant = !!body.instant
+    if (instant) return { ok: true, instant: true, scheduledAt: null }
+    if (!body.scheduledAt) return { ok: false, error: 'Une date et une heure de déploiement sont requises pour une mise à jour programmée.' }
+    const d = new Date(body.scheduledAt)
+    if (isNaN(d.getTime())) return { ok: false, error: 'Date de déploiement invalide.' }
+    return { ok: true, instant: false, scheduledAt: d }
+  }
+
+  if (action === 'create') {
+    const { title } = req.body
+    const items = sanitizeItems(req.body.items)
+    if (!title?.trim()) return res.status(400).json({ error: 'Le titre est requis.' })
+    if (!items || items.length === 0) return res.status(400).json({ error: 'Au moins un paragraphe est requis.' })
+    const timing = resolveDeployTiming(req.body)
+    if (!timing.ok) return res.status(400).json({ error: timing.error })
+
+    try {
+      const update = await prisma.siteUpdate.create({
+        data: {
+          title: title.trim(),
+          instant: timing.instant,
+          scheduledAt: timing.scheduledAt,
+          items: {
+            create: items.map((it, i) => ({ subtitle: it.subtitle, content: it.content, order: i })),
+          },
+        },
+        include: { items: { orderBy: { order: 'asc' } } },
+      })
+      return res.status(201).json({ ok: true, update })
+    } catch (err) {
+      console.error('[admin/site_update create]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  if (action === 'update') {
+    const { updateId, title } = req.body
+    const uid = parseInt(updateId, 10)
+    const items = sanitizeItems(req.body.items)
+    if (isNaN(uid)) return res.status(400).json({ error: 'updateId invalide.' })
+    if (!title?.trim()) return res.status(400).json({ error: 'Le titre est requis.' })
+    if (!items || items.length === 0) return res.status(400).json({ error: 'Au moins un paragraphe est requis.' })
+    const timing = resolveDeployTiming(req.body)
+    if (!timing.ok) return res.status(400).json({ error: timing.error })
+
+    try {
+      const existing = await prisma.siteUpdate.findUnique({ where: { id: uid } })
+      if (!existing) return res.status(404).json({ error: 'Mise à jour introuvable.' })
+
+      await prisma.$transaction([
+        prisma.siteUpdateItem.deleteMany({ where: { updateId: uid } }),
+        prisma.siteUpdate.update({
+          where: { id: uid },
+          data: {
+            title: title.trim(),
+            instant: timing.instant,
+            scheduledAt: timing.scheduledAt,
+            items: { create: items.map((it, i) => ({ subtitle: it.subtitle, content: it.content, order: i })) },
+          },
+        }),
+      ])
+
+      const update = await prisma.siteUpdate.findUnique({
+        where: { id: uid },
+        include: { items: { orderBy: { order: 'asc' } } },
+      })
+      return res.status(200).json({ ok: true, update })
+    } catch (err) {
+      console.error('[admin/site_update update]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  if (action === 'delete') {
+    const { updateId } = req.body
+    const uid = parseInt(updateId, 10)
+    if (isNaN(uid)) return res.status(400).json({ error: 'updateId invalide.' })
+    try {
+      const version = await prisma.$transaction(async (tx) => {
+        const v = await logDeletion(tx, 'SITE_UPDATE', [uid])
+        await tx.siteUpdate.delete({ where: { id: uid } })
+        return v
+      })
+      return res.status(200).json({ ok: true, dataVersion: version })
+    } catch (err) {
+      console.error('[admin/site_update delete]', err)
+      return res.status(500).json({ error: 'Erreur serveur ou mise à jour introuvable.' })
     }
   }
 
