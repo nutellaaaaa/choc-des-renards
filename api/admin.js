@@ -1135,7 +1135,7 @@ const WHATSAPP_VARS = [
   'prénom',
   'pseudo',
   'tel',
-  'tel adversaire'
+  'tel adversaire',
   "date du prochain match de l'utilisateur",
   "nom et prénom et classement de l'adversaire du prochain match de l'utilisateur",
   'date de début du duel',
