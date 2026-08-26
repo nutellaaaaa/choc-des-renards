@@ -68,6 +68,8 @@ module.exports = async function handler(req, res) {
       return handleBadgePush(req, res)
     case 'site_update':
       return handleSiteUpdate(req, res)
+    case 'charte':
+      return handleCharteRead(req, res)
     default:
       return res.status(400).json({ error: 'resource invalide ou manquant.' })
   }
@@ -1208,6 +1210,33 @@ async function handleSiteUpdate(req, res) {
     return res.status(200).json({ ok: true })
   } catch (err) {
     console.error('[site_update acknowledge]', err)
+    return res.status(500).json({ error: 'Erreur serveur.' })
+  }
+}
+
+/* ============================================================
+ * CHARTE — lecture seule des articles de la Charte (édités côté
+ * admin, voir admin.js resource=charte). Même contenu pour tous
+ * les joueurs, pas de personnalisation par utilisateur.
+ * ============================================================ */
+async function handleCharteRead(req, res) {
+  const auth = requireAuth(req, res)
+  if (!auth) return
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Méthode non autorisée.' })
+
+  try {
+    const articles = await prisma.charteArticle.findMany({
+      orderBy: { order: 'asc' },
+      include: { items: { orderBy: { order: 'asc' } } },
+    })
+    const result = articles.map(a => ({
+      id: a.id,
+      title: a.title,
+      items: a.items.map(i => ({ id: i.id, subtitle: i.subtitle, content: i.content })),
+    }))
+    return res.status(200).json({ articles: result })
+  } catch (err) {
+    console.error('[charte GET]', err)
     return res.status(500).json({ error: 'Erreur serveur.' })
   }
 }

@@ -377,6 +377,8 @@ module.exports = async function handler(req, res) {
       return handleMedals(req, res)
     case 'site_update':
       return handleSiteUpdate(req, res)
+    case 'charte':
+      return handleCharte(req, res)
     default:
       return res.status(400).json({ error: 'resource invalide ou manquant.' })
   }
@@ -580,6 +582,192 @@ async function handleFaq(req, res) {
       return res.status(200).json({ ok: true })
     } catch (err) {
       console.error('[admin/faq reorder]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  return res.status(400).json({ error: 'Action invalide.' })
+}
+
+/* ============================================================
+ * CHARTE — articles éditables de la page Charte (même système que
+ * la FAQ : titre + paragraphes ordonnés), affichés en lecture seule
+ * sous la visionneuse PDF. ex. admin/charte.js
+ * ============================================================ */
+
+// Contenu d'origine (auparavant codé en dur dans le HTML), utilisé comme
+// seed automatique la toute première fois que l'admin consulte cet onglet
+// (si la table est vide), pour ne rien perdre lors de la migration.
+const CHARTE_SEED = [
+  {
+    title: 'Participation',
+    items: [
+      { subtitle: null, content: "Tout adhérent·e au club de Bondy est libre de s'inscrire gratuitement au Choc des Renards auprès de Yanis.\n\nChaque joueur participant au choc est réputé accepter les termes de cette charte." },
+    ],
+  },
+  {
+    title: 'Déroulement',
+    items: [
+      { subtitle: null, content: "Le Choc des Renards s'organise en deux phases :\n- **Phase 1 — Septembre à Janvier :** l'ensemble des joueurs est réparti dans des poules. À l'issue, les joueurs sont séparés en deux groupes selon leur classement dans leur poule.\n- **Phase 2 — Février à Juin :** format phases finales en ronde suisse." },
+    ],
+  },
+  {
+    title: 'Format des affrontements',
+    items: [
+      { subtitle: null, content: "- Les joueurs reçoivent par message le numéro de téléphone et le nom de leur adversaire **un dimanche**.\n- Ils ont **deux semaines** à compter de ce jour pour effectuer leur match.\n- Le match se déroule en **3 sets gagnants de 11 points secs** (sans points d'écart). Pas de pause pendant le set. Un changement de côté est réalisé à chaque set.\n- Les volants sont fournis par les joueurs ou empruntés dans les caisses. Les autres modalités suivent le règlement officiel de la FFBAD.\n- À l'issue de l'affrontement, le vainqueur communique les scores à Yanis avant **le dernier samedi** de la période des deux semaines." },
+    ],
+  },
+  {
+    title: 'Bonus & Malus',
+    items: [
+      { subtitle: null, content: "Afin d'équilibrer certains affrontements, des **désavantages** seront attribués au joueur le mieux classé dans les cas suivants : **P contre R**, **P contre N** ou **D contre N**.\n\nLe malus est tiré au sort parmi la liste suivante :\n- Interdiction de smasher ou de tendre droit\n- Porter un cache-œil\n- Interdiction de taper le volant au-dessus de la bande\n- Jouer en demi-terrain pour le joueur le moins bien classé (le demi-terrain change selon le service en cours)\n- Jouer avec une raquette courte\n- Jouer avec une raquette lestée\n- Jouer avec une raquette de précision\n- Jouer avec un bras dans le dos constamment\n- Interdiction de faire un coup droit\n- Interdiction de faire un revers\n- Annoncer chaque coup à voix haute avant de le jouer\n- Les couloirs font partie du terrain du joueur le plus classé\n- Les points du joueur le moins classé comptent double\n- Le point est marqué par le joueur le mieux classé uniquement s'il touche le sol avant la raquette de l'adversaire\n- Le joueur le moins classé marque le point\n- Zone restrictive changeant à chaque set : rivière, box, couloir du fond, box puis rivière" },
+    ],
+  },
+  {
+    title: 'Exemptions',
+    items: [
+      { subtitle: null, content: "Dans des cas rares (voyage, blessure, maladie, décès…), un affrontement peut être annulé. L'organisation sera très reconnaissante d'être prévenue le plus tôt possible.\n\n**Aucun affrontement** ne sera réalisé durant les **vacances scolaires**." },
+    ],
+  },
+]
+
+async function seedCharteIfEmpty() {
+  const count = await prisma.charteArticle.count()
+  if (count > 0) return
+  for (let i = 0; i < CHARTE_SEED.length; i++) {
+    const a = CHARTE_SEED[i]
+    await prisma.charteArticle.create({
+      data: {
+        title: a.title,
+        order: i,
+        items: { create: a.items.map((it, j) => ({ subtitle: it.subtitle, content: it.content, order: j })) },
+      },
+    })
+  }
+}
+
+async function handleCharte(req, res) {
+  const payload = requireAdmin(req, res)
+  if (!payload) return
+
+  if (req.method === 'GET') {
+    try {
+      await seedCharteIfEmpty()
+      const articles = await prisma.charteArticle.findMany({
+        orderBy: { order: 'asc' },
+        include: { items: { orderBy: { order: 'asc' } } },
+      })
+      return res.status(200).json({ articles })
+    } catch (err) {
+      console.error('[admin/charte GET]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' })
+
+  const { action } = req.body || {}
+
+  function sanitizeItems(items) {
+    if (!Array.isArray(items)) return null
+    const cleaned = items
+      .map(it => ({
+        subtitle: it?.subtitle && String(it.subtitle).trim() ? String(it.subtitle).trim() : null,
+        content: it?.content ? String(it.content).trim() : '',
+      }))
+      .filter(it => it.content.length > 0)
+    return cleaned
+  }
+
+  if (action === 'create') {
+    const { title } = req.body
+    const items = sanitizeItems(req.body.items)
+    if (!title?.trim()) return res.status(400).json({ error: 'Le titre est requis.' })
+    if (!items || items.length === 0) return res.status(400).json({ error: 'Au moins un paragraphe est requis.' })
+
+    try {
+      const maxOrder = await prisma.charteArticle.aggregate({ _max: { order: true } })
+      const article = await prisma.charteArticle.create({
+        data: {
+          title: title.trim(),
+          order: (maxOrder._max.order ?? -1) + 1,
+          items: {
+            create: items.map((it, i) => ({ subtitle: it.subtitle, content: it.content, order: i })),
+          },
+        },
+        include: { items: { orderBy: { order: 'asc' } } },
+      })
+      return res.status(201).json({ ok: true, article })
+    } catch (err) {
+      console.error('[admin/charte create]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  if (action === 'update') {
+    const { articleId, title } = req.body
+    const aid = parseInt(articleId, 10)
+    const items = sanitizeItems(req.body.items)
+    if (isNaN(aid)) return res.status(400).json({ error: 'articleId invalide.' })
+    if (!title?.trim()) return res.status(400).json({ error: 'Le titre est requis.' })
+    if (!items || items.length === 0) return res.status(400).json({ error: 'Au moins un paragraphe est requis.' })
+
+    try {
+      const existing = await prisma.charteArticle.findUnique({ where: { id: aid } })
+      if (!existing) return res.status(404).json({ error: 'Article introuvable.' })
+
+      await prisma.$transaction([
+        prisma.charteArticleItem.deleteMany({ where: { articleId: aid } }),
+        prisma.charteArticle.update({
+          where: { id: aid },
+          data: {
+            title: title.trim(),
+            items: { create: items.map((it, i) => ({ subtitle: it.subtitle, content: it.content, order: i })) },
+          },
+        }),
+      ])
+
+      const article = await prisma.charteArticle.findUnique({
+        where: { id: aid },
+        include: { items: { orderBy: { order: 'asc' } } },
+      })
+      return res.status(200).json({ ok: true, article })
+    } catch (err) {
+      console.error('[admin/charte update]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+
+  if (action === 'delete') {
+    const { articleId } = req.body
+    const aid = parseInt(articleId, 10)
+    if (isNaN(aid)) return res.status(400).json({ error: 'articleId invalide.' })
+    try {
+      const version = await prisma.$transaction(async (tx) => {
+        const v = await logDeletion(tx, 'CHARTE_ARTICLE', [aid])
+        await tx.charteArticle.delete({ where: { id: aid } })
+        return v
+      })
+      return res.status(200).json({ ok: true, dataVersion: version })
+    } catch (err) {
+      console.error('[admin/charte delete]', err)
+      return res.status(500).json({ error: 'Erreur serveur ou article introuvable.' })
+    }
+  }
+
+  if (action === 'reorder') {
+    const { order } = req.body
+    if (!Array.isArray(order) || order.length === 0) return res.status(400).json({ error: 'order requis.' })
+    try {
+      await prisma.$transaction(
+        order.map((id, i) => {
+          const aid = parseInt(id, 10)
+          return prisma.charteArticle.update({ where: { id: aid }, data: { order: i } })
+        })
+      )
+      return res.status(200).json({ ok: true })
+    } catch (err) {
+      console.error('[admin/charte reorder]', err)
       return res.status(500).json({ error: 'Erreur serveur.' })
     }
   }

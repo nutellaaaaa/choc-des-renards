@@ -346,6 +346,30 @@ model FaqVote {
   @@unique([topicId, userId])
 }
 
+// ═══════════════════ CHARTE (articles éditables) ═══════════════════
+// Remplace l'ancien contenu de la Charte codé en dur dans le HTML.
+// Même système que la FAQ (article = "topic" + paragraphes ordonnés),
+// affiché en lecture seule sous la visionneuse PDF (page Charte).
+model CharteArticle {
+  id        Int      @id @default(autoincrement())
+  title     String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items CharteArticleItem[]
+}
+
+model CharteArticleItem {
+  id        Int    @id @default(autoincrement())
+  articleId Int
+  subtitle  String?
+  content   String
+  order     Int    @default(0)
+
+  article CharteArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+}
+
 // ═══════════════════ MISE À JOUR DU SITE ═══════════════════
 // Annonce plein écran affichée aux joueurs (jamais aux admins) avant
 // d'accéder au site, tant qu'ils n'ont pas cliqué "Installer la mise à

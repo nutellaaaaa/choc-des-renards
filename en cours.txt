@@ -132,19 +132,23 @@ Voici un petit récapitulatif des statuts des matchs si jamais ce n'était pas t
 
 - Médaille en ligne 
 
-a.fillon256 --> Analyse complète du site
-a.fillon257 --> PWA DONE
-a.fillon657 --> Notifs push DONE 
-a.fillon2008 DONE
+a.fillon256 DONE
+a.fillon258 DONE
+a.fillon257 
+
+a.fillon657 
+a.fillon2008 
+
 
 modifs : index, matches
 
-- Beugs
-- Générer pdf de fin de saison
+- Beugs done
+- Générer pdf de fin de saison done
+- mise à jour auto de l'app done
+
 - Création auto groupe renard choquant/choqués : moitié meilleurs poules 
 - beug clique matchs joueurs
 - éditer la charte
-- mise à jour auto de l'app
 - livraison version finale
 
 

@@ -2517,6 +2517,10 @@
         <span class="k-node-orb"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .5c0 1.5-2 1.8-2 3.3"/><circle cx="12" cy="17" r="0.4" fill="currentColor" stroke="none"/></svg></span>
         <span class="k-node-label">FAQ</span>
       </button>
+      <button class="k-node size-sm" style="left:43%;top:93%" data-tab="charte" data-badge-id="badge-charte" data-badge-type="info">
+        <span class="k-node-orb"><svg viewBox="0 0 24 24"><path d="M4 4.5A2.5 2.5 0 016.5 2H20v17H6.5A2.5 2.5 0 004 21.5v-17z"/><path d="M20 19H6.5A2.5 2.5 0 004 21.5"/></svg></span>
+        <span class="k-node-label">Charte</span>
+      </button>
       <button class="k-node size-sm" style="left:50%;top:93%" data-tab="site-update" data-badge-id="badge-site-update" data-badge-type="info">
         <span class="k-node-orb"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-2.6-6.4"/><path d="M21 4v5h-5"/></svg></span>
         <span class="k-node-label">Mise à jour du site</span>
@@ -2559,6 +2563,7 @@
           <button class="k-node size-sm" data-tab="whatsapp" data-badge-id="badge-whatsapp" data-badge-type="urgent"><span class="k-node-orb"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 01-12.4 7.6L3 20l1-5.4A8.5 8.5 0 1121 11.5z"/><path d="M8.5 10.5c.3 2.6 2.4 4.7 5 5"/></svg></span><span class="k-node-label">WhatsApp</span></button>
           <button class="k-node size-md" data-tab="contact" data-badge-id="badge-contact" data-badge-type="urgent"><span class="k-node-orb"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></span><span class="k-node-label">Contacts</span></button>
           <button class="k-node size-sm" data-tab="faq" data-badge-id="badge-faq" data-badge-type="info"><span class="k-node-orb"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .5c0 1.5-2 1.8-2 3.3"/><circle cx="12" cy="17" r="0.4" fill="currentColor" stroke="none"/></svg></span><span class="k-node-label">FAQ</span></button>
+          <button class="k-node size-sm" data-tab="charte" data-badge-id="badge-charte" data-badge-type="info"><span class="k-node-orb"><svg viewBox="0 0 24 24"><path d="M4 4.5A2.5 2.5 0 016.5 2H20v17H6.5A2.5 2.5 0 004 21.5v-17z"/><path d="M20 19H6.5A2.5 2.5 0 004 21.5"/></svg></span><span class="k-node-label">Charte</span></button>
           <button class="k-node size-sm" data-tab="site-update" data-badge-id="badge-site-update" data-badge-type="info"><span class="k-node-orb"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-2.6-6.4"/><path d="M21 4v5h-5"/></svg></span><span class="k-node-label">Mise à jour du site</span></button>
         </div>
       </div>
@@ -2579,6 +2584,7 @@
     <button class="admin-tab" onclick="adminTab('publication',this)">Publication matchs <span class="badge" id="badge-pending-matches" hidden>–</span></button>
     <button class="admin-tab" onclick="adminTab('notifications-list',this)">Notifications <span class="badge" id="badge-notifs" hidden>–</span></button>
     <button class="admin-tab" onclick="adminTab('faq',this)">FAQ <span class="badge badge-info" id="badge-faq">–</span></button>
+    <button class="admin-tab" onclick="adminTab('charte',this)">Charte <span class="badge badge-info" id="badge-charte">–</span></button>
     <button class="admin-tab" onclick="adminTab('site-update',this)">Mise à jour du site <span class="badge badge-info" id="badge-site-update">–</span></button>
     <button class="admin-tab" onclick="adminTab('contact',this)">Contacts <span class="badge" id="badge-contact" hidden>–</span></button>
     <button class="admin-tab" onclick="adminTab('other-actions',this)">Actions autres <span class="badge" hidden>–</span></button>
@@ -2903,6 +2909,20 @@
       <p style="font-size:0.8rem;color:var(--gray);margin-bottom:1.25rem">Glissez-déposez un sujet (⠿) pour changer son ordre d'affichage côté joueurs.</p>
       <div id="faq-admin-list"></div>
       <div id="faq-admin-empty" class="admin-empty" style="display:none">Aucun sujet de FAQ pour l'instant.</div>
+    </div>
+
+    <!-- Charte -->
+    <div id="admin-charte" class="admin-section">
+      <div class="admin-section-header">
+        <h3>Articles de la Charte</h3>
+        <button class="btn-sm btn-edit" onclick="openCharteCreateModal()">+ Nouvel article</button>
+      </div>
+      <p style="font-size:0.8rem;color:var(--gray);margin-bottom:1.25rem">
+        Ces articles s'affichent sous la visionneuse PDF de la page Charte. Glissez-déposez un article (⠿)
+        pour changer son ordre d'affichage côté joueurs.
+      </p>
+      <div id="charte-admin-list"></div>
+      <div id="charte-admin-empty" class="admin-empty" style="display:none">Aucun article pour l'instant.</div>
     </div>
 
     <!-- Mise à jour du site -->
@@ -3257,6 +3277,26 @@
     <div class="modal-actions">
       <button class="btn-modal-cancel" onclick="closeModal('faq-edit-modal')">Annuler</button>
       <button class="btn-modal-save" onclick="saveFaqTopic()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CRÉATION / ÉDITION ARTICLE DE CHARTE -->
+<div id="charte-edit-modal" class="admin-modal-bg">
+  <div class="admin-modal" style="max-width:640px">
+    <h3 id="charte-modal-title">Nouvel <span>article</span></h3>
+    <input type="hidden" id="charte-modal-article-id">
+    <div class="form-group">
+      <label>Titre de l'article</label>
+      <input type="text" id="charte-modal-title-input" placeholder="Ex : Participation">
+    </div>
+    <label style="display:block;font-family:var(--font-heading);font-size:0.76rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--gray);margin-bottom:0.6rem">Paragraphes</label>
+    <div id="charte-modal-items"></div>
+    <button type="button" class="btn-add-set" onclick="charteAddItemRow()">+ Ajouter un paragraphe</button>
+    <div id="charte-modal-error" class="modal-error"></div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeModal('charte-edit-modal')">Annuler</button>
+      <button class="btn-modal-save" onclick="saveCharteArticle()">Enregistrer</button>
     </div>
   </div>
 </div>
@@ -3857,71 +3897,7 @@
       </div>
     </div>
 
-    <div class="article open" onclick="toggleArticle(this)">
-      <div class="article-header"><div class="article-num">1</div><div class="article-title">Participation</div><div class="article-chevron">▾</div></div>
-      <div class="article-body">
-        <p>Tout adhérent·e au club de Bondy est libre de s'inscrire gratuitement au Choc des Renards auprès de Yanis.</p>
-        <p>Chaque joueur participant au choc est réputé accepter les termes de cette charte.</p>
-      </div>
-    </div>
-
-    <div class="article" onclick="toggleArticle(this)">
-      <div class="article-header"><div class="article-num">2</div><div class="article-title">Déroulement</div><div class="article-chevron">▾</div></div>
-      <div class="article-body">
-        <p>Le Choc des Renards s'organise en deux phases :</p>
-        <ul>
-          <li><span><strong>Phase 1 — Septembre à Janvier :</strong> l'ensemble des joueurs est réparti dans des poules. À l'issue, les joueurs sont séparés en deux groupes selon leur classement dans leur poule.</span></li>
-          <li><span><strong>Phase 2 — Février à Juin :</strong> format phases finales en ronde suisse.</span></li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="article" onclick="toggleArticle(this)">
-      <div class="article-header"><div class="article-num">3</div><div class="article-title">Format des affrontements</div><div class="article-chevron">▾</div></div>
-      <div class="article-body">
-        <ul>
-          <li><span>Les joueurs reçoivent par message le numéro de téléphone et le nom de leur adversaire <strong>un dimanche</strong>.</span></li>
-          <li><span>Ils ont <strong>deux semaines</strong> à compter de ce jour pour effectuer leur match.</span></li>
-          <li><span>Le match se déroule en <strong>3 sets gagnants de 11 points secs</strong> (sans points d'écart). Pas de pause pendant le set. Un changement de côté est réalisé à chaque set.</span></li>
-          <li><span>Les volants sont fournis par les joueurs ou empruntés dans les caisses. Les autres modalités suivent le règlement officiel de la FFBAD.</span></li>
-          <li><span>À l'issue de l'affrontement, le vainqueur communique les scores à Yanis avant <strong>le dernier samedi</strong> de la période des deux semaines.</span></li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="article" onclick="toggleArticle(this)">
-      <div class="article-header"><div class="article-num">4</div><div class="article-title">Bonus &amp; Malus</div><div class="article-chevron">▾</div></div>
-      <div class="article-body">
-        <p>Afin d'équilibrer certains affrontements, des <strong>désavantages</strong> seront attribués au joueur le mieux classé dans les cas suivants : <strong>P contre R</strong>, <strong>P contre N</strong> ou <strong>D contre N</strong>.</p>
-        <p>Le malus est tiré au sort parmi la liste suivante :</p>
-        <div class="malus-grid">
-          <div class="malus-item">Interdiction de smasher ou de tendre droit</div>
-          <div class="malus-item">Porter un cache-œil</div>
-          <div class="malus-item">Interdiction de taper le volant au-dessus de la bande</div>
-          <div class="malus-item">Jouer en demi-terrain pour le joueur le moins bien classé (le demi-terrain change selon le service en cours)</div>
-          <div class="malus-item">Jouer avec une raquette courte</div>
-          <div class="malus-item">Jouer avec une raquette lestée</div>
-          <div class="malus-item">Jouer avec une raquette de précision</div>
-          <div class="malus-item">Jouer avec un bras dans le dos constamment</div>
-          <div class="malus-item">Interdiction de faire un coup droit</div>
-          <div class="malus-item">Interdiction de faire un revers</div>
-          <div class="malus-item">Annoncer chaque coup à voix haute avant de le jouer</div>
-          <div class="malus-item">Les couloirs font partie du terrain du joueur le plus classé</div>
-          <div class="malus-item">Les points du joueur le moins classé comptent double</div>
-          <div class="malus-item">Le point est marqué par le joueur le mieux classé uniquement s'il touche le sol avant la raquette de l'adversaire</div>
-          <div class="malus-item">Le joueur le moins classé marque le point</div>
-          <div class="malus-item">Zone restrictive changeant à chaque set : rivière, box, couloir du fond, box puis rivière</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="article" onclick="toggleArticle(this)">
-      <div class="article-header"><div class="article-num">5</div><div class="article-title">Exemptions</div><div class="article-chevron">▾</div></div>
-      <div class="article-body">
-        <p>Dans des cas rares (voyage, blessure, maladie, décès…), un affrontement peut être annulé. L'organisation sera très reconnaissante d'être prévenue le plus tôt possible.</p>
-        <p><strong>Aucun affrontement</strong> ne sera réalisé durant les <strong>vacances scolaires</strong>.</p>
-      </div>
-    </div>
+    <div id="charte-content"><div class="admin-empty">Chargement…</div></div>
   </div>
 </div>
 
@@ -4301,6 +4277,7 @@ function showPage(id, btn) {
     document.querySelectorAll('#page-' + id + ' .article.open').forEach(closeArticle)
   }
   if (id === 'reglement') ensureCharteRendered()
+  if (id === 'reglement') loadCharte()
   if (id === 'classement') loadClassement()
   if (id === 'performances') loadPerformances()
   if (id === 'souvenirs') loadGallery()
@@ -6651,6 +6628,40 @@ function renderFaqContent(raw) {
   return html
 }
 
+async function loadCharte() {
+  const container = document.getElementById('charte-content')
+  container.innerHTML = '<div class="admin-empty">Chargement…</div>'
+  try {
+    const res = await fetch('/api/public?resource=charte', { headers: authHeaders() })
+    if (!res.ok) { container.innerHTML = '<div class="admin-empty">Impossible de charger la charte.</div>'; return }
+    const { articles } = await res.json()
+
+    if (!articles || articles.length === 0) {
+      container.innerHTML = '<div class="admin-empty">Aucun article pour l\'instant.</div>'
+      return
+    }
+
+    container.innerHTML = articles.map((a, i) => `
+      <div class="article" onclick="toggleArticle(this)">
+        <div class="article-header">
+          <div class="article-num">${i + 1}</div>
+          <div class="article-title">${esc(a.title)}</div>
+          <div class="article-chevron">▾</div>
+        </div>
+        <div class="article-body">
+          ${a.items.map(it => `
+            ${it.subtitle ? `<div class="faq-subtitle">${esc(it.subtitle)}</div>` : ''}
+            <div class="faq-content">${renderFaqContent(it.content)}</div>
+          `).join('')}
+        </div>
+      </div>
+    `).join('')
+  } catch (e) {
+    console.error('[loadCharte]', e)
+    container.innerHTML = '<div class="admin-empty">Erreur réseau.</div>'
+  }
+}
+
 async function loadFaq() {
   const container = document.getElementById('faq-content')
   container.innerHTML = '<div class="admin-empty">Chargement…</div>'
@@ -7260,6 +7271,7 @@ function adminTab(name, btn) {
   if (name === 'history') loadHistory()
   if (name === 'pending') loadRefused()
   if (name === 'faq') loadFaqAdmin()
+  if (name === 'charte') loadCharteAdmin()
   if (name === 'site-update') loadSiteUpdateAdmin()
   if (name === 'contact') loadContactAdmin()
   if (name === 'other-actions') { loadDataVersions(); loadOtherActionsConfig() }
@@ -7343,6 +7355,7 @@ async function loadAllAdminDataWithProgress() {
     { label: 'Publication des matchs…',    fn: loadPendingMatches },
     { label: 'Liste des joueurs…',         fn: loadPlayersForNotify },
     { label: 'FAQ…',                       fn: loadFaqAdmin },
+    { label: 'Charte…',                    fn: loadCharteAdmin },
     { label: 'Mises à jour du site…',      fn: loadSiteUpdateAdmin },
     { label: 'Prises de contact…',         fn: loadContactAdmin },
     { label: 'Demandes en attente…',       fn: loadRefused },
@@ -8723,6 +8736,186 @@ async function deleteNotif(id) {
   await fetch('/api/admin/notifications', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'delete', notificationId: id }) })
   await loadNotificationsList()
   filterNotifications()
+}
+
+/* ══════════════ CHARTE (admin) ══════════════ */
+let charteAdminArticles = []
+let charteItemRowCounter = 0
+let charteDragSourceId = null
+
+async function loadCharteAdmin() {
+  const list = document.getElementById('charte-admin-list')
+  const empty = document.getElementById('charte-admin-empty')
+  try {
+    const res = await fetch('/api/admin?resource=charte', { headers: authHeaders() })
+    if (!res.ok) return
+    const { articles } = await res.json()
+    charteAdminArticles = articles || []
+    setBadge('badge-charte', charteAdminArticles.length)
+
+    if (charteAdminArticles.length === 0) {
+      list.innerHTML = ''
+      empty.style.display = 'block'
+      return
+    }
+    empty.style.display = 'none'
+    renderCharteAdminList()
+  } catch (e) {
+    console.error('[loadCharteAdmin]', e)
+  }
+}
+
+/* ── Drag & drop reorder ── */
+function charteDragStart(ev, id) {
+  charteDragSourceId = id
+  ev.currentTarget.classList.add('dragging')
+  ev.dataTransfer.effectAllowed = 'move'
+}
+function charteDragOver(ev) {
+  ev.preventDefault()
+  ev.currentTarget.classList.add('drag-over')
+}
+async function charteDrop(ev, targetId) {
+  ev.preventDefault()
+  ev.currentTarget.classList.remove('drag-over')
+  if (charteDragSourceId === null || charteDragSourceId === targetId) return
+
+  const ids = charteAdminArticles.map(a => a.id)
+  const fromIdx = ids.indexOf(charteDragSourceId)
+  const toIdx = ids.indexOf(targetId)
+  if (fromIdx === -1 || toIdx === -1) return
+  ids.splice(toIdx, 0, ids.splice(fromIdx, 1)[0])
+
+  const byId = Object.fromEntries(charteAdminArticles.map(a => [a.id, a]))
+  charteAdminArticles = ids.map(id => byId[id])
+  renderCharteAdminList()
+
+  try {
+    await fetch('/api/admin?resource=charte', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'reorder', order: ids }) })
+  } catch (e) { console.error('[charte reorder]', e) }
+}
+function charteDragEnd(ev) {
+  ev.currentTarget.classList.remove('dragging')
+  document.querySelectorAll('.faq-admin-row.drag-over').forEach(r => r.classList.remove('drag-over'))
+  charteDragSourceId = null
+}
+function renderCharteAdminList() {
+  const list = document.getElementById('charte-admin-list')
+  if (!list) return
+  list.innerHTML = charteAdminArticles.map(a => `
+    <div class="faq-admin-row" draggable="true" data-id="${a.id}"
+         ondragstart="charteDragStart(event, ${a.id})" ondragover="charteDragOver(event)"
+         ondrop="charteDrop(event, ${a.id})" ondragend="charteDragEnd(event)">
+      <span class="faq-drag-handle">⠿</span>
+      <div class="faq-admin-row-main">
+        <div class="faq-admin-row-title">${esc(a.title)}</div>
+      </div>
+      <div class="faq-admin-row-actions">
+        <button class="btn-sm btn-edit" onclick="openCharteEditModal(${a.id})">Modifier</button>
+        <button class="btn-sm btn-danger" onclick="deleteCharteArticle(${a.id})">Supprimer</button>
+      </div>
+    </div>
+  `).join('')
+}
+
+/* ── Création / édition (paragraphes identiques au système FAQ) ── */
+function charteAddItemRow(subtitle, content) {
+  charteItemRowCounter++
+  const rowId = charteItemRowCounter
+  const container = document.getElementById('charte-modal-items')
+  const row = document.createElement('div')
+  row.className = 'faq-item-row'
+  row.id = 'charte-item-row-' + rowId
+  row.innerHTML = `
+    <div class="form-group">
+      <label>Sous-titre (optionnel)</label>
+      <input type="text" id="charte-item-subtitle-${rowId}" placeholder="Sous-titre…" value="${esc(subtitle || '')}">
+    </div>
+    <div class="faq-item-toolbar">
+      <button type="button" class="faq-fmt-btn" onclick="faqWrapSelection('charte-item-content-${rowId}','**','**')"><strong>G</strong></button>
+      <button type="button" class="faq-fmt-btn" onclick="faqWrapSelection('charte-item-content-${rowId}','*','*')"><em>I</em></button>
+      <button type="button" class="faq-fmt-btn" onclick="faqInsertListLine('charte-item-content-${rowId}')">• Liste</button>
+      <button type="button" class="faq-fmt-btn faq-fmt-remove" onclick="charteRemoveItemRow(${rowId})">✕ Retirer ce paragraphe</button>
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <textarea id="charte-item-content-${rowId}" rows="4" placeholder="Texte du paragraphe… (**gras**, *italique*, lignes commençant par « - » pour une liste)"></textarea>
+    </div>
+  `
+  container.appendChild(row)
+  if (content) row.querySelector('textarea').value = content
+}
+
+function charteRemoveItemRow(rowId) {
+  const row = document.getElementById('charte-item-row-' + rowId)
+  if (row) row.remove()
+}
+
+function collectCharteItems() {
+  const rows = document.querySelectorAll('#charte-modal-items .faq-item-row')
+  const items = []
+  rows.forEach(row => {
+    const subtitleInput = row.querySelector('input')
+    const textarea = row.querySelector('textarea')
+    const content = (textarea?.value || '').trim()
+    if (content) items.push({ subtitle: (subtitleInput?.value || '').trim() || null, content })
+  })
+  return items
+}
+
+function openCharteCreateModal() {
+  document.getElementById('charte-modal-title').innerHTML = 'Nouvel <span>article</span>'
+  document.getElementById('charte-modal-article-id').value = ''
+  document.getElementById('charte-modal-title-input').value = ''
+  document.getElementById('charte-modal-items').innerHTML = ''
+  document.getElementById('charte-modal-error').textContent = ''
+  charteAddItemRow()
+  document.getElementById('charte-edit-modal').classList.add('open')
+}
+
+function openCharteEditModal(articleId) {
+  const article = charteAdminArticles.find(a => a.id === articleId)
+  if (!article) return
+  document.getElementById('charte-modal-title').innerHTML = 'Modifier <span>l\'article</span>'
+  document.getElementById('charte-modal-article-id').value = article.id
+  document.getElementById('charte-modal-title-input').value = article.title
+  document.getElementById('charte-modal-items').innerHTML = ''
+  document.getElementById('charte-modal-error').textContent = ''
+  for (const it of article.items) charteAddItemRow(it.subtitle, it.content)
+  if (article.items.length === 0) charteAddItemRow()
+  document.getElementById('charte-edit-modal').classList.add('open')
+}
+
+async function saveCharteArticle() {
+  const errorEl = document.getElementById('charte-modal-error')
+  errorEl.textContent = ''
+  const articleId = document.getElementById('charte-modal-article-id').value
+  const title = document.getElementById('charte-modal-title-input').value.trim()
+  const items = collectCharteItems()
+
+  if (!title) { errorEl.textContent = 'Le titre est requis.'; return }
+  if (items.length === 0) { errorEl.textContent = 'Au moins un paragraphe est requis.'; return }
+
+  const action = articleId ? 'update' : 'create'
+  const body = { action, title, items }
+  if (articleId) body.articleId = parseInt(articleId, 10)
+
+  try {
+    const res = await fetch('/api/admin?resource=charte', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) })
+    const data = await res.json()
+    if (!res.ok) { errorEl.textContent = data.error || 'Erreur serveur.'; return }
+    closeModal('charte-edit-modal')
+    await loadCharteAdmin()
+  } catch (e) {
+    errorEl.textContent = 'Erreur réseau.'
+  }
+}
+
+async function deleteCharteArticle(articleId) {
+  if (!confirm('Supprimer définitivement cet article de la charte ?')) return
+  try {
+    await fetch('/api/admin?resource=charte', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'delete', articleId }) })
+    await loadCharteAdmin()
+  } catch (e) { console.error('[deleteCharteArticle]', e) }
 }
 
 /* ══════════════ FAQ (admin) ══════════════ */
@@ -10794,6 +10987,7 @@ function placeAdminTabs() {}
     publication:        '<svg viewBox="0 0 24 24"><path d="M12 19V6M6 11l6-6 6 6"/><path d="M4 21h16"/></svg>',
     'notifications-list':'<svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>',
     faq:                '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .5c0 1.5-2 1.8-2 3.3"/><circle cx="12" cy="17" r="0.4" fill="currentColor" stroke="none"/></svg>',
+    charte:             '<svg viewBox="0 0 24 24"><path d="M4 4.5A2.5 2.5 0 016.5 2H20v17H6.5A2.5 2.5 0 004 21.5v-17z"/><path d="M20 19H6.5A2.5 2.5 0 004 21.5"/></svg>',
     'site-update':      '<svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-2.6-6.4"/><path d="M21 4v5h-5"/></svg>',
     contact:            '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
     'other-actions':    '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5c.1-.5.1-1 0-1.5l1.8-1.4-2-3.4-2.1.6c-.4-.3-.8-.6-1.3-.8L15.4 5h-4l-.4 2c-.5.2-.9.5-1.3.8l-2.1-.6-2 3.4L7.4 12c-.1.5-.1 1 0 1.5l-1.8 1.4 2 3.4 2.1-.6c.4.3.8.6 1.3.8l.4 2h4l.4-2c.5-.2.9-.5 1.3-.8l2.1.6 2-3.4-1.8-1.4z"/></svg>',
@@ -10806,7 +11000,7 @@ function placeAdminTabs() {}
     notify:'Notifier un joueur', planned:'Matchs planifiés', whatsapp:'Communication WhatsApp',
     publication:'Publication matchs', 'notifications-list':'Notifications',
     faq:'FAQ', contact:'Contacts', 'other-actions':'Actions & autres', alerts:'Alertes',
-    vitrine:'Vitrine — Médailles', 'site-update':'Mise à jour du site'
+    vitrine:'Vitrine — Médailles', 'site-update':'Mise à jour du site', charte:'Charte'
   }
 
   function injectSectionHeaders() {
