@@ -1135,6 +1135,7 @@ const WHATSAPP_VARS = [
   'prénom',
   'pseudo',
   'tel',
+  'tel adversaire'
   "date du prochain match de l'utilisateur",
   "nom et prénom et classement de l'adversaire du prochain match de l'utilisateur",
   'date de début du duel',
@@ -1162,6 +1163,7 @@ function buildWhatsappVars(user, pm, opponent) {
     'prénom': user.firstName,
     'pseudo': user.username,
     'tel': user.phone || '—',
+    'opponent_tel': opponent?.phone || '—',
     "date du prochain match de l'utilisateur": pm?.scheduledDate ? fmtDate(pm.scheduledDate) : '—',
     "nom et prénom et classement de l'adversaire du prochain match de l'utilisateur": opponent ? `${opponent.firstName} ${opponent.lastName} (${opponent.category || 'NC'})` : '—',
     'date de début du duel': pm?.scheduledDate ? fmtDate(pm.scheduledDate) : '—',
