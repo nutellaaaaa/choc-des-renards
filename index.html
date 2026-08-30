@@ -5073,19 +5073,17 @@ async function handleRegister() {
   const phone     = document.getElementById('reg-phone').value.trim()
   const password  = document.getElementById('reg-password').value
   const confirm   = document.getElementById('reg-confirm').value
-  const ack       = document.getElementById('reg-ack').checked
   const rgpd      = document.getElementById('reg-rgpd').checked
   const errorEl   = document.getElementById('reg-error')
   const btn       = document.getElementById('reg-btn')
   errorEl.textContent = ''
   if (!firstName || !lastName || !phone || !password || !confirm) { errorEl.textContent = 'Veuillez remplir tous les champs.'; return }
   if (!rgpd) { errorEl.textContent = 'Vous devez consentir à la collecte de vos données.'; return }
-  if (!ack) { errorEl.textContent = 'Vous devez cocher la case de prise de connaissance.'; return }
   if (password !== confirm) { errorEl.textContent = 'Les mots de passe ne correspondent pas.'; return }
   if (password.length < 8) { errorEl.textContent = 'Le mot de passe doit contenir au moins 8 caractères.'; return }
   btn.disabled = true; btn.textContent = 'Création…'
   try {
-    const res  = await fetch('/api/register', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({firstName, lastName, phone, password, confirmPassword: confirm, acknowledged: ack}) })
+    const res  = await fetch('/api/register', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({firstName, lastName, phone, password, confirmPassword: confirm}) })
     const data = await res.json()
     if (!res.ok) { errorEl.textContent = data.error || "Erreur lors de l'inscription."; return }
     showPendingMessage()
