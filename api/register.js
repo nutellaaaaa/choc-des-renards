@@ -28,13 +28,10 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' })
 
-  const { password, confirmPassword, firstName, lastName, phone, acknowledged } = req.body || {}
+  const { password, confirmPassword, firstName, lastName, phone } = req.body || {}
 
   if (!password || !confirmPassword || !firstName || !lastName || !phone) {
     return res.status(400).json({ error: 'Tous les champs sont requis.' })
-  }
-  if (!acknowledged) {
-    return res.status(400).json({ error: 'Vous devez cocher la case de prise de connaissance des informations.' })
   }
   if (password !== confirmPassword) {
     return res.status(400).json({ error: 'Les mots de passe ne correspondent pas.' })
