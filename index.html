@@ -2329,7 +2329,7 @@
     <div id="auth-pending" class="auth-pending">
       <div class="auth-pending-icon">⏳</div>
       <h3>Demande envoyée !</h3>
-      <p>Votre demande d'inscription a bien été reçue.<br>L'administrateur doit valider votre compte avant que vous puissiez vous connecter.</p>
+      <p>Votre demande d'inscription a bien été reçue.<br>Revenez dans quelques heures pour vous connecter.</p>
       <button class="auth-pending-back" onclick="showPendingBack()">← Retour à la connexion</button>
     </div>
   </div>
@@ -3020,6 +3020,21 @@
           <h4>😴 Désactiver tous les joueurs</h4>
           <p>Passe tous les joueurs en actif=false. Utile en fin de saison pour préparer la suivante.</p>
           <button class="btn-sm btn-deactivate" onclick="otherAction('deactivate_all_players','Passer tous les joueurs en inactif ?')">Désactiver tous</button>
+        </div>
+        <div class="other-action-card">
+          <h4>👍 Avis utiles (pouces) FAQ</h4>
+          <p>Lorsqu'ils sont désactivés, les joueurs ne voient plus les boutons "Utile / Pas utile" sous les sujets de la FAQ.</p>
+          <button class="btn-sm btn-edit" id="btn-toggle-faq-votes" onclick="toggleFaqVotes()">…</button>
+        </div>
+        <div class="other-action-card">
+          <h4>🔑 Option "Pseudo oublié"</h4>
+          <p>Lorsqu'elle est désactivée, le lien "Pseudo oublié ?" n'apparaît plus sur l'écran de connexion.</p>
+          <button class="btn-sm btn-edit" id="btn-toggle-forgot-username" onclick="toggleForgotUsername()">…</button>
+        </div>
+        <div class="other-action-card">
+          <h4>📲 Pop-up d'installation de l'application</h4>
+          <p>Lorsqu'elle est désactivée, la bannière proposant d'installer l'application (PWA) ainsi que les instructions iOS n'apparaissent plus aux joueurs.</p>
+          <button class="btn-sm btn-edit" id="btn-toggle-app-popup" onclick="toggleAppPopup()">…</button>
         </div>
         <div class="other-action-card">
           <h4>📊 Réinitialiser les stats FAQ</h4>
@@ -5105,8 +5120,20 @@ function showPendingBack() {
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin() })
   document.getElementById('reg-confirm').addEventListener('keydown', e => { if (e.key === 'Enter') handleRegister() })
+  loadPublicSiteConfig()
   initAuth()
 })
+
+// Config publique lue avant connexion (ex: visibilité du lien "Pseudo oublié ?").
+async function loadPublicSiteConfig() {
+  try {
+    const res = await fetch('/api/login?action=config')
+    if (!res.ok) return
+    const data = await res.json()
+    if (typeof data.forgotUsernameEnabled === 'boolean') _forgotUsernameEnabled = data.forgotUsernameEnabled
+    applyForgotUsernameVisibility()
+  } catch(e) { /* silencieux : le lien reste visible par défaut si l'API n'est pas disponible */ }
+}
 
 /* ══════════════ STATS ACCUEIL DYNAMIQUES ══════════════ */
 async function loadHomeStats() {
@@ -5573,7 +5600,7 @@ async function loadScoreMatch() {
             : `${winnerHint}
                <div style="display:flex;gap:0.6rem;margin-top:0.75rem;flex-wrap:wrap">
                  <button class="btn-modal-save" onclick='openScoreModal(${JSON.stringify(c).replace(/'/g,"&#39;")})'>Renseigner le score</button>
-                 <button class="btn-modal-cancel" style="flex:0 0 auto" onclick='openChatFromConvocation("${c.type}",${c.id},${oppJson})'>💬 Organiser le match</button>
+                 ${!_hiddenTabs.includes('chat') ? `<button class="btn-modal-cancel" style="flex:0 0 auto" onclick='openChatFromConvocation("${c.type}",${c.id},${oppJson})'>💬 Organiser le match</button>` : ''}
                </div>`}
         </div>`
       }).join('')
@@ -6771,9 +6798,10 @@ async function loadFaq() {
             ${it.subtitle ? `<div class="faq-subtitle">${esc(it.subtitle)}</div>` : ''}
             <div class="faq-content">${renderFaqContent(it.content)}</div>
           `).join('')}
+          ${(_faqVotesEnabled || currentUser?.role === 'ADMIN') ? `
           <div class="faq-vote-row" id="faq-vote-${t.id}">
             ${faqVoteRowHtml(t)}
-          </div>
+          </div>` : ''}
         </div>
       </div>
     `).join('')
@@ -10272,6 +10300,86 @@ function showFeedback(id, msg, ok) {
   setTimeout(() => { el.textContent = ''; el.style.color = '' }, 5000)
 }
 
+/* ── Pouces FAQ ── */
+let _faqVotesEnabled = true
+async function toggleFaqVotes() {
+  try {
+    const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'toggle_faq_votes' }) })
+    const data = await res.json()
+    if (res.ok) {
+      _faqVotesEnabled = data.faqVotesEnabled
+      updateFaqVotesBtn()
+      showFeedback('other-actions-feedback', '✓ ' + data.message, true)
+    } else { showFeedback('other-actions-feedback', '✗ ' + data.error, false) }
+  } catch { showFeedback('other-actions-feedback', '✗ Erreur réseau.', false) }
+}
+function updateFaqVotesBtn() {
+  const btn = document.getElementById('btn-toggle-faq-votes')
+  if (!btn) return
+  if (_faqVotesEnabled) {
+    btn.textContent = '👍 Désactiver les pouces FAQ'
+    btn.className = 'btn-sm btn-deactivate'
+  } else {
+    btn.textContent = '👍 Activer les pouces FAQ'
+    btn.className = 'btn-sm btn-accept'
+  }
+}
+
+/* ── Option "Pseudo oublié" ── */
+let _forgotUsernameEnabled = true
+async function toggleForgotUsername() {
+  try {
+    const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'toggle_forgot_username' }) })
+    const data = await res.json()
+    if (res.ok) {
+      _forgotUsernameEnabled = data.forgotUsernameEnabled
+      updateForgotUsernameBtn()
+      applyForgotUsernameVisibility()
+      showFeedback('other-actions-feedback', '✓ ' + data.message, true)
+    } else { showFeedback('other-actions-feedback', '✗ ' + data.error, false) }
+  } catch { showFeedback('other-actions-feedback', '✗ Erreur réseau.', false) }
+}
+function updateForgotUsernameBtn() {
+  const btn = document.getElementById('btn-toggle-forgot-username')
+  if (!btn) return
+  if (_forgotUsernameEnabled) {
+    btn.textContent = '🔑 Désactiver "Pseudo oublié"'
+    btn.className = 'btn-sm btn-deactivate'
+  } else {
+    btn.textContent = '🔑 Activer "Pseudo oublié"'
+    btn.className = 'btn-sm btn-accept'
+  }
+}
+function applyForgotUsernameVisibility() {
+  const link = document.querySelector('.auth-forgot-link')
+  if (link) link.style.display = _forgotUsernameEnabled ? '' : 'none'
+}
+
+/* ── Pop-up d'installation de l'application (PWA) ── */
+let _appPopupEnabled = true
+async function toggleAppPopup() {
+  try {
+    const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'toggle_app_popup' }) })
+    const data = await res.json()
+    if (res.ok) {
+      _appPopupEnabled = data.appPopupEnabled
+      updateAppPopupBtn()
+      showFeedback('other-actions-feedback', '✓ ' + data.message, true)
+    } else { showFeedback('other-actions-feedback', '✗ ' + data.error, false) }
+  } catch { showFeedback('other-actions-feedback', '✗ Erreur réseau.', false) }
+}
+function updateAppPopupBtn() {
+  const btn = document.getElementById('btn-toggle-app-popup')
+  if (!btn) return
+  if (_appPopupEnabled) {
+    btn.textContent = "📲 Désactiver la pop-up d'installation"
+    btn.className = 'btn-sm btn-deactivate'
+  } else {
+    btn.textContent = "📲 Activer la pop-up d'installation"
+    btn.className = 'btn-sm btn-accept'
+  }
+}
+
 /* ── Onglets visibles ── */
 const PLAYER_TABS = [
   { key: 'accueil', label: 'Accueil', locked: true },
@@ -10389,6 +10497,8 @@ async function loadHiddenTabsForUser() {
     const data = await res.json()
     if (Array.isArray(data.hiddenTabs)) _hiddenTabs = data.hiddenTabs
     if (Array.isArray(data.tabOrder)) _tabOrder = data.tabOrder
+    if (typeof data.faqVotesEnabled === 'boolean') _faqVotesEnabled = data.faqVotesEnabled
+    if (typeof data.appPopupEnabled === 'boolean') _appPopupEnabled = data.appPopupEnabled
     applyHiddenTabs()
     applyDockOrder()
   } catch(e) { console.error('[loadHiddenTabsForUser]', e) }
@@ -10788,6 +10898,13 @@ async function loadOtherActionsConfig() {
     // Rappels auto
     _autoRemindersEnabled = data.autoRemindersEnabled ?? true
     updateAutoReminderBtn()
+    // Pouces FAQ / Pseudo oublié / Pop-up appli
+    _faqVotesEnabled = data.faqVotesEnabled ?? true
+    updateFaqVotesBtn()
+    _forgotUsernameEnabled = data.forgotUsernameEnabled ?? true
+    updateForgotUsernameBtn()
+    _appPopupEnabled = data.appPopupEnabled ?? true
+    updateAppPopupBtn()
   } catch(e) { console.error('[loadOtherActionsConfig]', e) }
 }
 
@@ -12436,6 +12553,7 @@ async function deleteMedal(id) {
     e.preventDefault()   // bloquer la bannière native du navigateur
     _installPrompt = e
 
+    if (typeof _appPopupEnabled !== 'undefined' && !_appPopupEnabled) return
     if (!_isDismissed() && !_isStandalone()) {
       setTimeout(() => _showBanner('pwa-install-banner'), SHOW_DELAY_MS)
     }
@@ -12443,7 +12561,7 @@ async function deleteMedal(id) {
 
   // Cas iOS Safari : pas d'événement, on détecte manuellement.
   // On affiche les instructions uniquement si l'app n'est pas déjà installée.
-  if (_isIOS() && !_isStandalone() && !_isDismissed()) {
+  if ((typeof _appPopupEnabled === 'undefined' || _appPopupEnabled) && _isIOS() && !_isStandalone() && !_isDismissed()) {
     setTimeout(() => _showBanner('pwa-ios-hint'), SHOW_DELAY_MS)
   }
 
