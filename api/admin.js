@@ -438,6 +438,66 @@ async function scrapeMyffbadClub() {
   return { scraped, logs }
 }
 
+// Compare une liste { fullName, simpleToken }[] (issue du scraping ou d'un
+// import CSV manuel) aux joueurs de la base, et propose les changements de
+// catégorie. Logique extraite de scrape_myffbad pour être partagée avec
+// import_myffbad_csv (solution de repli tant que le blocage réseau
+// Vercel→myffbad.fr n'est pas résolu).
+async function compareMyffbadScrapeToUsers(scraped) {
+  const users = await prisma.user.findMany({
+    where: { username: { notIn: ADMIN_USERNAMES }, isBot: false },
+    select: { id: true, firstName: true, lastName: true, category: true, username: true },
+  })
+
+  const normedScraped = scraped.map(s => ({ ...s, norm: normName(s.fullName) }))
+
+  const results = []
+  for (const u of users) {
+    const displayName = `${u.firstName} ${u.lastName}`
+    const key1 = normName(u.firstName + u.lastName)
+    const key2 = normName(u.lastName + u.firstName)
+    const match = normedScraped.find(s => s.norm === key1 || s.norm === key2)
+
+    if (!match) {
+      results.push({
+        userId: u.id, name: displayName, found: false, changed: false,
+        message: `${displayName} : non trouvé sur MYFFBAD.`,
+      })
+      continue
+    }
+
+    const m = (match.simpleToken || '').match(/^([A-Z]+)/)
+    const letter = m ? m[1] : null
+
+    if (!letter || !VALID_CATEGORIES.includes(letter)) {
+      results.push({
+        userId: u.id, name: displayName, found: true, changed: false,
+        message: `${displayName} : classement simple non disponible (« ${match.simpleToken || '—'} »), catégorie inchangée.`,
+      })
+      continue
+    }
+
+    if (letter === u.category) {
+      results.push({
+        userId: u.id, name: displayName, found: true, changed: false,
+        message: `${displayName} : classement inchangé (${letter}).`,
+      })
+    } else {
+      results.push({
+        userId: u.id, name: displayName, found: true, changed: true,
+        from: u.category, to: letter,
+        message: `${displayName} : classement ${u.category} → ${letter} (en attente de confirmation).`,
+      })
+    }
+  }
+
+  return {
+    results,
+    changedCount: results.filter(r => r.changed).length,
+    notFoundCount: results.filter(r => !r.found).length,
+  }
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -1939,7 +1999,7 @@ async function handleAction(req, res) {
   const globalActions = [
     'suspend_site', 'unsuspend_site', 'force_logout_all',
     'reset_all_matches', 'reset_all_notifications', 'deactivate_all_players',
-    'scrape_myffbad', 'apply_myffbad_changes', 'reset_faq_stats',
+    'scrape_myffbad', 'apply_myffbad_changes', 'reset_faq_stats', 'debug_network',
     'toggle_auto_reminders', 'send_reminders_manual',
     'toggle_faq_votes', 'toggle_forgot_username', 'toggle_app_popup', 'update_app_popup_config',
     'update_hidden_tabs', 'update_malus_config',
@@ -2035,60 +2095,60 @@ async function handleAction(req, res) {
           })
         }
 
-        case 'scrape_myffbad': {
-          const { scraped, logs } = await scrapeMyffbadClub()
-
-          logs.push({ ok: true, message: `── Total récupéré sur MYFFBAD : ${scraped.length} joueur(s). ──` })
-
-          const users = await prisma.user.findMany({
-            where: { username: { notIn: ADMIN_USERNAMES }, isBot: false },
-            select: { id: true, firstName: true, lastName: true, category: true, username: true },
-          })
-
-          const normedScraped = scraped.map(s => ({ ...s, norm: normName(s.fullName) }))
-
-          const results = []
-          for (const u of users) {
-            const displayName = `${u.firstName} ${u.lastName}`
-            const key1 = normName(u.firstName + u.lastName)
-            const key2 = normName(u.lastName + u.firstName)
-            const match = normedScraped.find(s => s.norm === key1 || s.norm === key2)
-
-            if (!match) {
-              results.push({
-                userId: u.id, name: displayName, found: false, changed: false,
-                message: `${displayName} : non trouvé sur MYFFBAD.`,
+        case 'debug_network': {
+          // Diagnostic temporaire : compare une requête vers un site témoin
+          // (toujours joignable) et une vers myffbad.fr, avec le même timeout
+          // que le scraper réel. Si le témoin réussit et myffbad.fr échoue
+          // systématiquement en UND_ERR_CONNECT_TIMEOUT, ça confirme un
+          // blocage réseau spécifique à myffbad.fr (probablement anti-bot
+          // contre les IPs "datacenter" de Vercel) plutôt qu'un souci Vercel
+          // général. À retirer une fois le diagnostic confirmé.
+          async function testConnectivity(url, timeoutMs) {
+            const controller = new AbortController()
+            const timer = setTimeout(() => controller.abort(), timeoutMs)
+            const startedAt = Date.now()
+            try {
+              const r = await fetch(url, {
+                signal: controller.signal,
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' },
               })
-              continue
-            }
-
-            const m = match.simpleToken.match(/^([A-Z]+)/)
-            const letter = m ? m[1] : null
-
-            if (!letter || !VALID_CATEGORIES.includes(letter)) {
-              results.push({
-                userId: u.id, name: displayName, found: true, changed: false,
-                message: `${displayName} : classement simple non disponible (« ${match.simpleToken || '—'} »), catégorie inchangée.`,
-              })
-              continue
-            }
-
-            if (letter === u.category) {
-              results.push({
-                userId: u.id, name: displayName, found: true, changed: false,
-                message: `${displayName} : classement inchangé (${letter}).`,
-              })
-            } else {
-              results.push({
-                userId: u.id, name: displayName, found: true, changed: true,
-                from: u.category, to: letter,
-                message: `${displayName} : classement ${u.category} → ${letter} (en attente de confirmation).`,
-              })
+              return { url, ok: true, status: r.status, ms: Date.now() - startedAt }
+            } catch (e) {
+              const cause = e.cause
+              const code = cause?.code || cause?.errno
+              const message = e.name === 'AbortError'
+                ? `délai dépassé (${timeoutMs / 1000}s)`
+                : (cause ? `${cause.message || String(cause)}${code ? ` [${code}]` : ''}` : (e.message || String(e)))
+              return { url, ok: false, error: message, ms: Date.now() - startedAt }
+            } finally {
+              clearTimeout(timer)
             }
           }
 
-          const changedCount = results.filter(r => r.changed).length
-          const notFoundCount = results.filter(r => !r.found).length
+          const [control, target] = await Promise.all([
+            testConnectivity('https://example.com/', 10000),
+            testConnectivity('https://myffbad.fr/', 10000),
+          ])
+
+          const diagnosis = control.ok && !target.ok
+            ? 'Blocage probablement spécifique à myffbad.fr (le site témoin est joignable, pas myffbad.fr) — vraisemblablement un blocage réseau côté MYFFBAD contre les IPs datacenter de Vercel.'
+            : (!control.ok
+              ? 'Le site témoin est lui aussi injoignable — le problème semble être un souci réseau général côté Vercel, pas spécifique à myffbad.fr.'
+              : 'myffbad.fr est joignable depuis Vercel en ce moment — le blocage réseau semble intermittent ou résolu.')
+
+          return res.status(200).json({
+            ok: true,
+            control,
+            target,
+            diagnosis,
+          })
+        }
+
+        case 'scrape_myffbad': {
+          const { scraped, logs } = await scrapeMyffbadClub()
+          logs.push({ ok: true, message: `── Total récupéré sur MYFFBAD : ${scraped.length} joueur(s). ──` })
+
+          const { results, changedCount, notFoundCount } = await compareMyffbadScrapeToUsers(scraped)
 
           return res.status(200).json({
             ok: true,
@@ -2098,6 +2158,46 @@ async function handleAction(req, res) {
             changedCount,
             notFoundCount,
             message: `Comparaison MYFFBAD terminée : ${changedCount} changement(s) proposé(s), ${notFoundCount} joueur(s) non trouvé(s).`,
+          })
+        }
+
+        case 'import_myffbad_csv': {
+          // Solution de repli le temps que le blocage réseau Vercel→myffbad.fr
+          // soit résolu (proxy, autre hébergement, etc.) : l'admin exporte/
+          // télécharge la page de recherche joueurs depuis son propre
+          // navigateur et colle le CSV ici. Réutilise exactement la même
+          // logique de comparaison que le scraping automatique — seule la
+          // source des données change.
+          // Format attendu : une ligne par joueur, "Nom Complet,ClassementSimple"
+          // (ex: "Ismaël AHOUNOU,D9"), avec ou sans ligne d'en-tête.
+          const { csv } = req.body || {}
+          if (!csv || typeof csv !== 'string' || !csv.trim()) {
+            return res.status(400).json({ error: 'Contenu CSV requis (champ "csv").' })
+          }
+
+          const lines = csv.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+          const scraped = []
+          for (const line of lines) {
+            const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
+            if (cols.length < 2) continue
+            const [fullName, simpleToken] = cols
+            if (!fullName || /^(nom|name|joueur)/i.test(fullName)) continue // ignore une éventuelle ligne d'en-tête
+            scraped.push({ fullName, simpleToken: simpleToken || '' })
+          }
+
+          if (scraped.length === 0) {
+            return res.status(400).json({ error: 'Aucune ligne exploitable dans le CSV fourni (attendu : "Nom Complet,Classement" par ligne).' })
+          }
+
+          const { results, changedCount, notFoundCount } = await compareMyffbadScrapeToUsers(scraped)
+
+          return res.status(200).json({
+            ok: true,
+            results,
+            totalScraped: scraped.length,
+            changedCount,
+            notFoundCount,
+            message: `Comparaison (import manuel) terminée : ${changedCount} changement(s) proposé(s), ${notFoundCount} joueur(s) non trouvé(s) sur ${scraped.length} ligne(s) importée(s).`,
           })
         }
 
