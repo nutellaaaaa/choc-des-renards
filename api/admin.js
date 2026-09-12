@@ -26,6 +26,16 @@ const { sendPushToUser } = require('./lib/sendPush')
 const cheerio = require('cheerio')
 const argon2 = require('argon2')
 
+// BUG FIX (scraping MYFFBAD) : depuis Node 17+, la résolution DNS renvoie les
+// adresses "telles quelles" (ordre du DNS, souvent IPv6 d'abord si le domaine
+// a un enregistrement AAAA) au lieu de préférer IPv4. Si le réseau egress
+// (ex: Vercel) ne peut pas router vers l'IPv6 de myffbad.fr, la connexion
+// TCP reste bloquée jusqu'au timeout undici (UND_ERR_CONNECT_TIMEOUT) sans
+// jamais atteindre le TLS/HTTP — d'où un échec identique sur toutes les
+// pages, indépendant du contenu ou d'un éventuel blocage anti-bot. Forcer
+// l'ordre "ipv4first" est le correctif standard recommandé par Node.
+try { require('dns').setDefaultResultOrder('ipv4first') } catch {}
+
 if (!global._prisma) global._prisma = new PrismaClient()
 const prisma = global._prisma
 
