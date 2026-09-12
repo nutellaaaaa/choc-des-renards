@@ -314,6 +314,39 @@ function normName(s) {
     .replace(/[^a-z]/g, '')
 }
 
+// Extrait un tableau JSON embarqué dans le payload React Server Components
+// (Next.js App Router en streaming). Le site n'expose plus les résultats de
+// recherche joueur via un <table> HTML exploitable : les données sont
+// dupliquées telles quelles (JSON) dans un <script>self.__next_f.push(...)
+// </script>, avec les guillemets échappés (\") puisqu'elles sont elles-mêmes
+// à l'intérieur d'une chaîne JS. On repère le tableau par sa clé, on compte
+// les crochets en ignorant les caractères échappés, puis on déséchappe et on
+// parse. Vérifié le 12/09/2026 sur une page réelle : le tableau contient des
+// objets {PersonName, PersonLicence, SimpleSubLevel, DoubleSubLevel,
+// MixteSubLevel, ClubId, ...} — bien plus fiable que parser le <table> visible
+// (dont la colonne "S/D/M" affiche 3 badges accolés sans séparateur, ce qui
+// cassait déjà l'ancien parsing cheerio avant même le souci réseau).
+function extractEscapedJSONArray(html, key) {
+  const marker = `\\"${key}\\":[`
+  const idx = html.indexOf(marker)
+  if (idx === -1) return null
+  const start = idx + marker.length - 1
+  let depth = 0
+  let i = start
+  for (; i < html.length; i++) {
+    const c = html[i]
+    if (c === '\\') { i++; continue } // saute le caractère échappé suivant
+    if (c === '[') depth++
+    else if (c === ']') { depth--; if (depth === 0) { i++; break } }
+  }
+  const raw = html.slice(start, i)
+  try {
+    return JSON.parse(raw.replace(/\\"/g, '"'))
+  } catch {
+    return null
+  }
+}
+
 // Scrape toutes les pages du club sur MYFFBAD et renvoie { scraped, logs }
 async function scrapeMyffbadClub() {
   const logs = []
@@ -338,7 +371,8 @@ async function scrapeMyffbadClub() {
     return err.message || String(err)
   }
 
-  for (let page = 1; page <= MAX_PAGES; page++) {
+  let maxPages = 1
+  for (let page = 1; page <= Math.min(Math.max(maxPages, 1), MAX_PAGES); page++) {
     const url = `${MYFFBAD_BASE}&page=${page}`
     let html
     const controller = new AbortController()
@@ -367,7 +401,7 @@ async function scrapeMyffbadClub() {
       logs.push({ ok: false, message: `Page ${page} : erreur réseau (${reason}).` })
       // Si la toute première page échoue au niveau réseau (pas juste HTTP),
       // c'est probablement MYFFBAD qui est indisponible ou qui bloque nos
-      // requêtes — inutile d'insister sur les 14 pages suivantes.
+      // requêtes — inutile d'insister sur les pages suivantes.
       if (page === 1) {
         logs.push({ ok: false, message: "Vérifiez que myffbad.fr est bien accessible (le site a connu des incidents/mises à jour de sécurité en 2026) et réessayez dans quelques minutes." })
       }
@@ -376,25 +410,26 @@ async function scrapeMyffbadClub() {
       clearTimeout(timer)
     }
 
-    const $ = cheerio.load(html)
-    const rows = $('table tbody tr')
-    if (rows.length === 0) {
-      logs.push({ ok: true, message: `Page ${page} : aucune ligne — fin de la pagination.` })
+    const results = extractEscapedJSONArray(html, 'results')
+    if (!results) {
+      logs.push({ ok: false, message: `Page ${page} : impossible de lire les résultats (structure de page inattendue — le site a peut-être encore changé).` })
       break
     }
 
+    if (page === 1) {
+      const maxPagesMatch = html.match(/\\"maxPages\\":(\d+)/)
+      if (maxPagesMatch) maxPages = parseInt(maxPagesMatch[1], 10) || 1
+    }
+
     let countOnPage = 0
-    rows.each((i, tr) => {
-      const tds = $(tr).find('td')
-      if (tds.length < 5) return
-      const fullName = $(tds[0]).text().trim().replace(/\s+/g, ' ')
-      if (!fullName) return
-      const sdmText = $(tds[4]).text().trim()
-      const tokens = sdmText.split(/\s+/).filter(Boolean)
-      const simpleToken = tokens[0] || ''
-      scraped.push({ fullName, simpleToken })
+    for (const p of results) {
+      const fullName = (p.PersonName || '').trim()
+      if (!fullName) continue
+      // SimpleSubLevel est déjà au format attendu par le comparateur plus bas
+      // (ex: "D9", "N2", "NC", "-"), pas besoin de le retokeniser.
+      scraped.push({ fullName, simpleToken: p.SimpleSubLevel || '' })
       countOnPage++
-    })
+    }
     logs.push({ ok: true, message: `Page ${page} : ${countOnPage} joueur(s) récupéré(s).` })
 
     if (countOnPage === 0) break
