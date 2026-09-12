@@ -295,13 +295,43 @@ async function scrapeMyffbadClub() {
   const logs = []
   const scraped = []
   const MAX_PAGES = 15
+  const FETCH_TIMEOUT_MS = 15000
+
+  // fetch() de Node (undici) ne renvoie qu'un message générique "fetch failed"
+  // en cas d'échec réseau — la vraie raison (DNS, TLS, connexion refusée/coupée,
+  // blocage anti-bot en amont, etc.) est dans err.cause. On la fait remonter
+  // explicitement pour pouvoir diagnostiquer (voir historique : la FFBaD a
+  // annoncé une mise à jour de sécurité de ses outils MyFFBaD/ICBad courant
+  // 2026, qui a pu ajouter une protection bloquant les requêtes serveur-à-serveur).
+  function describeFetchError(err) {
+    if (err.name === 'AbortError') return `délai dépassé (${FETCH_TIMEOUT_MS / 1000}s)`
+    const cause = err.cause
+    if (cause) {
+      const code = cause.code || cause.errno
+      const causeMsg = cause.message || String(cause)
+      return code ? `${causeMsg} [${code}]` : causeMsg
+    }
+    return err.message || String(err)
+  }
 
   for (let page = 1; page <= MAX_PAGES; page++) {
     const url = `${MYFFBAD_BASE}&page=${page}`
     let html
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
     try {
       const r = await fetch(url, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; CDR-bot/1.0)' },
+        signal: controller.signal,
+        headers: {
+          // En-têtes proches d'un vrai navigateur : certains WAF/anti-bot
+          // rejettent (ou coupent la connexion avant même la réponse HTTP,
+          // d'où un "fetch failed" sans code de statut) les requêtes dont le
+          // User-Agent est trop clairement un script.
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+          'Referer': 'https://myffbad.fr/recherche/joueur',
+        },
       })
       if (!r.ok) {
         logs.push({ ok: false, message: `Page ${page} : échec HTTP ${r.status}.` })
@@ -309,8 +339,17 @@ async function scrapeMyffbadClub() {
       }
       html = await r.text()
     } catch (e) {
-      logs.push({ ok: false, message: `Page ${page} : erreur réseau (${e.message}).` })
+      const reason = describeFetchError(e)
+      logs.push({ ok: false, message: `Page ${page} : erreur réseau (${reason}).` })
+      // Si la toute première page échoue au niveau réseau (pas juste HTTP),
+      // c'est probablement MYFFBAD qui est indisponible ou qui bloque nos
+      // requêtes — inutile d'insister sur les 14 pages suivantes.
+      if (page === 1) {
+        logs.push({ ok: false, message: "Vérifiez que myffbad.fr est bien accessible (le site a connu des incidents/mises à jour de sécurité en 2026) et réessayez dans quelques minutes." })
+      }
       break
+    } finally {
+      clearTimeout(timer)
     }
 
     const $ = cheerio.load(html)
@@ -1843,6 +1882,7 @@ async function handleAction(req, res) {
     'reset_all_matches', 'reset_all_notifications', 'deactivate_all_players',
     'scrape_myffbad', 'apply_myffbad_changes', 'reset_faq_stats',
     'toggle_auto_reminders', 'send_reminders_manual',
+    'toggle_faq_votes', 'toggle_forgot_username', 'toggle_app_popup', 'update_app_popup_config',
     'update_hidden_tabs', 'update_malus_config',
     'generate_season_pdf',
   ]
@@ -2041,6 +2081,85 @@ async function handleAction(req, res) {
             ok: true,
             autoRemindersEnabled: next,
             message: next ? 'Rappels automatiques activés.' : 'Rappels automatiques désactivés.',
+          })
+        }
+
+        case 'toggle_faq_votes': {
+          const state = await prisma.tournamentState.upsert({
+            where: { id: 1 },
+            update: {},
+            create: { id: 1, currentPhase: 'PHASE0' },
+          })
+          const next = !(state.faqVotesEnabled ?? true)
+          await prisma.tournamentState.update({ where: { id: 1 }, data: { faqVotesEnabled: next } })
+          return res.status(200).json({
+            ok: true,
+            faqVotesEnabled: next,
+            message: next ? 'Pouces FAQ activés.' : 'Pouces FAQ désactivés.',
+          })
+        }
+
+        case 'toggle_forgot_username': {
+          const state = await prisma.tournamentState.upsert({
+            where: { id: 1 },
+            update: {},
+            create: { id: 1, currentPhase: 'PHASE0' },
+          })
+          const next = !(state.forgotUsernameEnabled ?? true)
+          await prisma.tournamentState.update({ where: { id: 1 }, data: { forgotUsernameEnabled: next } })
+          return res.status(200).json({
+            ok: true,
+            forgotUsernameEnabled: next,
+            message: next ? '"Pseudo oublié" activé.' : '"Pseudo oublié" désactivé.',
+          })
+        }
+
+        case 'toggle_app_popup': {
+          const state = await prisma.tournamentState.upsert({
+            where: { id: 1 },
+            update: {},
+            create: { id: 1, currentPhase: 'PHASE0' },
+          })
+          const next = !(state.appPopupEnabled ?? true)
+          await prisma.tournamentState.update({ where: { id: 1 }, data: { appPopupEnabled: next } })
+          return res.status(200).json({
+            ok: true,
+            appPopupEnabled: next,
+            message: next ? "Pop-up d'installation activée." : "Pop-up d'installation désactivée.",
+          })
+        }
+
+        case 'update_app_popup_config': {
+          const { dismissDays, showDelaySec, maxShows } = data || {}
+
+          const cleanDismissDays = Number.isFinite(dismissDays) ? Math.max(0, Math.trunc(dismissDays)) : 7
+          const cleanShowDelaySec = Number.isFinite(showDelaySec) ? Math.max(0, Math.trunc(showDelaySec)) : 4
+          // maxShows : null/undefined = illimité, sinon entier >= 1
+          const cleanMaxShows = (maxShows === null || maxShows === undefined)
+            ? null
+            : (Number.isFinite(maxShows) ? Math.max(1, Math.trunc(maxShows)) : null)
+
+          await prisma.tournamentState.upsert({
+            where: { id: 1 },
+            update: {
+              appPopupDismissDays: cleanDismissDays,
+              appPopupShowDelaySec: cleanShowDelaySec,
+              appPopupMaxShows: cleanMaxShows,
+            },
+            create: {
+              id: 1, currentPhase: 'PHASE0',
+              appPopupDismissDays: cleanDismissDays,
+              appPopupShowDelaySec: cleanShowDelaySec,
+              appPopupMaxShows: cleanMaxShows,
+            },
+          })
+
+          return res.status(200).json({
+            ok: true,
+            appPopupDismissDays: cleanDismissDays,
+            appPopupShowDelaySec: cleanShowDelaySec,
+            appPopupMaxShows: cleanMaxShows,
+            message: 'Paramètres de la pop-up enregistrés.',
           })
         }
 
@@ -2621,6 +2740,12 @@ async function handleMatch(req, res) {
         autoRemindersEnabled: state?.autoRemindersEnabled ?? true,
         hiddenTabs: JSON.parse(state?.hiddenTabs || '[]'),
         tabOrder: JSON.parse(state?.tabOrder || '[]'),
+        faqVotesEnabled: state?.faqVotesEnabled ?? true,
+        forgotUsernameEnabled: state?.forgotUsernameEnabled ?? true,
+        appPopupEnabled: state?.appPopupEnabled ?? true,
+        appPopupDismissDays: state?.appPopupDismissDays ?? 7,
+        appPopupShowDelaySec: state?.appPopupShowDelaySec ?? 4,
+        appPopupMaxShows: state?.appPopupMaxShows ?? null,
       })
     } catch (err) {
       console.error('[admin/match GET]', err)

@@ -40,6 +40,22 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
   if (req.method === 'OPTIONS') return res.status(200).end()
 
+  // ── GET /api/login?action=config — config publique (avant connexion) ───────
+  // Utilisé par l'écran de connexion pour savoir s'il doit afficher le lien
+  // "Pseudo oublié ?". Volontairement non authentifié : ne renvoie que des
+  // indicateurs d'affichage, aucune donnée sensible.
+  if (req.method === 'GET' && req.query?.action === 'config') {
+    try {
+      const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
+      return res.status(200).json({
+        forgotUsernameEnabled: state?.forgotUsernameEnabled ?? true,
+      })
+    } catch (err) {
+      console.error('[login config]', err)
+      return res.status(200).json({ forgotUsernameEnabled: true })
+    }
+  }
+
   // ── GET /api/login?action=me — vérifier l'état de la session en cours ──────
   // Permet de détecter un forceLogout déclenché par l'admin pendant que
   // l'utilisateur est déjà connecté (le token JWT reste valide 30 jours,
@@ -240,6 +256,12 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: 'Prénom, nom et téléphone requis.' })
     }
     try {
+      const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
+      if (state?.forgotUsernameEnabled === false) {
+        return res.status(403).json({ error: 'Cette option est désactivée. Contactez l\'administrateur.' })
+      }
+    } catch {}
+    try {
       const normalizedPhone = phone.replace(/[\s.\-]/g, '')
       const user = await prisma.user.findFirst({
         where: {
@@ -318,7 +340,7 @@ module.exports = async function handler(req, res) {
 
     if (!user.accepted) {
       await logLogin(user.id, req, false, 'Compte en attente de validation')
-      return res.status(403).json({ error: 'Votre demande d\'inscription est en attente de validation par l\'administrateur.' })
+      return res.status(403).json({ error: 'Votre demande d\'inscription est en cours de traitement. Revenez dans quelques heures.' })
     }
 
     if (user.forceLogout) {

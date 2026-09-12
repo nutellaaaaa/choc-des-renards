@@ -261,6 +261,10 @@ async function handleFaq(req, res) {
     if (typeof useful !== 'boolean') return res.status(400).json({ error: 'useful (booléen) requis.' })
 
     try {
+      const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
+      if (state?.faqVotesEnabled === false) {
+        return res.status(403).json({ error: 'Cette fonctionnalité a été désactivée par l\'administrateur.' })
+      }
       const topic = await prisma.faqTopic.findUnique({ where: { id: tid } })
       if (!topic) return res.status(404).json({ error: 'Sujet introuvable.' })
 

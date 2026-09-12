@@ -109,7 +109,7 @@ module.exports = async function handler(req, res) {
 
     return res.status(201).json({
       pending: true,
-      message: 'Votre demande d\'inscription a été envoyée. Elle sera validée par l\'administrateur avant de pouvoir vous connecter.',
+      message: 'Votre demande d\'inscription a été envoyée. Revenez dans quelques heures pour vous connecter.',
     })
   } catch (err) {
     console.error('[REGISTER]', err)

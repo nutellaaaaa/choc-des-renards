@@ -355,6 +355,11 @@ module.exports = async function handler(req, res) {
       rankingFrozen: !!state.rankingSnapshot,
       hiddenTabs: hiddenTabsArr,
       tabOrder: tabOrderArr,
+      faqVotesEnabled: state.faqVotesEnabled ?? true,
+      appPopupEnabled: state.appPopupEnabled ?? true,
+      appPopupDismissDays: state.appPopupDismissDays ?? 7,
+      appPopupShowDelaySec: state.appPopupShowDelaySec ?? 4,
+      appPopupMaxShows: state.appPopupMaxShows ?? null,
     }
     if (isAdmin) response.fromSnapshot = !!state.rankingSnapshot
 

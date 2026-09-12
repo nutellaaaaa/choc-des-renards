@@ -3031,10 +3031,32 @@
           <p>Lorsqu'elle est désactivée, le lien "Pseudo oublié ?" n'apparaît plus sur l'écran de connexion.</p>
           <button class="btn-sm btn-edit" id="btn-toggle-forgot-username" onclick="toggleForgotUsername()">…</button>
         </div>
-        <div class="other-action-card">
+        <div class="other-action-card" style="grid-column:1/-1">
           <h4>📲 Pop-up d'installation de l'application</h4>
           <p>Lorsqu'elle est désactivée, la bannière proposant d'installer l'application (PWA) ainsi que les instructions iOS n'apparaissent plus aux joueurs.</p>
           <button class="btn-sm btn-edit" id="btn-toggle-app-popup" onclick="toggleAppPopup()">…</button>
+          <div style="display:flex;flex-wrap:wrap;gap:1.2rem;align-items:flex-end;margin-top:0.9rem">
+            <div style="display:flex;flex-direction:column;gap:0.3rem">
+              <label style="font-size:0.78rem;color:var(--gray)">Réapparition après refus (jours)</label>
+              <input type="number" id="app-popup-dismiss-days" min="0" step="1" value="7" style="width:100px;background:var(--dark2);border:1px solid var(--dark4);border-radius:6px;color:var(--white);padding:0.4rem 0.6rem;font-family:var(--font-body)">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.3rem">
+              <label style="font-size:0.78rem;color:var(--gray)">Délai avant 1ère apparition (secondes)</label>
+              <input type="number" id="app-popup-show-delay" min="0" step="1" value="4" style="width:100px;background:var(--dark2);border:1px solid var(--dark4);border-radius:6px;color:var(--white);padding:0.4rem 0.6rem;font-family:var(--font-body)">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.3rem">
+              <label style="font-size:0.78rem;color:var(--gray)">Nombre max d'apparitions par joueur</label>
+              <div style="display:flex;align-items:center;gap:0.5rem">
+                <input type="number" id="app-popup-max-shows" min="1" step="1" placeholder="∞" style="width:100px;background:var(--dark2);border:1px solid var(--dark4);border-radius:6px;color:var(--white);padding:0.4rem 0.6rem;font-family:var(--font-body)" oninput="document.getElementById('app-popup-max-shows-infinite').checked = false" onkeydown="if(event.key==='Backspace' && !this.value) document.getElementById('app-popup-max-shows-infinite').checked=true">
+                <label style="display:flex;align-items:center;gap:0.35rem;font-size:0.8rem;color:var(--gray-light);cursor:pointer;white-space:nowrap">
+                  <input type="checkbox" id="app-popup-max-shows-infinite" checked style="accent-color:var(--orange)" onchange="if(this.checked) document.getElementById('app-popup-max-shows').value=''">
+                  Illimité
+                </label>
+              </div>
+            </div>
+            <button class="btn-sm btn-accept" onclick="saveAppPopupConfig()">Enregistrer</button>
+            <span id="app-popup-config-feedback" style="font-size:0.85rem;font-weight:600"></span>
+          </div>
         </div>
         <div class="other-action-card">
           <h4>📊 Réinitialiser les stats FAQ</h4>
@@ -10357,6 +10379,9 @@ function applyForgotUsernameVisibility() {
 
 /* ── Pop-up d'installation de l'application (PWA) ── */
 let _appPopupEnabled = true
+let _appPopupDismissDays = 7
+let _appPopupShowDelaySec = 4
+let _appPopupMaxShows = null // null = illimité
 async function toggleAppPopup() {
   try {
     const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'toggle_app_popup' }) })
@@ -10378,6 +10403,39 @@ function updateAppPopupBtn() {
     btn.textContent = "📲 Activer la pop-up d'installation"
     btn.className = 'btn-sm btn-accept'
   }
+}
+function renderAppPopupConfig() {
+  const daysEl = document.getElementById('app-popup-dismiss-days')
+  const delayEl = document.getElementById('app-popup-show-delay')
+  const maxEl = document.getElementById('app-popup-max-shows')
+  const infEl = document.getElementById('app-popup-max-shows-infinite')
+  if (daysEl) daysEl.value = _appPopupDismissDays
+  if (delayEl) delayEl.value = _appPopupShowDelaySec
+  if (maxEl) maxEl.value = _appPopupMaxShows == null ? '' : _appPopupMaxShows
+  if (infEl) infEl.checked = _appPopupMaxShows == null
+}
+async function saveAppPopupConfig() {
+  const daysEl = document.getElementById('app-popup-dismiss-days')
+  const delayEl = document.getElementById('app-popup-show-delay')
+  const maxEl = document.getElementById('app-popup-max-shows')
+  const infEl = document.getElementById('app-popup-max-shows-infinite')
+  const dismissDays = Math.max(0, parseInt(daysEl?.value, 10) || 0)
+  const showDelaySec = Math.max(0, parseInt(delayEl?.value, 10) || 0)
+  const maxShows = (infEl?.checked || !maxEl?.value) ? null : Math.max(1, parseInt(maxEl.value, 10) || 1)
+  try {
+    const res = await fetch('/api/admin/action', {
+      method:'POST', headers: authHeaders(),
+      body: JSON.stringify({ action:'update_app_popup_config', data: { dismissDays, showDelaySec, maxShows } }),
+    })
+    const data = await res.json()
+    if (res.ok) {
+      _appPopupDismissDays = data.appPopupDismissDays
+      _appPopupShowDelaySec = data.appPopupShowDelaySec
+      _appPopupMaxShows = data.appPopupMaxShows
+      renderAppPopupConfig()
+      showFeedback('app-popup-config-feedback', '✓ ' + data.message, true)
+    } else { showFeedback('app-popup-config-feedback', '✗ ' + data.error, false) }
+  } catch { showFeedback('app-popup-config-feedback', '✗ Erreur réseau.', false) }
 }
 
 /* ── Onglets visibles ── */
@@ -10499,6 +10557,9 @@ async function loadHiddenTabsForUser() {
     if (Array.isArray(data.tabOrder)) _tabOrder = data.tabOrder
     if (typeof data.faqVotesEnabled === 'boolean') _faqVotesEnabled = data.faqVotesEnabled
     if (typeof data.appPopupEnabled === 'boolean') _appPopupEnabled = data.appPopupEnabled
+    if (typeof data.appPopupDismissDays === 'number') _appPopupDismissDays = data.appPopupDismissDays
+    if (typeof data.appPopupShowDelaySec === 'number') _appPopupShowDelaySec = data.appPopupShowDelaySec
+    if ('appPopupMaxShows' in data) _appPopupMaxShows = data.appPopupMaxShows
     applyHiddenTabs()
     applyDockOrder()
   } catch(e) { console.error('[loadHiddenTabsForUser]', e) }
@@ -10905,6 +10966,10 @@ async function loadOtherActionsConfig() {
     updateForgotUsernameBtn()
     _appPopupEnabled = data.appPopupEnabled ?? true
     updateAppPopupBtn()
+    _appPopupDismissDays = data.appPopupDismissDays ?? 7
+    _appPopupShowDelaySec = data.appPopupShowDelaySec ?? 4
+    _appPopupMaxShows = data.appPopupMaxShows ?? null
+    renderAppPopupConfig()
   } catch(e) { console.error('[loadOtherActionsConfig]', e) }
 }
 
@@ -12479,9 +12544,14 @@ async function deleteMedal(id) {
   // ─────────────────────────────────────────────────────────────────────────
   // 2. BANNIÈRE D'INSTALLATION
   // ─────────────────────────────────────────────────────────────────────────
-  const DISMISS_KEY   = 'pwa_install_dismissed'
-  const DISMISS_DAYS  = 7    // ne plus montrer pendant 7 jours après fermeture
-  const SHOW_DELAY_MS = 4000 // attendre 4s après chargement avant de montrer
+  const DISMISS_KEY     = 'pwa_install_dismissed'
+  const SHOW_COUNT_KEY  = 'pwa_install_show_count'
+  // Valeurs par défaut si la config admin n'a pas encore été chargée
+  // (_appPopupDismissDays / _appPopupShowDelaySec / _appPopupMaxShows sont
+  // des variables globales, mises à jour par loadHiddenTabsForUser()).
+  function _dismissDays()  { return (typeof _appPopupDismissDays === 'number') ? _appPopupDismissDays : 7 }
+  function _showDelayMs()  { return ((typeof _appPopupShowDelaySec === 'number') ? _appPopupShowDelaySec : 4) * 1000 }
+  function _maxShows()     { return (typeof _appPopupMaxShows !== 'undefined') ? _appPopupMaxShows : null } // null = illimité
 
   let _installPrompt = null  // stocke l'événement beforeinstallprompt
 
@@ -12494,8 +12564,21 @@ async function deleteMedal(id) {
   function _isDismissed() {
     try {
       const ts = parseInt(localStorage.getItem(DISMISS_KEY) || '0', 10)
-      return ts && (Date.now() - ts) < DISMISS_DAYS * 864e5
+      return ts && (Date.now() - ts) < _dismissDays() * 864e5
     } catch { return false }
+  }
+
+  function _getShowCount() {
+    try { return parseInt(localStorage.getItem(SHOW_COUNT_KEY) || '0', 10) || 0 } catch { return 0 }
+  }
+
+  function _incrementShowCount() {
+    try { localStorage.setItem(SHOW_COUNT_KEY, String(_getShowCount() + 1)) } catch {}
+  }
+
+  function _maxShowsReached() {
+    const max = _maxShows()
+    return typeof max === 'number' && max > 0 && _getShowCount() >= max
   }
 
   function _isIOS() {
@@ -12514,6 +12597,7 @@ async function deleteMedal(id) {
     // Forcer un reflow pour que la transition CSS s'applique
     void el.offsetWidth
     el.classList.add('visible')
+    _incrementShowCount()
   }
 
   function _hideBanner(id) {
@@ -12541,11 +12625,16 @@ async function deleteMedal(id) {
   window.pwaDismiss = function () {
     _hideBanner('pwa-install-banner')
     _hideBanner('pwa-ios-hint')
-    // Mémoriser le refus pendant DISMISS_DAYS jours
+    // Mémoriser le refus pendant le délai configuré par l'admin
     try { localStorage.setItem(DISMISS_KEY, String(Date.now())) } catch {}
   }
 
   // ── Logique d'affichage ───────────────────────────────────────────────────
+  // Chaque condition (activé, non refusé récemment, pas déjà installé, quota
+  // non atteint) est réévaluée juste avant l'affichage (après le délai), pour
+  // laisser le temps à la config admin (chargée après connexion) d'arriver.
+
+  function _appPopupIsEnabled() { return typeof _appPopupEnabled === 'undefined' || _appPopupEnabled }
 
   // Cas Android/Chrome : l'événement beforeinstallprompt se déclenche
   // automatiquement si le site est PWA-éligible et non encore installé.
@@ -12553,16 +12642,23 @@ async function deleteMedal(id) {
     e.preventDefault()   // bloquer la bannière native du navigateur
     _installPrompt = e
 
-    if (typeof _appPopupEnabled !== 'undefined' && !_appPopupEnabled) return
-    if (!_isDismissed() && !_isStandalone()) {
-      setTimeout(() => _showBanner('pwa-install-banner'), SHOW_DELAY_MS)
-    }
+    setTimeout(() => {
+      if (!_appPopupIsEnabled()) return
+      if (!_isDismissed() && !_isStandalone() && !_maxShowsReached()) {
+        _showBanner('pwa-install-banner')
+      }
+    }, _showDelayMs())
   })
 
   // Cas iOS Safari : pas d'événement, on détecte manuellement.
   // On affiche les instructions uniquement si l'app n'est pas déjà installée.
-  if ((typeof _appPopupEnabled === 'undefined' || _appPopupEnabled) && _isIOS() && !_isStandalone() && !_isDismissed()) {
-    setTimeout(() => _showBanner('pwa-ios-hint'), SHOW_DELAY_MS)
+  if (_isIOS() && !_isStandalone()) {
+    setTimeout(() => {
+      if (!_appPopupIsEnabled()) return
+      if (!_isDismissed() && !_isStandalone() && !_maxShowsReached()) {
+        _showBanner('pwa-ios-hint')
+      }
+    }, _showDelayMs())
   }
 
   // L'événement appinstalled se déclenche quand l'utilisateur accepte via

@@ -116,6 +116,18 @@ model TournamentState {
   tabOrder             String  @default("[]")
   // Configuration des malus (JSON array de strings). Vide = utiliser MALUS_LIST hardcodé.
   malusConfig          String  @default("[]")
+  // Pouces "Utile / Pas utile" sous les sujets de la FAQ, côté joueur
+  faqVotesEnabled       Boolean @default(true)
+  // Lien "Pseudo oublié ?" sur l'écran de connexion
+  forgotUsernameEnabled Boolean @default(true)
+  // Pop-up / bannière proposant d'installer l'application (PWA)
+  appPopupEnabled       Boolean @default(true)
+  // Délai avant réaffichage après un refus (jours)
+  appPopupDismissDays   Int     @default(7)
+  // Délai avant la toute première apparition après connexion (secondes)
+  appPopupShowDelaySec  Int     @default(4)
+  // Nombre max d'apparitions total par joueur. null = illimité.
+  appPopupMaxShows      Int?
 }
 
 model Poule {
