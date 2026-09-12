@@ -41,7 +41,13 @@ const prisma = global._prisma
 
 const ADMIN_USERNAMES = ['admin', 'root']
 const VALID_CATEGORIES = ['N', 'R', 'D', 'P', 'NC']
-const MYFFBAD_BASE = 'https://myffbad.fr/recherche/joueur?league=12&committee=67&club=2359&isFirstLoad=false'
+// MYFFBAD a refondu son site (2026) : l'ancienne URL de recherche paginée
+// (/recherche/joueur?league=...&committee=...&club=...) a été remplacée par
+// une page dédiée par club. On y récupère les données via le JSON Next.js
+// embarqué (__NEXT_DATA__) plutôt que par un tableau HTML, plus robuste face
+// aux changements de mise en page.
+const MYFFBAD_CLUB_ID = 2359
+const MYFFBAD_CLUB_URL = `https://myffbad.fr/club/${MYFFBAD_CLUB_ID}`
 
 // Format d'un hash Argon2 encodé (ex: $argon2id$v=19$m=65536,t=3,p=1$<salt>$<hash>)
 const ARGON2_HASH_REGEX = /^\$argon2(id|i|d)\$v=\d+\$m=\d+,t=\d+,p=\d+\$[A-Za-z0-9+/]+\$[A-Za-z0-9+/]+$/
