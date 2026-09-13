@@ -132,37 +132,20 @@ Voici un petit récapitulatif des statuts des matchs si jamais ce n'était pas t
 
 - Médaille en ligne 
 
-a.fillon256 DONE
-a.fillon258 DONE
-a.fillon257 DONE
-a.fillon657 DONE
-a.fillon2008 DONE
-
-
-modifs : index, matches
-
-- Beugs done
-- Générer pdf de fin de saison done
-- mise à jour auto de l'app done
-- éditer la charte done
-- Création auto groupe renard choquant/choqués : moitié meilleurs poules done 
-- forfait joueur done
-- barre de chargement joueurs ayant installé la mise à jour / joueur totaux + historique d'installation (date, heure, adresse ip de la même manière que pour les connexions et les suivis de notifications) done
-- beug clique matchs joueurs done
-
+- Beugs 
+- Générer pdf de fin de saison 
+- mise à jour auto de l'app 
+- éditer la charte 
+- Création auto groupe renard choquant/choqués : moitié meilleurs poules  
+- forfait joueur 
+- barre de chargement joueurs ayant installé la mise à jour / joueur totaux + historique d'installation (date, heure, adresse ip de la même manière que pour les connexions et les suivis de notifications) 
+- beug clique matchs joueurs 
 - snapshot base de donnée à vérifier (stats faq, malus supprimés, médaille supprimée, article faq modifiée ou supprimée, article charte modifiée ou supprimée, mise à jour modifiée ou supprimée, utilisateurs supprimés, utilisateurs dont l'inscription a été refusée)
 - option suppression badges gris 
 - maj PWA
 - livraison version finale
 
 
-Correction de 20 bugs mineurs dans le but de renforcer le bon fonctionnement du site
-Possibilité de générer un pdf récapitulatif de fin de saison dans actions et autres
-Article FAQ modifié — FAQ_TOPIC snapshoté avant écrasement (en plus de la suppression déjà couverte)
-Article de charte modifié — CHARTE_ARTICLE snapshoté avant écrasement
-Mise à jour du site modifiée — SITE_UPDATE snapshoté avant écrasement
-Médaille supprimée — nouveau logDeletion(tx, 'MEDAL', [medalId]) avant delete
-Malus supprimés — cas particulier : la config malus vit dans un unique champ JSON (TournamentState.malusConfig), pas de ligne par malus. J'ai comparé l'ancienne liste complète à la nouvelle pour détecter les entrées réellement retirées (pas juste désactivées), et j'écris directement une ligne DataVersion (entityType: 'MALUS') avec le payload des malus supprimés, rétention 30 jours comme le reste.
 
 
 

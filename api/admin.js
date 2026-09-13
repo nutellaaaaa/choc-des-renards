@@ -41,21 +41,13 @@ const prisma = global._prisma
 
 const ADMIN_USERNAMES = ['admin', 'root']
 const VALID_CATEGORIES = ['N', 'R', 'D', 'P', 'NC']
-// CORRECTIF (vérifié sur une page club fraîchement récupérée, sept. 2026) :
-// contrairement à ce qu'indiquait un commentaire précédent, MYFFBAD n'a PAS
-// remplacé /recherche/joueur par une page unique par club. Le site est
-// passé sous Next.js App Router (payload RSC en streaming, pas de
-// __NEXT_DATA__ à la Pages Router), mais la route de recherche paginée
-// existe toujours et son tableau HTML (<table><thead>/<tbody>) est bien
-// rendu côté serveur en clair — d'où le maintien du parsing cheerio
-// ci-dessous. La constante MYFFBAD_CLUB_URL (page /club/:id, qui affiche les
-// créneaux/infos du club et non la liste des joueurs) avait été introduite
-// par erreur et n'était utilisée nulle part : c'était la cause du crash
-// "MYFFBAD_BASE is not defined" au moment du scraping.
-const MYFFBAD_LEAGUE_ID = 12
-const MYFFBAD_COMMITTEE_ID = 67
+// MYFFBAD a refondu son site (2026) : l'ancienne URL de recherche paginée
+// (/recherche/joueur?league=...&committee=...&club=...) a été remplacée par
+// une page dédiée par club. On y récupère les données via le JSON Next.js
+// embarqué (__NEXT_DATA__) plutôt que par un tableau HTML, plus robuste face
+// aux changements de mise en page.
 const MYFFBAD_CLUB_ID = 2359
-const MYFFBAD_BASE = `https://myffbad.fr/recherche/joueur?league=${MYFFBAD_LEAGUE_ID}&committee=${MYFFBAD_COMMITTEE_ID}&club=${MYFFBAD_CLUB_ID}&isFirstLoad=false`
+const MYFFBAD_CLUB_URL = `https://myffbad.fr/club/${MYFFBAD_CLUB_ID}`
 
 // Format d'un hash Argon2 encodé (ex: $argon2id$v=19$m=65536,t=3,p=1$<salt>$<hash>)
 const ARGON2_HASH_REGEX = /^\$argon2(id|i|d)\$v=\d+\$m=\d+,t=\d+,p=\d+\$[A-Za-z0-9+/]+\$[A-Za-z0-9+/]+$/
@@ -228,8 +220,8 @@ async function pickRandomMalusWithConcurrency(malusList) {
 // Rang de classement, du plus faible au plus fort (FFBad) — utilisé pour le malus automatique
 const CATEGORY_RANK = { NC: 0, P: 1, D: 2, R: 3, N: 4 }
 // Écarts de classement qui déclenchent un malus automatique pour compenser l'écart
-// N/DC → N vs NC ; D/NC ; P/NC ajoutés en plus de P/R, P/N, D/N
-const AUTO_MALUS_PAIRS = [['P', 'R'], ['P', 'N'], ['D', 'N'], ['N', 'NC'], ['D', 'NC'], ['P', 'NC']]
+// N/DC → N vs NC ; D/NC ; P/NC ajoutés en plus de P/R, P/N, D/N ; R/NC ajouté également
+const AUTO_MALUS_PAIRS = [['P', 'R'], ['P', 'N'], ['D', 'N'], ['N', 'NC'], ['D', 'NC'], ['P', 'NC'], ['R', 'NC']]
 
 function pickRandomMalus(list) {
   const src = list || MALUS_LIST
@@ -314,39 +306,6 @@ function normName(s) {
     .replace(/[^a-z]/g, '')
 }
 
-// Extrait un tableau JSON embarqué dans le payload React Server Components
-// (Next.js App Router en streaming). Le site n'expose plus les résultats de
-// recherche joueur via un <table> HTML exploitable : les données sont
-// dupliquées telles quelles (JSON) dans un <script>self.__next_f.push(...)
-// </script>, avec les guillemets échappés (\") puisqu'elles sont elles-mêmes
-// à l'intérieur d'une chaîne JS. On repère le tableau par sa clé, on compte
-// les crochets en ignorant les caractères échappés, puis on déséchappe et on
-// parse. Vérifié le 12/09/2026 sur une page réelle : le tableau contient des
-// objets {PersonName, PersonLicence, SimpleSubLevel, DoubleSubLevel,
-// MixteSubLevel, ClubId, ...} — bien plus fiable que parser le <table> visible
-// (dont la colonne "S/D/M" affiche 3 badges accolés sans séparateur, ce qui
-// cassait déjà l'ancien parsing cheerio avant même le souci réseau).
-function extractEscapedJSONArray(html, key) {
-  const marker = `\\"${key}\\":[`
-  const idx = html.indexOf(marker)
-  if (idx === -1) return null
-  const start = idx + marker.length - 1
-  let depth = 0
-  let i = start
-  for (; i < html.length; i++) {
-    const c = html[i]
-    if (c === '\\') { i++; continue } // saute le caractère échappé suivant
-    if (c === '[') depth++
-    else if (c === ']') { depth--; if (depth === 0) { i++; break } }
-  }
-  const raw = html.slice(start, i)
-  try {
-    return JSON.parse(raw.replace(/\\"/g, '"'))
-  } catch {
-    return null
-  }
-}
-
 // Scrape toutes les pages du club sur MYFFBAD et renvoie { scraped, logs }
 async function scrapeMyffbadClub() {
   const logs = []
@@ -371,8 +330,7 @@ async function scrapeMyffbadClub() {
     return err.message || String(err)
   }
 
-  let maxPages = 1
-  for (let page = 1; page <= Math.min(Math.max(maxPages, 1), MAX_PAGES); page++) {
+  for (let page = 1; page <= MAX_PAGES; page++) {
     const url = `${MYFFBAD_BASE}&page=${page}`
     let html
     const controller = new AbortController()
@@ -401,7 +359,7 @@ async function scrapeMyffbadClub() {
       logs.push({ ok: false, message: `Page ${page} : erreur réseau (${reason}).` })
       // Si la toute première page échoue au niveau réseau (pas juste HTTP),
       // c'est probablement MYFFBAD qui est indisponible ou qui bloque nos
-      // requêtes — inutile d'insister sur les pages suivantes.
+      // requêtes — inutile d'insister sur les 14 pages suivantes.
       if (page === 1) {
         logs.push({ ok: false, message: "Vérifiez que myffbad.fr est bien accessible (le site a connu des incidents/mises à jour de sécurité en 2026) et réessayez dans quelques minutes." })
       }
@@ -410,92 +368,31 @@ async function scrapeMyffbadClub() {
       clearTimeout(timer)
     }
 
-    const results = extractEscapedJSONArray(html, 'results')
-    if (!results) {
-      logs.push({ ok: false, message: `Page ${page} : impossible de lire les résultats (structure de page inattendue — le site a peut-être encore changé).` })
+    const $ = cheerio.load(html)
+    const rows = $('table tbody tr')
+    if (rows.length === 0) {
+      logs.push({ ok: true, message: `Page ${page} : aucune ligne — fin de la pagination.` })
       break
     }
 
-    if (page === 1) {
-      const maxPagesMatch = html.match(/\\"maxPages\\":(\d+)/)
-      if (maxPagesMatch) maxPages = parseInt(maxPagesMatch[1], 10) || 1
-    }
-
     let countOnPage = 0
-    for (const p of results) {
-      const fullName = (p.PersonName || '').trim()
-      if (!fullName) continue
-      // SimpleSubLevel est déjà au format attendu par le comparateur plus bas
-      // (ex: "D9", "N2", "NC", "-"), pas besoin de le retokeniser.
-      scraped.push({ fullName, simpleToken: p.SimpleSubLevel || '' })
+    rows.each((i, tr) => {
+      const tds = $(tr).find('td')
+      if (tds.length < 5) return
+      const fullName = $(tds[0]).text().trim().replace(/\s+/g, ' ')
+      if (!fullName) return
+      const sdmText = $(tds[4]).text().trim()
+      const tokens = sdmText.split(/\s+/).filter(Boolean)
+      const simpleToken = tokens[0] || ''
+      scraped.push({ fullName, simpleToken })
       countOnPage++
-    }
+    })
     logs.push({ ok: true, message: `Page ${page} : ${countOnPage} joueur(s) récupéré(s).` })
 
     if (countOnPage === 0) break
   }
 
   return { scraped, logs }
-}
-
-// Compare une liste { fullName, simpleToken }[] (issue du scraping ou d'un
-// import CSV manuel) aux joueurs de la base, et propose les changements de
-// catégorie. Logique extraite de scrape_myffbad pour être partagée avec
-// import_myffbad_csv (solution de repli tant que le blocage réseau
-// Vercel→myffbad.fr n'est pas résolu).
-async function compareMyffbadScrapeToUsers(scraped) {
-  const users = await prisma.user.findMany({
-    where: { username: { notIn: ADMIN_USERNAMES }, isBot: false },
-    select: { id: true, firstName: true, lastName: true, category: true, username: true },
-  })
-
-  const normedScraped = scraped.map(s => ({ ...s, norm: normName(s.fullName) }))
-
-  const results = []
-  for (const u of users) {
-    const displayName = `${u.firstName} ${u.lastName}`
-    const key1 = normName(u.firstName + u.lastName)
-    const key2 = normName(u.lastName + u.firstName)
-    const match = normedScraped.find(s => s.norm === key1 || s.norm === key2)
-
-    if (!match) {
-      results.push({
-        userId: u.id, name: displayName, found: false, changed: false,
-        message: `${displayName} : non trouvé sur MYFFBAD.`,
-      })
-      continue
-    }
-
-    const m = (match.simpleToken || '').match(/^([A-Z]+)/)
-    const letter = m ? m[1] : null
-
-    if (!letter || !VALID_CATEGORIES.includes(letter)) {
-      results.push({
-        userId: u.id, name: displayName, found: true, changed: false,
-        message: `${displayName} : classement simple non disponible (« ${match.simpleToken || '—'} »), catégorie inchangée.`,
-      })
-      continue
-    }
-
-    if (letter === u.category) {
-      results.push({
-        userId: u.id, name: displayName, found: true, changed: false,
-        message: `${displayName} : classement inchangé (${letter}).`,
-      })
-    } else {
-      results.push({
-        userId: u.id, name: displayName, found: true, changed: true,
-        from: u.category, to: letter,
-        message: `${displayName} : classement ${u.category} → ${letter} (en attente de confirmation).`,
-      })
-    }
-  }
-
-  return {
-    results,
-    changedCount: results.filter(r => r.changed).length,
-    notFoundCount: results.filter(r => !r.found).length,
-  }
 }
 
 module.exports = async function handler(req, res) {
@@ -779,7 +676,7 @@ const CHARTE_SEED = [
   {
     title: 'Bonus & Malus',
     items: [
-      { subtitle: null, content: "Afin d'équilibrer certains affrontements, des **désavantages** seront attribués au joueur le mieux classé dans les cas suivants : **P contre R**, **P contre N** ou **D contre N**.\n\nLe malus est tiré au sort parmi la liste suivante :\n- Interdiction de smasher ou de tendre droit\n- Porter un cache-œil\n- Interdiction de taper le volant au-dessus de la bande\n- Jouer en demi-terrain pour le joueur le moins bien classé (le demi-terrain change selon le service en cours)\n- Jouer avec une raquette courte\n- Jouer avec une raquette lestée\n- Jouer avec une raquette de précision\n- Jouer avec un bras dans le dos constamment\n- Interdiction de faire un coup droit\n- Interdiction de faire un revers\n- Annoncer chaque coup à voix haute avant de le jouer\n- Les couloirs font partie du terrain du joueur le plus classé\n- Les points du joueur le moins classé comptent double\n- Le point est marqué par le joueur le mieux classé uniquement s'il touche le sol avant la raquette de l'adversaire\n- Le joueur le moins classé marque le point\n- Zone restrictive changeant à chaque set : rivière, box, couloir du fond, box puis rivière" },
+      { subtitle: null, content: "Afin d'équilibrer certains affrontements, des **désavantages** seront attribués au joueur le mieux classé dans les cas suivants : **P contre R**, **P contre N**, **D contre N**, **N contre NC**, **D contre NC**, **P contre NC** ou **R contre NC**.\n\nLe malus est tiré au sort parmi la liste suivante :\n- Interdiction de smasher ou de tendre droit\n- Porter un cache-œil\n- Interdiction de taper le volant au-dessus de la bande\n- Jouer en demi-terrain pour le joueur le moins bien classé (le demi-terrain change selon le service en cours)\n- Jouer avec une raquette courte\n- Jouer avec une raquette lestée\n- Jouer avec une raquette de précision\n- Jouer avec un bras dans le dos constamment\n- Interdiction de faire un coup droit\n- Interdiction de faire un revers\n- Annoncer chaque coup à voix haute avant de le jouer\n- Les couloirs font partie du terrain du joueur le plus classé\n- Les points du joueur le moins classé comptent double\n- Le point est marqué par le joueur le mieux classé uniquement s'il touche le sol avant la raquette de l'adversaire\n- Le joueur le moins classé marque le point\n- Zone restrictive changeant à chaque set : rivière, box, couloir du fond, box puis rivière" },
     ],
   },
   {
@@ -1999,9 +1896,10 @@ async function handleAction(req, res) {
   const globalActions = [
     'suspend_site', 'unsuspend_site', 'force_logout_all',
     'reset_all_matches', 'reset_all_notifications', 'deactivate_all_players',
-    'scrape_myffbad', 'apply_myffbad_changes', 'reset_faq_stats', 'debug_network',
+    'scrape_myffbad', 'apply_myffbad_changes', 'reset_faq_stats',
     'toggle_auto_reminders', 'send_reminders_manual',
     'toggle_faq_votes', 'toggle_forgot_username', 'toggle_app_popup', 'update_app_popup_config',
+    'dedupe_planned_matches', 'cleanup_orphaned_notifications',
     'update_hidden_tabs', 'update_malus_config',
     'generate_season_pdf',
   ]
@@ -2095,60 +1993,180 @@ async function handleAction(req, res) {
           })
         }
 
-        case 'debug_network': {
-          // Diagnostic temporaire : compare une requête vers un site témoin
-          // (toujours joignable) et une vers myffbad.fr, avec le même timeout
-          // que le scraper réel. Si le témoin réussit et myffbad.fr échoue
-          // systématiquement en UND_ERR_CONNECT_TIMEOUT, ça confirme un
-          // blocage réseau spécifique à myffbad.fr (probablement anti-bot
-          // contre les IPs "datacenter" de Vercel) plutôt qu'un souci Vercel
-          // général. À retirer une fois le diagnostic confirmé.
-          async function testConnectivity(url, timeoutMs) {
-            const controller = new AbortController()
-            const timer = setTimeout(() => controller.abort(), timeoutMs)
-            const startedAt = Date.now()
-            try {
-              const r = await fetch(url, {
-                signal: controller.signal,
-                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' },
-              })
-              return { url, ok: true, status: r.status, ms: Date.now() - startedAt }
-            } catch (e) {
-              const cause = e.cause
-              const code = cause?.code || cause?.errno
-              const message = e.name === 'AbortError'
-                ? `délai dépassé (${timeoutMs / 1000}s)`
-                : (cause ? `${cause.message || String(cause)}${code ? ` [${code}]` : ''}` : (e.message || String(e)))
-              return { url, ok: false, error: message, ms: Date.now() - startedAt }
-            } finally {
-              clearTimeout(timer)
-            }
+        // Nettoyage des PlannedMatch en double pour une même paire de joueurs
+        // + phase (cf. bug fix de getExistingPairKeys ci-dessus : un recalcul
+        // de ronde pouvait auparavant créer un second PlannedMatch identique,
+        // avec un malus potentiellement différent si la config avait changé
+        // entre-temps). Corrige les doublons déjà en base ; les nouveaux
+        // calculs n'en créeront plus grâce au fix de getExistingPairKeys.
+        case 'dedupe_planned_matches': {
+          const all = await prisma.plannedMatch.findMany({
+            where: { forfeited: false },
+            orderBy: { createdAt: 'asc' },
+            include: {
+              player1: { select: { firstName: true, lastName: true } },
+              player2: { select: { firstName: true, lastName: true } },
+            },
+          })
+
+          const groups = new Map()
+          for (const pm of all) {
+            const key = `${pm.phase}:${[pm.player1Id, pm.player2Id].sort((a, b) => a - b).join('-')}`
+            if (!groups.has(key)) groups.set(key, [])
+            groups.get(key).push(pm)
           }
 
-          const [control, target] = await Promise.all([
-            testConnectivity('https://example.com/', 10000),
-            testConnectivity('https://myffbad.fr/', 10000),
-          ])
+          const toDelete = []
+          const report = []
+          for (const group of groups.values()) {
+            if (group.length < 2) continue
+            // On garde en priorité celui déjà notifié aux joueurs (pour ne pas
+            // invalider une notification déjà envoyée) ; sinon le plus ancien.
+            const keeper = group.find(pm => pm.notifiedAt) || group[0]
+            const dupes = group.filter(pm => pm.id !== keeper.id)
+            for (const d of dupes) toDelete.push(d.id)
+            report.push(
+              `${keeper.player1.firstName} ${keeper.player1.lastName} vs ${keeper.player2.firstName} ${keeper.player2.lastName}` +
+              ` (${keeper.phase}) : conservé #${keeper.id}${keeper.notifiedAt ? ' (déjà notifié)' : ''}` +
+              ` — supprimé ${dupes.map(d => `#${d.id}${d.malus ? ` [malus: ${d.malus}]` : ''}`).join(', ')}.`
+            )
+          }
 
-          const diagnosis = control.ok && !target.ok
-            ? 'Blocage probablement spécifique à myffbad.fr (le site témoin est joignable, pas myffbad.fr) — vraisemblablement un blocage réseau côté MYFFBAD contre les IPs datacenter de Vercel.'
-            : (!control.ok
-              ? 'Le site témoin est lui aussi injoignable — le problème semble être un souci réseau général côté Vercel, pas spécifique à myffbad.fr.'
-              : 'myffbad.fr est joignable depuis Vercel en ce moment — le blocage réseau semble intermittent ou résolu.')
+          if (toDelete.length === 0) {
+            return res.status(200).json({ ok: true, removed: 0, report: [], message: 'Aucun doublon trouvé.' })
+          }
+
+          // BUG FIX (Issue 3) : chaque PlannedMatch génère sa propre Notification
+          // "Prochain match programmé" par joueur. Un doublon = une notification en
+          // trop, qu'un joueur peut avoir laissée non lue même après avoir pris
+          // connaissance du "vrai" match — elle ne disparaissait jamais (le lien
+          // plannedMatchId passait juste à NULL). On supprime maintenant ces
+          // notifications (et messages WhatsApp non envoyés) orphelines en même
+          // temps que leur PlannedMatch en double.
+          let deletedNotifs = 0
+          await prisma.$transaction(async (tx) => {
+            const r1 = await tx.notification.deleteMany({ where: { plannedMatchId: { in: toDelete } } })
+            deletedNotifs = r1.count
+            await tx.whatsappMessage.deleteMany({ where: { plannedMatchId: { in: toDelete }, sent: false } })
+            await tx.plannedMatch.deleteMany({ where: { id: { in: toDelete } } })
+          })
 
           return res.status(200).json({
             ok: true,
-            control,
-            target,
-            diagnosis,
+            removed: toDelete.length,
+            report,
+            message: `${toDelete.length} match(s) en double supprimé(s) (${report.length} paire(s) concernée(s))` +
+              (deletedNotifs ? `, ${deletedNotifs} notification(s) orpheline(s) nettoyée(s)` : '') + '.',
+          })
+        }
+
+        // Nettoyage des notifications et alertes admin devenues orphelines : liées
+        // à un match planifié ou à un utilisateur qui n'existe plus en base (ex:
+        // match supprimé directement via "planned_delete" sans passer par le
+        // nettoyage dédié de dedupe_planned_matches, utilisateur supprimé après
+        // qu'une notification lui ait déjà été envoyée). AdminAlert stocke sa
+        // référence au match (plannedMatchId) dans un champ JSON "meta" — pas une
+        // vraie clé étrangère — donc rien ne la nettoie automatiquement quand le
+        // match est supprimé.
+        case 'cleanup_orphaned_notifications': {
+          const [allNotifs, allUsers, allPlanned, alertRows] = await Promise.all([
+            prisma.notification.findMany({ select: { id: true, userId: true, plannedMatchId: true } }),
+            prisma.user.findMany({ select: { id: true } }),
+            prisma.plannedMatch.findMany({ select: { id: true } }),
+            prisma.adminAlert.findMany({
+              where: { type: { in: ['malus_reassigned', 'malus_reassign_failed'] } },
+              select: { id: true, meta: true },
+            }),
+          ])
+
+          const validUserIds = new Set(allUsers.map(u => u.id))
+          const validPlannedIds = new Set(allPlanned.map(p => p.id))
+
+          const notifToDelete = allNotifs
+            .filter(n => !validUserIds.has(n.userId) || (n.plannedMatchId && !validPlannedIds.has(n.plannedMatchId)))
+            .map(n => n.id)
+
+          const orphanAlerts = alertRows
+            .filter(a => {
+              const pmId = a.meta && typeof a.meta === 'object' ? a.meta.plannedMatchId : null
+              return pmId != null && !validPlannedIds.has(pmId)
+            })
+            .map(a => a.id)
+
+          if (notifToDelete.length === 0 && orphanAlerts.length === 0) {
+            return res.status(200).json({
+              ok: true, removedNotifications: 0, removedAlerts: 0,
+              message: 'Aucune notification ou alerte orpheline trouvée.',
+            })
+          }
+
+          await prisma.$transaction(async (tx) => {
+            if (notifToDelete.length > 0) await tx.notification.deleteMany({ where: { id: { in: notifToDelete } } })
+            if (orphanAlerts.length > 0) await tx.adminAlert.deleteMany({ where: { id: { in: orphanAlerts } } })
+          })
+
+          return res.status(200).json({
+            ok: true,
+            removedNotifications: notifToDelete.length,
+            removedAlerts: orphanAlerts.length,
+            message: `${notifToDelete.length} notification(s) orpheline(s) et ${orphanAlerts.length} alerte(s) orpheline(s) supprimée(s).`,
           })
         }
 
         case 'scrape_myffbad': {
           const { scraped, logs } = await scrapeMyffbadClub()
+
           logs.push({ ok: true, message: `── Total récupéré sur MYFFBAD : ${scraped.length} joueur(s). ──` })
 
-          const { results, changedCount, notFoundCount } = await compareMyffbadScrapeToUsers(scraped)
+          const users = await prisma.user.findMany({
+            where: { username: { notIn: ADMIN_USERNAMES }, isBot: false },
+            select: { id: true, firstName: true, lastName: true, category: true, username: true },
+          })
+
+          const normedScraped = scraped.map(s => ({ ...s, norm: normName(s.fullName) }))
+
+          const results = []
+          for (const u of users) {
+            const displayName = `${u.firstName} ${u.lastName}`
+            const key1 = normName(u.firstName + u.lastName)
+            const key2 = normName(u.lastName + u.firstName)
+            const match = normedScraped.find(s => s.norm === key1 || s.norm === key2)
+
+            if (!match) {
+              results.push({
+                userId: u.id, name: displayName, found: false, changed: false,
+                message: `${displayName} : non trouvé sur MYFFBAD.`,
+              })
+              continue
+            }
+
+            const m = match.simpleToken.match(/^([A-Z]+)/)
+            const letter = m ? m[1] : null
+
+            if (!letter || !VALID_CATEGORIES.includes(letter)) {
+              results.push({
+                userId: u.id, name: displayName, found: true, changed: false,
+                message: `${displayName} : classement simple non disponible (« ${match.simpleToken || '—'} »), catégorie inchangée.`,
+              })
+              continue
+            }
+
+            if (letter === u.category) {
+              results.push({
+                userId: u.id, name: displayName, found: true, changed: false,
+                message: `${displayName} : classement inchangé (${letter}).`,
+              })
+            } else {
+              results.push({
+                userId: u.id, name: displayName, found: true, changed: true,
+                from: u.category, to: letter,
+                message: `${displayName} : classement ${u.category} → ${letter} (en attente de confirmation).`,
+              })
+            }
+          }
+
+          const changedCount = results.filter(r => r.changed).length
+          const notFoundCount = results.filter(r => !r.found).length
 
           return res.status(200).json({
             ok: true,
@@ -2158,46 +2176,6 @@ async function handleAction(req, res) {
             changedCount,
             notFoundCount,
             message: `Comparaison MYFFBAD terminée : ${changedCount} changement(s) proposé(s), ${notFoundCount} joueur(s) non trouvé(s).`,
-          })
-        }
-
-        case 'import_myffbad_csv': {
-          // Solution de repli le temps que le blocage réseau Vercel→myffbad.fr
-          // soit résolu (proxy, autre hébergement, etc.) : l'admin exporte/
-          // télécharge la page de recherche joueurs depuis son propre
-          // navigateur et colle le CSV ici. Réutilise exactement la même
-          // logique de comparaison que le scraping automatique — seule la
-          // source des données change.
-          // Format attendu : une ligne par joueur, "Nom Complet,ClassementSimple"
-          // (ex: "Ismaël AHOUNOU,D9"), avec ou sans ligne d'en-tête.
-          const { csv } = req.body || {}
-          if (!csv || typeof csv !== 'string' || !csv.trim()) {
-            return res.status(400).json({ error: 'Contenu CSV requis (champ "csv").' })
-          }
-
-          const lines = csv.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
-          const scraped = []
-          for (const line of lines) {
-            const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
-            if (cols.length < 2) continue
-            const [fullName, simpleToken] = cols
-            if (!fullName || /^(nom|name|joueur)/i.test(fullName)) continue // ignore une éventuelle ligne d'en-tête
-            scraped.push({ fullName, simpleToken: simpleToken || '' })
-          }
-
-          if (scraped.length === 0) {
-            return res.status(400).json({ error: 'Aucune ligne exploitable dans le CSV fourni (attendu : "Nom Complet,Classement" par ligne).' })
-          }
-
-          const { results, changedCount, notFoundCount } = await compareMyffbadScrapeToUsers(scraped)
-
-          return res.status(200).json({
-            ok: true,
-            results,
-            totalScraped: scraped.length,
-            changedCount,
-            notFoundCount,
-            message: `Comparaison (import manuel) terminée : ${changedCount} changement(s) proposé(s), ${notFoundCount} joueur(s) non trouvé(s) sur ${scraped.length} ligne(s) importée(s).`,
           })
         }
 
@@ -3643,21 +3621,36 @@ function shiftPastBlackouts(date, blackouts) {
 // Résultat : la fenêtre est coupée en deux (avant + après les vacances)
 // tout en conservant le même nombre de jours jouables.
 // Itère car l'extension peut elle-même chevaucher un autre blackout.
+//
+// BUG FIX : la version précédente ne marquait jamais un blackout comme
+// "déjà compensé". Comme bp.dateEnd ne bouge pas et que `deadline` ne fait
+// que croître, le même blackout repassait le test de chevauchement à
+// CHAQUE tour de boucle (overlapEnd = min(bp.dateEnd, deadline) restait égal
+// à bp.dateEnd dès que deadline le dépassait) → il était réappliqué encore
+// et encore jusqu'à la limite de sécurité (guard=50), gonflant la deadline
+// de façon démesurée (ex: +7 jours de vacances comptés jusqu'à 50 fois).
+// On marque maintenant chaque blackout comme compensé dès qu'il a été pris
+// en compte une fois, tout en continuant d'itérer pour les blackouts encore
+// non traités qui pourraient être révélés par une extension précédente.
 function extendDeadlineForBlackouts(windowStart, rawDeadline, blackouts) {
   let deadline = new Date(rawDeadline)
+  const counted = new Set()
   let moved = true
   let guard = 0
   while (moved && guard < 50) {
     moved = false
     guard++
-    for (const bp of blackouts) {
+    for (let i = 0; i < blackouts.length; i++) {
+      if (counted.has(i)) continue
+      const bp = blackouts[i]
       const overlapStart = bp.dateStart > windowStart ? bp.dateStart : windowStart
       const overlapEnd   = bp.dateEnd   < deadline    ? bp.dateEnd   : deadline
       if (overlapStart <= overlapEnd) {
         const blackoutDays = Math.round((overlapEnd.getTime() - overlapStart.getTime()) / MS_PER_DAY) + 1
         deadline = addDays(deadline, blackoutDays)
+        counted.add(i)
         moved = true
-        break // relancer : l'extension peut chevaucher un autre blackout
+        break // relancer : l'extension peut révéler le chevauchement d'un autre blackout
       }
     }
   }
@@ -3690,23 +3683,45 @@ function generateRoundRobinRounds(playerIds) {
   return rounds
 }
 
-// Construit l'ensemble des paires (userId1-userId2, triées) déjà jouées ou en attente de
-// publication pour une phase donnée, à partir des Match existants (comparaison par nom, le
-// modèle Match ne stocke pas d'opponentId — cf. planned_convert plus haut).
+// Construit l'ensemble des paires (userId1-userId2, triées) déjà jouées, en attente de
+// publication, OU déjà planifiées (PlannedMatch pas encore joué), pour une phase donnée.
+// BUG FIX (doublons) : cette fonction ne regardait auparavant que la table Match (résultats
+// déjà rentrés). Un PlannedMatch encore en attente (pas forfait, pas encore converti en Match)
+// n'y apparaît jamais — donc relancer le calcul d'une phase/ronde (par erreur, ou après avoir
+// ajusté des paramètres) recréait un DEUXIÈME PlannedMatch pour la même paire. Le round-robin
+// étant déterministe (pas aléatoire), les deux calculs produisent exactement les mêmes paires ;
+// seul le malus pouvait différer entre les deux si la configuration des malus avait changé
+// entre les deux exécutions (ce qui correspond exactement au symptôme observé : doublons avec
+// malus différents). On exclut donc aussi les paires déjà présentes dans PlannedMatch.
 async function getExistingPairKeys(phase, members) {
   const idByName = new Map()
   for (const m of members) idByName.set(normPersonName(m.firstName) + '|' + normPersonName(m.lastName), m.id)
 
-  const matches = await prisma.match.findMany({
-    where: { phase, userId: { in: members.map(m => m.id) } },
-    select: { userId: true, opponentFirstName: true, opponentLastName: true },
-  })
+  const memberIds = members.map(m => m.id)
+
+  const [matches, plannedMatches] = await Promise.all([
+    prisma.match.findMany({
+      where: { phase, userId: { in: memberIds } },
+      select: { userId: true, opponentFirstName: true, opponentLastName: true },
+    }),
+    prisma.plannedMatch.findMany({
+      where: {
+        phase,
+        OR: [{ player1Id: { in: memberIds } }, { player2Id: { in: memberIds } }],
+      },
+      select: { player1Id: true, player2Id: true },
+    }),
+  ])
 
   const keys = new Set()
   for (const m of matches) {
     const oppId = idByName.get(normPersonName(m.opponentFirstName) + '|' + normPersonName(m.opponentLastName))
     if (!oppId) continue
     const key = [m.userId, oppId].sort((a, b) => a - b).join('-')
+    keys.add(key)
+  }
+  for (const pm of plannedMatches) {
+    const key = [pm.player1Id, pm.player2Id].sort((a, b) => a - b).join('-')
     keys.add(key)
   }
   return keys

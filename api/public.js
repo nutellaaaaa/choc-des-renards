@@ -382,7 +382,10 @@ async function handleConvocations(req, res) {
           orderBy: { endDate: 'asc' },
         }),
         prisma.plannedMatch.findMany({
-          where: { forfeited: false, OR: [{ player1Id: uid }, { player2Id: uid }] },
+          // BUG FIX : un match planifié mais pas encore notifié ne doit pas
+          // apparaître côté joueur — sinon il voit un adversaire/une date
+          // avant même d'avoir reçu la notification officielle.
+          where: { forfeited: false, notifiedAt: { not: null }, OR: [{ player1Id: uid }, { player2Id: uid }] },
           orderBy: { scheduledDate: 'asc' },
         }),
       ])
@@ -419,14 +422,21 @@ async function handleConvocations(req, res) {
             roundNumber: m.roundNumber || null,
             reason: m.reason || null,
             note: m.note || null,
+            // Malus que CE joueur devra appliquer (null si aucun malus, ou si le malus
+            // concerne l'adversaire) — un match planifié peut avoir un malus, mais il ne
+            // s'applique qu'à un seul des deux joueurs (malusTarget).
+            malus: (m.malus && ((m.malusTarget === 1 && m.player1Id === uid) || (m.malusTarget === 2 && m.player2Id === uid))) ? m.malus : null,
           }
         }))
       }
 
       // Pour les rencontres spéciales, la date limite (endDate) bloque réellement la saisie.
-      // Pour les matchs planifiés, scheduledDate est juste indicative (pas de blocage dur).
+      // Pour les matchs planifiés, la date affichée doit être la fin de la fenêtre
+      // (deadlineAt), pas scheduledDate qui n'est que le DÉBUT de la période —
+      // sinon le joueur voit une deadline qui a déjà l'air dépassée dès le début
+      // de son cycle. Elle reste indicative (pas de blocage dur sur ce champ).
       const specialConv = await enrich(specials, 'special', 'endDate', true)
-      const plannedConv = await enrich(planned, 'planned', 'scheduledDate', false)
+      const plannedConv = await enrich(planned, 'planned', 'deadlineAt', false)
 
       const convocations = [...specialConv, ...plannedConv].sort((a, b) => {
         if (!a.deadline) return 1

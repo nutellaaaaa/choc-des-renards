@@ -3064,6 +3064,16 @@
           <button class="btn-sm btn-danger" onclick="otherAction('reset_faq_stats','⚠️ Supprimer TOUTES les données de visibilité de la FAQ (vues, avis, historique de consultation) pour tous les sujets ? Action irréversible.')">Réinitialiser les stats FAQ</button>
         </div>
         <div class="other-action-card">
+          <h4>🧹 Nettoyer les matchs planifiés en double</h4>
+          <p>Un recalcul de ronde pouvait par le passé créer deux fois le même match (même paire, même phase) — corrigé pour les prochains calculs. Cette action supprime les doublons déjà en base (conserve celui déjà notifié aux joueurs, sinon le plus ancien).</p>
+          <button class="btn-sm btn-danger" onclick="otherAction('dedupe_planned_matches','⚠️ Rechercher et supprimer les matchs planifiés en double (même paire, même phase) ? Le match conservé est celui déjà notifié aux joueurs, sinon le plus ancien.')">Nettoyer les doublons</button>
+        </div>
+        <div class="other-action-card">
+          <h4>🧹 Nettoyer les notifications et alertes orphelines</h4>
+          <p>Supprime les notifications et les alertes admin (⚡ Malus réassigné / ⚠️ Réassignation échouée) qui font encore référence à un match planifié ou à un utilisateur qui n'existe plus en base (supprimé depuis).</p>
+          <button class="btn-sm btn-danger" onclick="otherAction('cleanup_orphaned_notifications','⚠️ Rechercher et supprimer les notifications et alertes orphelines (liées à un match ou un utilisateur supprimé) ?')">Nettoyer les orphelines</button>
+        </div>
+        <div class="other-action-card">
           <h4>🔔 Rappels automatiques de score</h4>
           <p>Lorsqu'ils sont activés, les joueurs reçoivent une notification 48h avant la deadline d'un match si le score n'a pas encore été saisi. Vous pouvez aussi envoyer les rappels manuellement.</p>
           <div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:0.6rem">
@@ -5610,13 +5620,16 @@ async function loadScoreMatch() {
           ? `<div style="margin-top:0.25rem">⏰ ${c.type === 'special' ? 'Date limite' : 'Date prévue'} : <strong>${fmtDateOnly(c.deadline)}</strong></div>`
           : ''
         const reasonLine = c.reason ? `<div style="margin-top:0.2rem">📌 <strong>${esc(c.reason)}</strong></div>` : ''
+     const malusLine = c.malus
+       ? `<div style="margin-top:0.4rem;padding:0.5rem 0.75rem;background:rgba(255,109,0,0.07);border-left:3px solid var(--orange);border-radius:0 5px 5px 0;font-size:0.84rem;color:var(--orange-light)">♡ Malus à appliquer pour ce match : <strong>${esc(c.malus)}</strong></div>`
+       : ''
         const winnerHint = `<div style="margin-top:0.6rem;padding:0.5rem 0.75rem;background:rgba(255,109,0,0.07);border-left:3px solid var(--orange);border-radius:0 5px 5px 0;font-size:0.84rem;color:var(--orange-light)">🏆 Vous avez gagné le match ? C'est à vous de renseigner le score. Si vous avez perdu, attendez que votre adversaire le saisisse — vous serez notifié(e).</div>`
         const oppJson = JSON.stringify(c.opponent || {}).replace(/'/g, "&#39;")
         return `
         <div class="notif-history-card" style="opacity:${c.expired ? 0.55 : 1}">
           <div class="notif-history-title">🏸 Contre ${oppName}</div>
           <div class="notif-history-meta">${typeLabel}</div>
-          ${deadlineLine}${reasonLine}
+          ${deadlineLine}${reasonLine}${malusLine}
           ${c.expired
             ? `<div style="color:#ff6b6b;font-size:0.85rem;margin-top:0.5rem">⛔ La date limite est dépassée. Contactez l'administrateur.</div>`
             : `${winnerHint}
@@ -10270,6 +10283,7 @@ async function otherAction(action, confirmMsg) {
     if (res.ok) {
       feedback.textContent = '✓ ' + (data.message || 'Opération effectuée.')
       feedback.style.color = '#6ddc6d'
+      if (Array.isArray(data.report) && data.report.length) console.log('[' + action + ']', data.report)
       await loadUsers()
     } else {
       feedback.textContent = '✗ ' + (data.error || 'Erreur.')
