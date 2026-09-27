@@ -4095,18 +4095,19 @@ async function computePhase1(req, res, answers) {
 // Permet d'intégrer une poule nouvellement créée (ex: joueurs arrivés en
 // cours de saison) sans recalculer ni toucher aux matchs déjà planifiés des
 // autres poules. Le calendrier de rondes de la Phase 1 est PARTAGÉ entre
-// toutes les poules (ronde n → même date pour tout le monde) : on ne peut
-// donc pas repartir de settings.periodStart comme le fait computePhase1
-// (ça redonnerait à la nouvelle poule les dates des rondes déjà passées).
-// On reconstruit ici la même suite déterministe de dates de ronde (mêmes
-// paramètres + mêmes périodes de non-jeu ⇒ mêmes dates), on repère où le
-// calendrier existant s'arrête (nombre de rondes déjà utilisées par les
-// AUTRES poules), et on fait démarrer la nouvelle poule juste après, en
-// poursuivant le même cycle. Si les rondes de cette poule dépassent la fin
-// de période actuelle, celle-ci est prolongée automatiquement (pas de
-// question bloquante ici, contrairement à computePhase1 : cette commande
-// n'est utilisable que depuis la console, qui ne sait pas relayer de
-// question interactive à l'admin).
+// toutes les poules (ronde n → même date pour tout le monde) : la nouvelle
+// poule doit donc démarrer à LA MÊME DATE que la ronde actuellement en cours
+// pour les autres poules (celles-ci jouent déjà cette ronde-là), pas après
+// la dernière ronde déjà planifiée — qui peut être une ronde future pas
+// encore jouée si le calendrier a été généré plusieurs rondes à l'avance.
+// On repère la ronde « en cours » via sa date (dernière date déjà atteinte),
+// on réutilise les dates réelles déjà en base pour les rondes existantes à
+// partir de là, et on ne recalcule (en poursuivant le même cycle) que les
+// rondes qui vont au-delà du calendrier déjà existant. Si les rondes de
+// cette poule dépassent la fin de période actuelle, celle-ci est prolongée
+// automatiquement (pas de question bloquante ici, contrairement à
+// computePhase1 : cette commande n'est utilisable que depuis la console,
+// qui ne sait pas relayer de question interactive à l'admin).
 async function computePhase1Poule(req, res, pouleId) {
   const phase = 'PHASE1'
   const logEntries = []
@@ -4146,16 +4147,30 @@ async function computePhase1Poule(req, res, pouleId) {
       return res.status(400).json({ ok: false, error: 'Poule insuffisante.', logs: logEntries })
     }
 
-    // Où en est le calendrier existant : une date de ronde = une valeur
-    // distincte de scheduledDate parmi les matchs déjà planifiés en Phase 1
-    // (toutes poules confondues), puisque le round-robin d'origine attribue
-    // la même date à la même ronde pour toutes les poules.
-    const existingDates = await prisma.plannedMatch.findMany({
+    // Où en est le calendrier existant : liste triée des dates de ronde déjà
+    // utilisées en Phase 1 (toutes poules confondues), puisque le round-robin
+    // d'origine attribue la même date à la même ronde pour toutes les poules.
+    const existingDatesRaw = await prisma.plannedMatch.findMany({
       where: { phase },
       distinct: ['scheduledDate'],
       select: { scheduledDate: true },
+      orderBy: { scheduledDate: 'asc' },
     })
-    const existingRoundCount = existingDates.length
+    const existingDates = existingDatesRaw.map(d => new Date(d.scheduledDate))
+
+    // BUG FIX : la nouvelle poule doit démarrer à LA MÊME DATE que la ronde
+    // actuellement en cours pour les autres poules — pas après la dernière
+    // ronde déjà planifiée, qui peut très bien être une ronde future pas
+    // encore jouée (le calendrier est souvent généré plusieurs rondes à
+    // l'avance). On prend donc la dernière ronde dont la date est déjà
+    // atteinte ; si toutes les rondes planifiées sont encore dans le futur,
+    // on s'aligne sur la première d'entre elles (la plus proche/« en cours »).
+    const now = new Date()
+    let currentRoundIndex = 0
+    if (existingDates.length > 0) {
+      const nextFutureIdx = existingDates.findIndex(d => d > now)
+      currentRoundIndex = nextFutureIdx === -1 ? existingDates.length - 1 : Math.max(nextFutureIdx - 1, 0)
+    }
 
     const existingKeys = await getExistingPairKeys(phase, members)
     const byId = new Map(members.map(m => [m.id, m]))
@@ -4177,25 +4192,29 @@ async function computePhase1Poule(req, res, pouleId) {
       return res.status(400).json({ ok: false, error: 'Rien à planifier.', logs: logEntries })
     }
 
-    if (existingRoundCount > 0) {
-      log('info', `Calendrier existant : ${existingRoundCount} ronde(s) déjà programmée(s) pour les autres poules. Cette poule démarrera à la ronde ${existingRoundCount + 1}, en poursuivant le même cycle — aucune date passée ne lui sera attribuée.`)
+    if (existingDates.length > 0) {
+      log('info', `Calendrier existant : ${existingDates.length} ronde(s) déjà programmée(s). Cette poule démarre à la ronde ${currentRoundIndex + 1} (${fmtDate(existingDates[currentRoundIndex])}) — la même date que la ronde en cours pour les autres poules.`)
     } else {
       log('info', `Aucun match encore planifié pour la Phase 1 — cette poule démarre depuis le début de la période (${fmtDate(settings.periodStart)}).`)
     }
 
-    // Reconstruction déterministe de la suite de dates de ronde (mêmes
-    // paramètres + mêmes périodes de non-jeu ⇒ mêmes dates que celles déjà
-    // en usage pour les rondes existantes), étendue jusqu'à couvrir les
-    // rondes de la nouvelle poule.
-    const totalRoundsNeeded = existingRoundCount + filteredRounds.length
-    const roundDates = []
-    let cursor = new Date(settings.periodStart)
-    for (let r = 0; r < totalRoundsNeeded; r++) {
-      if (r > 0) cursor = addDays(cursor, settings.cycleLengthDays)
-      cursor = shiftPastBlackouts(cursor, blackouts)
-      roundDates.push(new Date(cursor))
+    // Dates de ronde pour la nouvelle poule : on réutilise les dates réelles
+    // déjà en base à partir de la ronde en cours (currentRoundIndex), pour
+    // rester exactement synchronisé avec les autres poules — y compris si
+    // leur espacement réel a été décalé par des périodes de non-jeu. Les
+    // rondes qui iraient au-delà du calendrier déjà existant sont générées
+    // en poursuivant le même cycle depuis la dernière date connue.
+    const newRoundDates = []
+    let cursor = existingDates.length > 0 ? new Date(existingDates[existingDates.length - 1]) : new Date(settings.periodStart)
+    for (let i = 0; i < filteredRounds.length; i++) {
+      const idx = currentRoundIndex + i
+      if (idx < existingDates.length) {
+        newRoundDates.push(new Date(existingDates[idx]))
+      } else {
+        cursor = shiftPastBlackouts(addDays(cursor, settings.cycleLengthDays), blackouts)
+        newRoundDates.push(new Date(cursor))
+      }
     }
-    const newRoundDates = roundDates.slice(existingRoundCount)
 
     const lastDeadline = addHours(addDays(newRoundDates[newRoundDates.length - 1], settings.cycleLengthDays), -settings.deadlineHoursBeforeCycleEnd)
     if (lastDeadline > settings.periodEnd) {
@@ -4208,7 +4227,7 @@ async function computePhase1Poule(req, res, pouleId) {
       const scheduledDate = newRoundDates[rIdx]
       const rawDeadline = addHours(addDays(scheduledDate, settings.cycleLengthDays), -settings.deadlineHoursBeforeCycleEnd)
       const deadlineAt = extendDeadlineForBlackouts(scheduledDate, rawDeadline, blackouts)
-      log('info', `Ronde ${existingRoundCount + rIdx + 1} : ${fmtDate(scheduledDate)}.`)
+      log('info', `Ronde ${currentRoundIndex + rIdx + 1} : ${fmtDate(scheduledDate)}.`)
       for (const [a, b] of roundPairs) {
         const p1 = byId.get(a), p2 = byId.get(b)
         const auto = computeAutoMalus(p1.category, p2.category, dynamicMalusList)
