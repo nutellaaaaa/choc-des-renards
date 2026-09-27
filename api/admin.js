@@ -273,24 +273,25 @@ function validateSetScores(sets) {
 }
 
 function computeStats(matches) {
-  let played = 0, wins = 0, losses = 0, setDiff = 0, points = 0
+  let played = 0, wins = 0, losses = 0, setDiff = 0, setsWon = 0, points = 0
   for (const m of matches) {
     const pw = m.sets.filter(s => s.playerScore > s.opponentScore).length
     const ow = m.sets.filter(s => s.opponentScore > s.playerScore).length
-    played++; setDiff += pw - ow
+    played++; setDiff += pw - ow; setsWon += pw
     // BUG FIX : bye "comptabilisé comme défaite" doit valoir 0 point pas 1.
     const isByeLoss = m.opponentFirstName === 'Exempt' && m.opponentLastName === '(bye)' && !(pw > ow)
     if (pw > ow) { wins++; points += 3 } else { losses++; points += isByeLoss ? 0 : 1 }
   }
-  return { played, wins, losses, setDiff, points }
+  return { played, wins, losses, setDiff, setsWon, points }
 }
 
+// Même règle que matches.js (onglet classement) : victoires DESC, sets gagnés
+// DESC, puis niveau (à score égal, le MOINS bien classé passe devant — il
+// est déjà désavantagé par son niveau) ; createdAt ASC en dernier recours.
 function sortPlayers(players) {
   return [...players].sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins
-    if (a.played !== b.played) return a.played - b.played
-    if (b.points !== a.points) return b.points - a.points
-    // BUG FIX : tiebreak par catégorie (règle documentée), pas par date d'inscription.
+    if (b.setsWon !== a.setsWon) return b.setsWon - a.setsWon
     const rankA = CATEGORY_RANK[a.category] ?? 0
     const rankB = CATEGORY_RANK[b.category] ?? 0
     if (rankA !== rankB) return rankA - rankB
@@ -306,11 +307,29 @@ function normName(s) {
     .replace(/[^a-z]/g, '')
 }
 
-// Scrape toutes les pages du club sur MYFFBAD et renvoie { scraped, logs }
+// Récupère la liste des joueurs du club sur MYFFBAD et renvoie { scraped, logs }.
+//
+// BUG FIX : cette fonction plantait à chaque appel (ReferenceError sur
+// MYFFBAD_BASE, une variable qui n'existe nulle part dans ce fichier). Le
+// commentaire au-dessus de MYFFBAD_CLUB_URL décrivait déjà la migration vers
+// la nouvelle page club + JSON __NEXT_DATA__ suite à la refonte 2026 du site,
+// mais le corps de cette fonction n'avait jamais été réécrit en conséquence —
+// il scrapait toujours l'ancienne recherche paginée (table HTML), qui n'existe
+// plus. Réécrite ci-dessous pour correspondre à ce que le commentaire décrit.
+//
+// La page club étant rendue par Next.js, on récupère le JSON embarqué dans
+// <script id="__NEXT_DATA__"> (pas besoin d'exécuter le JS, ce bloc est dans
+// le HTML servi tel quel) puis on cherche dedans, de façon heuristique plutôt
+// que par un chemin fixe (props.pageProps.xxx.yyy — trop fragile face à la
+// moindre réorganisation), le tableau d'objets qui ressemble à une liste de
+// joueurs (au moins un champ nom + un champ prénom, sous un des noms de clé
+// usuels — la structure exacte n'a pas pu être vérifiée en amont, le site
+// bloquant les accès automatisés génériques y compris pour du diagnostic).
+// Si rien n'est trouvé, un log de diagnostic liste les clés disponibles dans
+// props.pageProps pour pouvoir ajuster précisément au besoin.
 async function scrapeMyffbadClub() {
   const logs = []
   const scraped = []
-  const MAX_PAGES = 15
   const FETCH_TIMEOUT_MS = 15000
 
   // fetch() de Node (undici) ne renvoie qu'un message générique "fetch failed"
@@ -330,68 +349,104 @@ async function scrapeMyffbadClub() {
     return err.message || String(err)
   }
 
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    const url = `${MYFFBAD_BASE}&page=${page}`
-    let html
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
-    try {
-      const r = await fetch(url, {
-        signal: controller.signal,
-        headers: {
-          // En-têtes proches d'un vrai navigateur : certains WAF/anti-bot
-          // rejettent (ou coupent la connexion avant même la réponse HTTP,
-          // d'où un "fetch failed" sans code de statut) les requêtes dont le
-          // User-Agent est trop clairement un script.
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
-          'Referer': 'https://myffbad.fr/recherche/joueur',
-        },
-      })
-      if (!r.ok) {
-        logs.push({ ok: false, message: `Page ${page} : échec HTTP ${r.status}.` })
-        break
-      }
-      html = await r.text()
-    } catch (e) {
-      const reason = describeFetchError(e)
-      logs.push({ ok: false, message: `Page ${page} : erreur réseau (${reason}).` })
-      // Si la toute première page échoue au niveau réseau (pas juste HTTP),
-      // c'est probablement MYFFBAD qui est indisponible ou qui bloque nos
-      // requêtes — inutile d'insister sur les 14 pages suivantes.
-      if (page === 1) {
-        logs.push({ ok: false, message: "Vérifiez que myffbad.fr est bien accessible (le site a connu des incidents/mises à jour de sécurité en 2026) et réessayez dans quelques minutes." })
-      }
-      break
-    } finally {
-      clearTimeout(timer)
-    }
-
-    const $ = cheerio.load(html)
-    const rows = $('table tbody tr')
-    if (rows.length === 0) {
-      logs.push({ ok: true, message: `Page ${page} : aucune ligne — fin de la pagination.` })
-      break
-    }
-
-    let countOnPage = 0
-    rows.each((i, tr) => {
-      const tds = $(tr).find('td')
-      if (tds.length < 5) return
-      const fullName = $(tds[0]).text().trim().replace(/\s+/g, ' ')
-      if (!fullName) return
-      const sdmText = $(tds[4]).text().trim()
-      const tokens = sdmText.split(/\s+/).filter(Boolean)
-      const simpleToken = tokens[0] || ''
-      scraped.push({ fullName, simpleToken })
-      countOnPage++
+  let html
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+  try {
+    const r = await fetch(MYFFBAD_CLUB_URL, {
+      signal: controller.signal,
+      headers: {
+        // En-têtes proches d'un vrai navigateur : certains WAF/anti-bot
+        // rejettent (ou coupent la connexion avant même la réponse HTTP,
+        // d'où un "fetch failed" sans code de statut) les requêtes dont le
+        // User-Agent est trop clairement un script.
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+        'Referer': 'https://myffbad.fr/recherche/club',
+      },
     })
-    logs.push({ ok: true, message: `Page ${page} : ${countOnPage} joueur(s) récupéré(s).` })
-
-    if (countOnPage === 0) break
+    if (!r.ok) {
+      logs.push({ ok: false, message: `Échec HTTP ${r.status} sur la page du club.` })
+      return { scraped, logs }
+    }
+    html = await r.text()
+  } catch (e) {
+    const reason = describeFetchError(e)
+    logs.push({ ok: false, message: `Erreur réseau (${reason}).` })
+    logs.push({ ok: false, message: "Vérifiez que myffbad.fr est bien accessible (le site a connu des incidents/mises à jour de sécurité en 2026) et réessayez dans quelques minutes." })
+    return { scraped, logs }
+  } finally {
+    clearTimeout(timer)
   }
 
+  const $ = cheerio.load(html)
+  const nextDataRaw = $('#__NEXT_DATA__').html()
+  if (!nextDataRaw) {
+    logs.push({ ok: false, message: "Bloc __NEXT_DATA__ introuvable dans la page — la structure du site a peut-être encore changé depuis la dernière vérification." })
+    return { scraped, logs }
+  }
+
+  let nextData
+  try {
+    nextData = JSON.parse(nextDataRaw)
+  } catch (e) {
+    logs.push({ ok: false, message: `__NEXT_DATA__ trouvé mais illisible (JSON invalide) : ${e.message}` })
+    return { scraped, logs }
+  }
+
+  const NAME_KEYS = ['nom', 'lastname', 'lastName', 'nomFamille']
+  const FIRSTNAME_KEYS = ['prenom', 'prénom', 'firstname', 'firstName']
+  const RANK_KEYS = ['classementSimple', 'classement_simple', 'classementsdm', 'sdm', 'classement', 'classements']
+
+  function findKey(obj, candidates) {
+    const keys = Object.keys(obj)
+    const found = keys.find(k => candidates.some(c => c.toLowerCase() === k.toLowerCase()))
+    return found !== undefined ? obj[found] : undefined
+  }
+  function looksLikePlayer(obj) {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false
+    return findKey(obj, NAME_KEYS) !== undefined && findKey(obj, FIRSTNAME_KEYS) !== undefined
+  }
+
+  // Recherche récursive du premier tableau dont TOUS les éléments ressemblent
+  // à des fiches joueur, peu importe où il se trouve dans l'arbre JSON.
+  let playerArray = null
+  const seen = new Set()
+  function walk(node) {
+    if (playerArray || !node || typeof node !== 'object' || seen.has(node)) return
+    seen.add(node)
+    if (Array.isArray(node)) {
+      if (node.length > 0 && node.every(looksLikePlayer)) { playerArray = node; return }
+      for (const item of node) walk(item)
+    } else {
+      for (const key of Object.keys(node)) walk(node[key])
+    }
+  }
+  walk(nextData)
+
+  if (!playerArray) {
+    const pageProps = nextData?.props?.pageProps
+    const hint = pageProps && typeof pageProps === 'object' ? Object.keys(pageProps).join(', ') : 'introuvable'
+    logs.push({ ok: false, message: `__NEXT_DATA__ lu, mais aucun tableau de joueurs reconnu à l'intérieur. Clés disponibles dans props.pageProps : ${hint}. Merci de transmettre cette ligne pour ajuster le scraper.` })
+    return { scraped, logs }
+  }
+
+  for (const p of playerArray) {
+    const nom = findKey(p, NAME_KEYS)
+    const prenom = findKey(p, FIRSTNAME_KEYS)
+    if (!nom || !prenom) continue
+    const fullName = `${prenom} ${nom}`.toString().trim().replace(/\s+/g, ' ')
+    let rankRaw = findKey(p, RANK_KEYS)
+    // Le classement peut être imbriqué (ex: { simple: 'P10', double: ..., mixte: ... })
+    if (rankRaw && typeof rankRaw === 'object') rankRaw = findKey(rankRaw, ['simple', 'simpleValue']) ?? Object.values(rankRaw)[0]
+    const sdmText = (rankRaw ?? '').toString().trim()
+    const tokens = sdmText.split(/\s+/).filter(Boolean)
+    const simpleToken = tokens[0] || ''
+    scraped.push({ fullName, simpleToken })
+  }
+
+  logs.push({ ok: true, message: `${scraped.length} joueur(s) récupéré(s) sur la page du club.` })
   return { scraped, logs }
 }
 
@@ -2198,11 +2253,35 @@ async function handleAction(req, res) {
             applied.push({ userId: uid, name: `${u.firstName} ${u.lastName}`, category })
           }
 
+          // BUG FIX (malus mal attribués) : une catégorie mise à jour ici pouvait
+          // rendre le malus d'un match déjà planifié injustifié (ou au contraire
+          // en oublier un devenu nécessaire) sans que rien ne le corrige jamais —
+          // voir runFixMalusAssignments. On recalcule donc systématiquement les
+          // malus des deux phases dès qu'au moins une catégorie a changé.
+          let malusFixSummary = null
+          if (applied.length > 0) {
+            malusFixSummary = { removed: 0, added: 0, targetFixed: 0 }
+            for (const phase of ['PHASE1', 'PHASE2']) {
+              const s = await runFixMalusAssignments(phase)
+              malusFixSummary.removed += s.removed
+              malusFixSummary.added += s.added
+              malusFixSummary.targetFixed += s.targetFixed
+              for (const c of s.corrections) {
+                const detail = c.action === 'removed' ? `malus « ${c.before} » retiré suite à la mise à jour de classement (joueurs de même niveau ou écart non concerné)`
+                  : c.action === 'added' ? `malus « ${c.after} » attribué suite à la mise à jour de classement (écart de catégorie apparu)`
+                  : `cible du malus corrigée suite à la mise à jour de classement`
+                await prisma.schedulingLog.create({ data: { phase, type: 'action', message: `Match #${c.plannedMatchId} (${c.players}) : ${detail}.` } }).catch(() => {})
+              }
+            }
+          }
+          const malusFixCount = malusFixSummary ? (malusFixSummary.removed + malusFixSummary.added + malusFixSummary.targetFixed) : 0
+
           return res.status(200).json({
             ok: true,
             appliedCount: applied.length,
             applied,
-            message: `${applied.length} classement(s) mis à jour.`,
+            malusFixSummary,
+            message: `${applied.length} classement(s) mis à jour.${malusFixCount > 0 ? ` ${malusFixCount} malus corrigé(s) sur les matchs déjà planifiés — voir la console de planification.` : ''}`,
           })
         }
 
@@ -3592,6 +3671,9 @@ async function handleMatch(req, res) {
  *   POST action=fix_blackout_deadlines { phase? }  → vérifie/corrige les deadlines déjà planifiées par
  *                                                     rapport aux périodes de non-jeu actuelles (Point 3, BUG 1) ;
  *                                                     phase omise = vérifie PHASE1 et PHASE2
+ *   POST action=fix_malus_assignments { phase? }   → vérifie/corrige les malus déjà planifiés par rapport
+ *                                                     aux catégories actuelles des joueurs ; phase omise =
+ *                                                     vérifie PHASE1 et PHASE2
  * ============================================================ */
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
@@ -3925,6 +4007,39 @@ async function handleScheduling(req, res) {
 
   if (action === 'fix_blackout_deadlines') {
     return fixBlackoutDeadlines(req, res)
+  }
+
+  if (action === 'fix_malus_assignments') {
+    const requestedPhase = req.body?.phase
+    const phases = ['PHASE1', 'PHASE2'].includes(requestedPhase) ? [requestedPhase] : ['PHASE1', 'PHASE2']
+    try {
+      const combined = { checked: 0, removed: 0, added: 0, targetFixed: 0, corrections: [] }
+      for (const phase of phases) {
+        const summary = await runFixMalusAssignments(phase)
+        combined.checked += summary.checked
+        combined.removed += summary.removed
+        combined.added += summary.added
+        combined.targetFixed += summary.targetFixed
+        combined.corrections.push(...summary.corrections)
+        for (const c of summary.corrections) {
+          const detail = c.action === 'removed' ? `malus « ${c.before} » retiré (joueurs de niveaux ne justifiant plus de malus)`
+            : c.action === 'added' ? `malus « ${c.after} » attribué (écart de catégorie apparu après une correction de classement)`
+            : `cible du malus corrigée (l'écart de catégorie s'est inversé)`
+          await prisma.schedulingLog.create({ data: { phase: c.phase, type: 'action', message: `Match #${c.plannedMatchId} (${c.players}) : ${detail}.` } }).catch(() => {})
+        }
+      }
+      const totalCorrected = combined.removed + combined.added + combined.targetFixed
+      const message = totalCorrected > 0
+        ? `Vérification des malus terminée : ${totalCorrected} match(s) corrigé(s) sur ${combined.checked} vérifié(s) (${combined.removed} retiré(s), ${combined.added} ajouté(s), ${combined.targetFixed} cible(s) corrigée(s)).`
+        : `Vérification des malus terminée : aucune correction nécessaire (${combined.checked} match(s) vérifié(s)).`
+      for (const phase of phases) {
+        await prisma.schedulingLog.create({ data: { phase, type: 'info', message } }).catch(() => {})
+      }
+      return res.status(200).json({ ok: true, ...combined, message })
+    } catch (err) {
+      console.error('[fix_malus_assignments]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
   }
 
   return res.status(400).json({ error: 'Action invalide.' })
@@ -4287,6 +4402,78 @@ async function computePhase1Poule(req, res, pouleId) {
 }
 
 // Remplace le fil de logs actif d'une phase par la nouvelle liste (un seul fil par phase).
+// ── Nettoyage / correction : malus vs catégorie actuelle des joueurs ──
+// Root cause identifiée : la seule route qui peut changer la catégorie d'un
+// joueur après son inscription est "apply_myffbad_changes" (synchronisation
+// MyFFBad). Elle met à jour user.category en base mais ne touche jamais aux
+// PlannedMatch déjà générés — exactement le même schéma que le bug des
+// deadlines (Point 3) : une donnée change après coup, mais ce qui a été
+// calculé dessus au moment de la planification (ici le malus, basé sur
+// l'écart entre p1.category et p2.category à cet instant-là) ne se met
+// jamais à jour. Deux joueurs planifiés avec des catégories différentes,
+// puis corrigés au même niveau ensuite (classement mal renseigné à
+// l'inscription, par exemple), gardent le malus généré avec les anciennes
+// catégories — d'où des malus visibles entre joueurs de même niveau.
+//
+// Cette fonction recalcule, pour chaque PlannedMatch non forfait, ce que
+// computeAutoMalus() déciderait avec les catégories ACTUELLES des deux
+// joueurs, et corrige ce qui diverge :
+//   - malus présent mais qui ne devrait plus l'être (même niveau, ou écart
+//     non concerné par la règle) → supprimé
+//   - malus absent mais qui devrait exister (écart de catégorie qualifiant
+//     apparu après une correction de classement) → attribué (en respectant
+//     les limites de concurrence, comme à la génération)
+//   - malus présent et toujours justifié, mais attribué au mauvais joueur
+//     (l'écart s'est inversé) → cible corrigée, texte du malus conservé
+//   - malus présent, toujours justifié, bon joueur ciblé → laissé tel quel
+//     (on ne change pas le texte du malus juste pour changer, un malus
+//     manuel reste un malus manuel tant qu'il reste valide).
+async function runFixMalusAssignments(phase) {
+  const malusList = await loadMalusList()
+  const plannedMatches = await prisma.plannedMatch.findMany({
+    where: { phase, forfeited: false },
+    include: {
+      player1: { select: { firstName: true, lastName: true, category: true } },
+      player2: { select: { firstName: true, lastName: true, category: true } },
+    },
+  })
+  const summary = { checked: 0, removed: 0, added: 0, targetFixed: 0, corrections: [] }
+
+  for (const pm of plannedMatches) {
+    summary.checked++
+    const auto = computeAutoMalus(pm.player1.category, pm.player2.category, malusList)
+    const label = `${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}`
+
+    if (!auto) {
+      // Aucun malus ne devrait exister (même niveau, ou écart non concerné par la règle).
+      if (pm.malus) {
+        await prisma.plannedMatch.update({ where: { id: pm.id }, data: { malus: null, malusTarget: null } })
+        summary.removed++
+        summary.corrections.push({ plannedMatchId: pm.id, phase, players: label, action: 'removed', before: pm.malus })
+      }
+      continue
+    }
+
+    if (!pm.malus) {
+      // Un malus devrait exister mais n'a jamais été attribué (écart apparu après coup).
+      const chosen = await pickRandomMalusWithConcurrency(malusList)
+      await prisma.plannedMatch.update({ where: { id: pm.id }, data: { malus: chosen, malusTarget: auto.malusTarget } })
+      summary.added++
+      summary.corrections.push({ plannedMatchId: pm.id, phase, players: label, action: 'added', after: chosen })
+      continue
+    }
+
+    if (pm.malusTarget !== auto.malusTarget) {
+      // Malus toujours justifié mais l'écart s'est inversé (le joueur autrefois
+      // le mieux classé ne l'est plus) : on corrige la cible, pas le texte.
+      await prisma.plannedMatch.update({ where: { id: pm.id }, data: { malusTarget: auto.malusTarget } })
+      summary.targetFixed++
+      summary.corrections.push({ plannedMatchId: pm.id, phase, players: label, action: 'target_fixed', before: pm.malusTarget, after: auto.malusTarget })
+    }
+  }
+  return summary
+}
+
 async function flushLogs(phase, entries) {
   await prisma.schedulingLog.deleteMany({ where: { phase } })
   if (entries.length > 0) {
@@ -4523,7 +4710,7 @@ async function handleConsoleCommand(req, res) {
     // ── aide ──
     if (cmd === 'aide' || cmd === 'help') {
       await say('info', [
-        'Diagnostic  : verifier · deadlines · corriger deadlines · alerte · liste · joueur <pseudo> · poule <nom>',
+        'Diagnostic  : verifier · deadlines · corriger deadlines · corriger malus · alerte · liste · joueur <pseudo> · poule <nom>',
         'Actions     : annuler <id> · forfait <id> · deadline <id> <heures> · deplacer <id> <jj/mm/aaaa>',
         'Notifs      : notifier <id>',
         'Calcul      : statut · calculer · calculer poule <nom> (Phase 1) · recalculer ronde <n> (Phase 2) · supprimer matchs · verrouiller · deverrouiller',
@@ -4659,6 +4846,28 @@ async function handleConsoleCommand(req, res) {
         await say('action', `Match #${c.plannedMatchId} (${c.players}) : deadline corrigée de ${fmtDateTime(c.before)} à ${fmtDateTime(c.after)}.`)
       }
       await say('info', `${summary.corrected} match(s) corrigé(s) sur ${summary.checked} vérifié(s).`)
+      return res.status(200).json({ ok: true })
+    }
+
+    // ── corriger malus ── nettoyage : recalcule le malus de chaque match
+    // planifié (non forfait) par rapport aux catégories ACTUELLES des deux
+    // joueurs. Corrige les malus devenus injustifiés (ex: joueurs remis au
+    // même niveau après une correction de classement via MyFFBad), attribue
+    // ceux qui manquent, et corrige la cible si l'écart s'est inversé.
+    if (cmd === 'corriger malus') {
+      const summary = await runFixMalusAssignments(ph)
+      const total = summary.removed + summary.added + summary.targetFixed
+      if (total === 0) {
+        await say('info', `Aucune correction nécessaire (${summary.checked} match(s) vérifié(s)).`)
+        return res.status(200).json({ ok: true })
+      }
+      for (const c of summary.corrections) {
+        const detail = c.action === 'removed' ? `malus « ${c.before} » retiré (joueurs de même niveau ou écart non concerné)`
+          : c.action === 'added' ? `malus « ${c.after} » attribué (écart de catégorie apparu après coup)`
+          : `cible corrigée (avant : ${c.before === 1 ? 'joueur 1' : 'joueur 2'}, après : ${c.after === 1 ? 'joueur 1' : 'joueur 2'})`
+        await say('action', `Match #${c.plannedMatchId} (${c.players}) : ${detail}.`)
+      }
+      await say('info', `${total} match(s) corrigé(s) sur ${summary.checked} vérifié(s) (${summary.removed} retiré(s), ${summary.added} ajouté(s), ${summary.targetFixed} cible(s) corrigée(s)).`)
       return res.status(200).json({ ok: true })
     }
 

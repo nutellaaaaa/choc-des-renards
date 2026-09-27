@@ -6710,11 +6710,18 @@ function renderPerformancesTable(sorted) {
   return html
 }
 
-// Même ordre que le classement (victoires DESC, matchs joués ASC, points DESC)
+// Même ordre que le classement (victoires DESC, sets gagnés DESC, niveau ASC —
+// le moins bien classé devant à score égal, déjà désavantagé par son niveau)
+const PERF_CATEGORY_RANK = { NC: 0, P: 1, D: 2, R: 3, N: 4 }
 function sortPlayersForDisplay(list) {
   return [...list].sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins
-    if (a.played !== b.played) return a.played - b.played
+    const aSets = a.setsWon ?? ((a.wins || 0) + Math.max(a.setDiff || 0, 0))
+    const bSets = b.setsWon ?? ((b.wins || 0) + Math.max(b.setDiff || 0, 0))
+    if (bSets !== aSets) return bSets - aSets
+    const rankA = PERF_CATEGORY_RANK[a.category] ?? 0
+    const rankB = PERF_CATEGORY_RANK[b.category] ?? 0
+    if (rankA !== rankB) return rankA - rankB
     return b.points - a.points
   })
 }

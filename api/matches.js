@@ -19,19 +19,20 @@ function requireAuth(req, res) {
 }
 
 function computeStats(matches) {
-  let played = 0, wins = 0, losses = 0, setDiff = 0, points = 0
+  let played = 0, wins = 0, losses = 0, setDiff = 0, setsWon = 0, points = 0
   for (const m of matches) {
     const pw = m.sets.filter(s => s.playerScore > s.opponentScore).length
     const ow = m.sets.filter(s => s.opponentScore > s.playerScore).length
     played++
     setDiff += pw - ow
+    setsWon += pw
     // BUG FIX : un bye "comptabilisé comme une défaite" doit valoir 0 point
     // (c'est ce que l'UI annonce), pas 1 comme une défaite normale.
     const isByeLoss = m.opponentFirstName === 'Exempt' && m.opponentLastName === '(bye)' && !(pw > ow)
     if (pw > ow) { wins++; points += 3 }
     else { losses++; points += isByeLoss ? 0 : 1 }
   }
-  return { played, wins, losses, setDiff, points }
+  return { played, wins, losses, setDiff, setsWon, points }
 }
 
 // Stats limitées aux matchs d'une phase donnée.
@@ -39,14 +40,15 @@ function computeStatsForPhase(matches, phase) {
   return computeStats((matches || []).filter(m => m.phase === phase))
 }
 
-// Ordre : victoires DESC, matchs joués ASC, points DESC, catégorie ASC, createdAt ASC
+// Ordre demandé par l'admin : victoires DESC, sets gagnés DESC, puis niveau
+// (à score égal, le joueur le mieux classé passe devant) ; createdAt ASC en
+// tout dernier recours pour un ordre stable en cas d'égalité parfaite.
 function sortPlayers(players) {
   return [...players].sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins
-    if (a.played !== b.played) return a.played - b.played
-    if (b.points !== a.points) return b.points - a.points
-    // BUG FIX : tiebreak final par catégorie (le moins bien classé d'abord,
-    // règle documentée du site), pas par date d'inscription.
+    if (b.setsWon !== a.setsWon) return b.setsWon - a.setsWon
+    // À score égal, le joueur le MOINS bien classé passe devant (celui qui a
+    // le mieux classé en face est déjà avantagé par son niveau) : ordre ASCENDANT sur le rang.
     const rankA = CATEGORY_RANK[a.category] ?? 0
     const rankB = CATEGORY_RANK[b.category] ?? 0
     if (rankA !== rankB) return rankA - rankB
@@ -315,7 +317,7 @@ module.exports = async function handler(req, res) {
           id: pl.id, firstName: pl.firstName, lastName: pl.lastName,
           username: pl.username, category: pl.category,
           points: pl.points, wins: pl.wins, losses: pl.losses,
-          played: pl.played, setDiff: pl.setDiff,
+          played: pl.played, setDiff: pl.setDiff, setsWon: pl.setsWon,
         })),
       }
     })
