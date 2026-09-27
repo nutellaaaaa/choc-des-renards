@@ -4091,6 +4091,172 @@ async function computePhase1(req, res, answers) {
   }
 }
 
+// ── Calcul ciblé pour une seule poule (Phase 1) ──────────────────────────
+// Permet d'intégrer une poule nouvellement créée (ex: joueurs arrivés en
+// cours de saison) sans recalculer ni toucher aux matchs déjà planifiés des
+// autres poules. Le calendrier de rondes de la Phase 1 est PARTAGÉ entre
+// toutes les poules (ronde n → même date pour tout le monde) : on ne peut
+// donc pas repartir de settings.periodStart comme le fait computePhase1
+// (ça redonnerait à la nouvelle poule les dates des rondes déjà passées).
+// On reconstruit ici la même suite déterministe de dates de ronde (mêmes
+// paramètres + mêmes périodes de non-jeu ⇒ mêmes dates), on repère où le
+// calendrier existant s'arrête (nombre de rondes déjà utilisées par les
+// AUTRES poules), et on fait démarrer la nouvelle poule juste après, en
+// poursuivant le même cycle. Si les rondes de cette poule dépassent la fin
+// de période actuelle, celle-ci est prolongée automatiquement (pas de
+// question bloquante ici, contrairement à computePhase1 : cette commande
+// n'est utilisable que depuis la console, qui ne sait pas relayer de
+// question interactive à l'admin).
+async function computePhase1Poule(req, res, pouleId) {
+  const phase = 'PHASE1'
+  const logEntries = []
+  const log = (type, message) => logEntries.push({ phase, type, message })
+
+  try {
+    const [settings, dynamicMalusList, blackouts, poule] = await Promise.all([
+      prisma.schedulingSettings.findUnique({ where: { phase } }),
+      loadMalusList(),
+      prisma.blackoutPeriod.findMany({ where: { phase }, orderBy: { dateStart: 'asc' } }),
+      prisma.poule.findUnique({
+        where: { id: pouleId },
+        include: {
+          members: {
+            where: { user: { active: true, accepted: true, banned: false, withdrawnAt: null } },
+            include: { user: { select: { id: true, firstName: true, lastName: true, username: true, category: true } } },
+          },
+        },
+      }),
+    ])
+
+    if (!settings) {
+      log('erreur', 'Aucun paramètre de planification configuré pour la Phase 1. Configurez la période et le cycle avant de calculer.')
+      await flushLogs(phase, logEntries)
+      return res.status(400).json({ ok: false, error: 'Paramètres manquants.', logs: logEntries })
+    }
+    if (!poule || poule.phase !== phase) {
+      log('erreur', 'Poule introuvable pour la Phase 1.')
+      await flushLogs(phase, logEntries)
+      return res.status(404).json({ ok: false, error: 'Poule introuvable.', logs: logEntries })
+    }
+
+    const members = poule.members.map(m => m.user)
+    if (members.length < 2) {
+      log('erreur', `Poule « ${poule.name} » : moins de 2 joueurs actifs — rien à planifier.`)
+      await flushLogs(phase, logEntries)
+      return res.status(400).json({ ok: false, error: 'Poule insuffisante.', logs: logEntries })
+    }
+
+    // Où en est le calendrier existant : une date de ronde = une valeur
+    // distincte de scheduledDate parmi les matchs déjà planifiés en Phase 1
+    // (toutes poules confondues), puisque le round-robin d'origine attribue
+    // la même date à la même ronde pour toutes les poules.
+    const existingDates = await prisma.plannedMatch.findMany({
+      where: { phase },
+      distinct: ['scheduledDate'],
+      select: { scheduledDate: true },
+    })
+    const existingRoundCount = existingDates.length
+
+    const existingKeys = await getExistingPairKeys(phase, members)
+    const byId = new Map(members.map(m => [m.id, m]))
+    const rounds = generateRoundRobinRounds(members.map(m => m.id))
+    let totalPairs = 0, excludedPairs = 0
+    const filteredRounds = rounds.map(roundPairs => roundPairs.filter(([a, b]) => {
+      totalPairs++
+      const key = [a, b].sort((x, y) => x - y).join('-')
+      if (existingKeys.has(key)) { excludedPairs++; return false }
+      return true
+    }))
+
+    if (members.length % 2 !== 0) log('info', `Poule « ${poule.name} » : ${members.length} joueurs (nombre impair) — un exempt tournant par ronde.`)
+    log('info', `Poule « ${poule.name} » : ${members.length} joueurs, ${filteredRounds.length} ronde(s), ${totalPairs - excludedPairs} match(s) à créer${excludedPairs ? ` (${excludedPairs} paire(s) déjà jouée(s) ou en attente de publication, exclue(s))` : ''}.`)
+
+    if (filteredRounds.length === 0 || totalPairs - excludedPairs === 0) {
+      log('erreur', 'Rien à planifier pour cette poule (poule vide ou toutes les paires déjà jouées).')
+      await flushLogs(phase, logEntries)
+      return res.status(400).json({ ok: false, error: 'Rien à planifier.', logs: logEntries })
+    }
+
+    if (existingRoundCount > 0) {
+      log('info', `Calendrier existant : ${existingRoundCount} ronde(s) déjà programmée(s) pour les autres poules. Cette poule démarrera à la ronde ${existingRoundCount + 1}, en poursuivant le même cycle — aucune date passée ne lui sera attribuée.`)
+    } else {
+      log('info', `Aucun match encore planifié pour la Phase 1 — cette poule démarre depuis le début de la période (${fmtDate(settings.periodStart)}).`)
+    }
+
+    // Reconstruction déterministe de la suite de dates de ronde (mêmes
+    // paramètres + mêmes périodes de non-jeu ⇒ mêmes dates que celles déjà
+    // en usage pour les rondes existantes), étendue jusqu'à couvrir les
+    // rondes de la nouvelle poule.
+    const totalRoundsNeeded = existingRoundCount + filteredRounds.length
+    const roundDates = []
+    let cursor = new Date(settings.periodStart)
+    for (let r = 0; r < totalRoundsNeeded; r++) {
+      if (r > 0) cursor = addDays(cursor, settings.cycleLengthDays)
+      cursor = shiftPastBlackouts(cursor, blackouts)
+      roundDates.push(new Date(cursor))
+    }
+    const newRoundDates = roundDates.slice(existingRoundCount)
+
+    const lastDeadline = addHours(addDays(newRoundDates[newRoundDates.length - 1], settings.cycleLengthDays), -settings.deadlineHoursBeforeCycleEnd)
+    if (lastDeadline > settings.periodEnd) {
+      await prisma.schedulingSettings.update({ where: { phase }, data: { periodEnd: lastDeadline } })
+      log('avertissement', `La période de Phase 1 a dû être prolongée jusqu'au ${fmtDate(lastDeadline)} pour caser toutes les rondes de cette poule.`)
+    }
+
+    const toCreate = []
+    filteredRounds.forEach((roundPairs, rIdx) => {
+      const scheduledDate = newRoundDates[rIdx]
+      const rawDeadline = addHours(addDays(scheduledDate, settings.cycleLengthDays), -settings.deadlineHoursBeforeCycleEnd)
+      const deadlineAt = extendDeadlineForBlackouts(scheduledDate, rawDeadline, blackouts)
+      log('info', `Ronde ${existingRoundCount + rIdx + 1} : ${fmtDate(scheduledDate)}.`)
+      for (const [a, b] of roundPairs) {
+        const p1 = byId.get(a), p2 = byId.get(b)
+        const auto = computeAutoMalus(p1.category, p2.category, dynamicMalusList)
+        toCreate.push({
+          player1Id: a, player2Id: b, phase, scheduledDate, deadlineAt,
+          malus: auto?.malus || null, malusTarget: auto?.malusTarget || null,
+        })
+        if (auto) log('info', `Malus automatique appliqué : ${p1.firstName} ${p1.lastName} vs ${p2.firstName} ${p2.lastName} (écart de classement ${p1.category}/${p2.category}).`)
+      }
+    })
+
+    await prisma.plannedMatch.createMany({ data: toCreate })
+
+    // Applique les limites de concurrence des malus, comme après un calcul complet —
+    // cela peut éventuellement réassigner le malus d'un match déjà existant si
+    // l'ajout de cette poule fait dépasser une limite ; c'est le même filet de
+    // sécurité que celui utilisé partout ailleurs (alerte admin à la clé).
+    let malusReassigned = 0
+    try {
+      const state = await prisma.tournamentState.findUnique({ where: { id: 1 } })
+      if (state?.malusConfig) {
+        const cfg = JSON.parse(state.malusConfig)
+        if (Array.isArray(cfg)) {
+          const r1 = await enforceMalusConcurrency(cfg)
+          malusReassigned = r1.reassigned
+          for (const lm of r1.logMessages) {
+            if (lm.phase === phase) log(lm.type, lm.message)
+            else await prisma.schedulingLog.create({ data: lm }).catch(() => {})
+          }
+          if (r1.reassigned > 0) log('info', `${r1.reassigned} match(s) réassigné(s) pour respecter les limites de malus (détail ci-dessus).`)
+        }
+      }
+    } catch (e) {
+      console.error('[computePhase1Poule enforceMalusConcurrency]', e)
+    }
+
+    log('action', `${toCreate.length} match(s) planifié(s) créé(s) pour la poule « ${poule.name} », intégrés au calendrier existant sans toucher aux matchs des autres poules.${malusReassigned > 0 ? ` ${malusReassigned} match(s) réassigné(s) pour les limites de malus.` : ''}`)
+
+    await flushLogs(phase, logEntries)
+    return res.status(201).json({ ok: true, count: toCreate.length, logs: logEntries })
+  } catch (err) {
+    console.error('[computePhase1Poule]', err)
+    log('erreur', `Erreur inattendue : ${err.message}`)
+    await flushLogs(phase, logEntries).catch(() => {})
+    return res.status(500).json({ ok: false, error: 'Erreur serveur.', logs: logEntries })
+  }
+}
+
 // Remplace le fil de logs actif d'une phase par la nouvelle liste (un seul fil par phase).
 async function flushLogs(phase, entries) {
   await prisma.schedulingLog.deleteMany({ where: { phase } })
@@ -4239,7 +4405,7 @@ async function handleConsoleCommand(req, res) {
         'Diagnostic  : verifier · deadlines · alerte · liste · joueur <pseudo> · poule <nom>',
         'Actions     : annuler <id> · forfait <id> · deadline <id> <heures> · deplacer <id> <jj/mm/aaaa>',
         'Notifs      : notifier <id>',
-        'Calcul      : statut · calculer · recalculer ronde <n> (Phase 2) · supprimer matchs · verrouiller · deverrouiller',
+        'Calcul      : statut · calculer · calculer poule <nom> (Phase 1) · recalculer ronde <n> (Phase 2) · supprimer matchs · verrouiller · deverrouiller',
         'Export      : exporter',
       ].join('\n'))
       return res.status(200).json({ ok: true })
@@ -4278,6 +4444,19 @@ async function handleConsoleCommand(req, res) {
     if (cmd === 'calculer') {
       if (ph === 'PHASE1') return computePhase1(req, res, {})
       return computePhase2Round(req, res, {}, null)
+    }
+
+    // ── calculer poule <nom> ── calcul ciblé pour une seule poule (nouveaux
+    // arrivants) : ne touche à rien pour les autres poules, enchaîne sur le
+    // calendrier existant. Phase 1 uniquement.
+    if (cmd.startsWith('calculer poule ')) {
+      if (ph !== 'PHASE1') { await say('erreur', 'Le calcul ciblé par poule n\'est disponible que pour la Phase 1.'); return res.status(200).json({ ok: true }) }
+      const name = raw.slice('calculer poule '.length).trim()
+      if (!name) { await say('erreur', 'Usage : calculer poule <nom>'); return res.status(200).json({ ok: true }) }
+      const groupings = await getGroupingsForPhase(ph)
+      const poule = groupings.find(x => x.name.toLowerCase() === name.toLowerCase())
+      if (!poule) { await say('erreur', `Poule « ${name} » introuvable pour la Phase 1.`); return res.status(200).json({ ok: true }) }
+      return computePhase1Poule(req, res, poule.id)
     }
 
     // ── supprimer matchs ──
