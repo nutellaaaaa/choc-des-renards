@@ -296,7 +296,7 @@ module.exports = async function handler(req, res) {
     })
 
     if (!user) {
-      return res.status(401).json({ error: 'Identifiants incorrects.' })
+      return res.status(401).json({ error: 'Pseudo incorrect.' })
     }
 
     const valid = await argon2.verify(user.passwordHash, password)
@@ -323,7 +323,7 @@ module.exports = async function handler(req, res) {
         } catch {}
       }
       await logLogin(user.id, req, false, 'Mot de passe incorrect')
-      return res.status(401).json({ error: 'Identifiants incorrects.' })
+      return res.status(401).json({ error: 'Mot de passe incorrect.' })
     }
 
     const isAdmin = ['admin', 'root'].includes(user.username.toLowerCase()) || user.role === 'ADMIN'

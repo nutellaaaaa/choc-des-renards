@@ -2329,7 +2329,7 @@
     <div id="auth-pending" class="auth-pending">
       <div class="auth-pending-icon">⏳</div>
       <h3>Demande envoyée !</h3>
-      <p>Votre demande d'inscription a bien été reçue.<br>Revenez dans quelques heures pour vous connecter.</p>
+      <p>Votre compte sera bientôt validé. Vous pouvez revenir dans quelques heures (ou demain) pour vous connecter avec votre prénom comme pseudo.<br>Veillez à ne pas oublier votre mot de passe.</p>
       <button class="auth-pending-back" onclick="showPendingBack()">← Retour à la connexion</button>
     </div>
   </div>
@@ -4666,14 +4666,24 @@ function showApp() {
     loadHomeStats()
   } else {
     document.getElementById('admin-panel').classList.remove('active')
-    document.querySelectorAll('.nav-btn').forEach(b => b.style.display = '')
-    if (dock) dock.style.display = ''
+    // BUG FIX (Point 4) : avant, tous les .nav-btn étaient remis visibles ici
+    // en synchrone, puis loadHiddenTabsForUser() était lancé SANS être attendu
+    // — pendant le temps de la requête réseau, tous les onglets (y compris
+    // ceux masqués pour ce compte) étaient visibles ET cliquables, et même
+    // après leur disparition du menu on restait sur la page déjà ouverte.
+    // On les garde donc invisibles et non-cliquables (sans changer `display`,
+    // pour ne pas perturber la logique existante) jusqu'à ce que le filtre
+    // réel soit connu et appliqué.
+    document.querySelectorAll('.nav-btn').forEach(b => { b.style.display = ''; b.style.visibility = 'hidden'; b.style.pointerEvents = 'none' })
+    if (dock) { dock.style.display = ''; dock.style.visibility = 'hidden'; dock.style.pointerEvents = 'none' }
     // À la connexion, l'utilisateur arrive toujours sur la page d'accueil : on force
     // la mise à jour visuelle de la page active + du bouton actif dans la navbar/dock,
     // même s'il avait quitté le site depuis une autre page (ex. FAQ) lors d'une session précédente.
     showPage('accueil', document.getElementById('nav-accueil-btn'))
-    applyHiddenTabs()
-    loadHiddenTabsForUser()
+    loadHiddenTabsForUser().finally(() => {
+      document.querySelectorAll('.nav-btn').forEach(b => { b.style.visibility = ''; b.style.pointerEvents = '' })
+      if (dock) { dock.style.visibility = ''; dock.style.pointerEvents = '' }
+    })
     startInactivityTimer()
     startSessionHeartbeat()
     loadHomeStats()
@@ -5693,14 +5703,15 @@ function openScoreModal(conv) {
 }
 
 function addScSetRow() {
+  if (scSetCount >= 5) return
   scSetCount++
   const num = scSetCount
   const row = document.createElement('div')
   row.className = 'set-row'; row.id = 'sc-set-row-' + num
   row.innerHTML = `<label>Set ${num}</label>
-    <input type="number" id="sc-set-p-${num}" min="0" max="11" value="0">
+    <input type="number" id="sc-set-p-${num}" min="0" max="11" value="0" oninput="autoAddSetIfNeeded('sc-sets', addScSetRow)">
     <span class="set-sep">–</span>
-    <input type="number" id="sc-set-o-${num}" min="0" max="11" value="0">
+    <input type="number" id="sc-set-o-${num}" min="0" max="11" value="0" oninput="autoAddSetIfNeeded('sc-sets', addScSetRow)">
     <button class="btn-remove-set" onclick="removeScSetRow(${num})">✕</button>`
   document.getElementById('sc-sets').appendChild(row)
 }
@@ -7854,6 +7865,30 @@ function onMatchPhaseChange() {
   document.getElementById('match-round-group').style.display = document.getElementById('match-phase').value === 'PHASE2' ? 'block' : 'none'
 }
 
+// Point 12 : un match se joue en 3 sets gagnants (5 sets max). Dès qu'un set
+// vient d'avoir un vainqueur (scores différents) et que personne n'a encore
+// remporté 3 sets, on ajoute automatiquement le set suivant — l'utilisateur
+// n'a plus besoin de cliquer sur "+ Ajouter un set" à chaque fois.
+function computeSetWinsFromRows(rows) {
+  let pw = 0, ow = 0
+  rows.forEach(r => {
+    const ps = parseInt(r.querySelector('input:nth-of-type(1)').value, 10)
+    const os = parseInt(r.querySelector('input:nth-of-type(2)').value, 10)
+    if (!isNaN(ps) && !isNaN(os) && ps !== os) { if (ps > os) pw++; else ow++ }
+  })
+  return { pw, ow }
+}
+function autoAddSetIfNeeded(containerId, addRowFn, maxSets = 5) {
+  const rows = document.querySelectorAll('#' + containerId + ' .set-row')
+  if (rows.length === 0 || rows.length >= maxSets) return
+  const { pw, ow } = computeSetWinsFromRows(rows)
+  if (pw >= 3 || ow >= 3) return // match déjà décidé, pas de set supplémentaire
+  const lastRow = rows[rows.length - 1]
+  const ps = parseInt(lastRow.querySelector('input:nth-of-type(1)').value, 10)
+  const os = parseInt(lastRow.querySelector('input:nth-of-type(2)').value, 10)
+  if (!isNaN(ps) && !isNaN(os) && ps !== os) addRowFn()
+}
+
 function addSetRow() {
   if (setCount >= 5) return
   setCount++
@@ -7861,9 +7896,9 @@ function addSetRow() {
   const row = document.createElement('div')
   row.className = 'set-row'; row.id = 'set-row-' + num
   row.innerHTML = `<label>Set ${num}</label>
-    <input type="number" id="set-player-${num}" min="0" max="11" value="0">
+    <input type="number" id="set-player-${num}" min="0" max="11" value="0" oninput="autoAddSetIfNeeded('sets-container', addSetRow)">
     <span class="set-sep">–</span>
-    <input type="number" id="set-opp-${num}" min="0" max="11" value="0">
+    <input type="number" id="set-opp-${num}" min="0" max="11" value="0" oninput="autoAddSetIfNeeded('sets-container', addSetRow)">
     <button class="btn-remove-set" onclick="removeSetRow(${num})">✕</button>`
   document.getElementById('sets-container').appendChild(row)
   if (setCount >= 5) document.getElementById('btn-add-set').style.display = 'none'
@@ -9966,14 +10001,15 @@ async function notifyNextMatches() {
 }
 
 function addPlannedSetRow() {
+  if (plannedSetCount >= 5) return
   plannedSetCount++
   const num = plannedSetCount
   const row = document.createElement('div')
   row.className = 'set-row'; row.id = 'pset-row-' + num
   row.innerHTML = `<label>Set ${num}</label>
-    <input type="number" id="pset-p-${num}" min="0" max="11" value="0">
+    <input type="number" id="pset-p-${num}" min="0" max="11" value="0" oninput="autoAddSetIfNeeded('planned-score-sets', addPlannedSetRow)">
     <span class="set-sep">–</span>
-    <input type="number" id="pset-o-${num}" min="0" max="11" value="0">
+    <input type="number" id="pset-o-${num}" min="0" max="11" value="0" oninput="autoAddSetIfNeeded('planned-score-sets', addPlannedSetRow)">
     <button class="btn-remove-set" onclick="removePSetRow(${num})">✕</button>`
   document.getElementById('planned-score-sets').appendChild(row)
 }
@@ -10038,14 +10074,15 @@ async function savePlannedScore() {
 
 /* ── Saisie score rencontre spéciale ── */
 function addSpecialSetRow() {
+  if (specialScoreSetCount >= 5) return
   specialScoreSetCount++
   const num = specialScoreSetCount
   const row = document.createElement('div')
   row.className = 'set-row'; row.id = 'sset-row-' + num
   row.innerHTML = `<label>Set ${num}</label>
-    <input type="number" id="sset-p-${num}" min="0" max="11" value="0">
+    <input type="number" id="sset-p-${num}" min="0" max="11" value="0" oninput="autoAddSetIfNeeded('special-score-sets', addSpecialSetRow)">
     <span class="set-sep">–</span>
-    <input type="number" id="sset-o-${num}" min="0" max="11" value="0">
+    <input type="number" id="sset-o-${num}" min="0" max="11" value="0" oninput="autoAddSetIfNeeded('special-score-sets', addSpecialSetRow)">
     <button class="btn-remove-set" onclick="removeSSRow(${num})">✕</button>`
   document.getElementById('special-score-sets').appendChild(row)
 }
@@ -10645,7 +10682,7 @@ async function generateSeasonPdf() {
 
 function buildAndOpenSeasonPdf(d) {
   const CAT_FULL = { NC:'Non classé', P:'Promotion', D:'Départemental', R:'Régional', N:'National' }
-  const fmtDiff = n => n > 0 ? `+${n}` : String(n)
+  const fmtDiff = n => String(n)
   const podiumEmojis = ['🥇','🥈','🥉']
   const podiumColors = ['#f5c842','#c0c0c0','#cd7f32']
   const podiumClasses = ['gold','silver','bronze']

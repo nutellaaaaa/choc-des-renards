@@ -3589,6 +3589,9 @@ async function handleMatch(req, res) {
  *   POST action=compute_phase1  { answers? }       → génère le round-robin par poule (Phase 1)
  *   POST action=reset_phase1    {}                 → supprime les matchs planifiés Phase 1 et déverrouille
  *   POST action=console_command { phase, command } → interprète une commande texte de la console
+ *   POST action=fix_blackout_deadlines { phase? }  → vérifie/corrige les deadlines déjà planifiées par
+ *                                                     rapport aux périodes de non-jeu actuelles (Point 3, BUG 1) ;
+ *                                                     phase omise = vérifie PHASE1 et PHASE2
  * ============================================================ */
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
@@ -3828,13 +3831,16 @@ async function handleScheduling(req, res) {
     if (end < start) return res.status(400).json({ error: 'La date de fin doit être après la date de début.' })
     try {
       const bp = await prisma.blackoutPeriod.create({ data: { phase, label: label.trim(), dateStart: start, dateEnd: end } })
-      // Une période de non-jeu ajoutée après génération doit être traitée comme une
-      // régénération manuelle : on prévient l'admin dans la console plutôt que de
-      // recalculer silencieusement (cf. cahier des charges).
+      // BUG FIX (Point 3) : le message précédent conseillait de "relancer le
+      // calcul", mais celui-ci exclut les paires déjà planifiées (voir
+      // getExistingPairKeys) et ne touche donc JAMAIS les deadlines des
+      // matchs déjà générés — la période de non-jeu n'était alors jamais
+      // compensée pour ces matchs-là. On renvoie maintenant vers l'action
+      // dédiée qui recalcule et corrige ces deadlines (fix_blackout_deadlines).
       const settings = await prisma.schedulingSettings.findUnique({ where: { phase } })
       if (settings?.locked) {
         await prisma.schedulingLog.create({
-          data: { phase, type: 'avertissement', message: `Période de non-jeu « ${label.trim()} » ajoutée alors que les matchs sont déjà générés. Relancez le calcul (il régénérera en tenant compte des scores déjà saisis) pour l'appliquer.` },
+          data: { phase, type: 'avertissement', message: `Période de non-jeu « ${label.trim()} » ajoutée alors que des matchs sont déjà planifiés. Lancez la vérification des deadlines (action "fix_blackout_deadlines") pour corriger celles qui chevauchent cette période.` },
         })
       }
       return res.status(201).json({ ok: true, blackout: bp, needsRecompute: !!settings?.locked })
@@ -3915,6 +3921,10 @@ async function handleScheduling(req, res) {
     const result = await movePlannedMatchCore(pmid, newDate)
     if (result.error) return res.status(result.status || 500).json({ error: result.error })
     return res.status(200).json({ ok: true, plannedMatch: result.plannedMatch, warning: result.warning })
+  }
+
+  if (action === 'fix_blackout_deadlines') {
+    return fixBlackoutDeadlines(req, res)
   }
 
   return res.status(400).json({ error: 'Action invalide.' })
@@ -4284,6 +4294,98 @@ async function flushLogs(phase, entries) {
   }
 }
 
+// Cœur de la correction, réutilisé par l'action HTTP fix_blackout_deadlines
+// et par la commande console "corriger deadlines". Ne fait aucune écriture
+// de log lui-même (l'appelant décide comment restituer le résultat).
+async function runFixBlackoutDeadlines(phase) {
+  const [settings, blackouts, plannedMatches] = await Promise.all([
+    prisma.schedulingSettings.findUnique({ where: { phase } }),
+    prisma.blackoutPeriod.findMany({ where: { phase }, orderBy: { dateStart: 'asc' } }),
+    prisma.plannedMatch.findMany({
+      where: { phase },
+      include: {
+        player1: { select: { firstName: true, lastName: true } },
+        player2: { select: { firstName: true, lastName: true } },
+      },
+    }),
+  ])
+  const summary = { checked: 0, corrected: 0, skippedForfeited: 0, skippedNoSchedule: 0, corrections: [] }
+  if (!settings) return summary // pas de paramètres configurés pour cette phase : rien à vérifier
+
+  for (const pm of plannedMatches) {
+    if (!pm.scheduledDate || !pm.deadlineAt) { summary.skippedNoSchedule++; continue }
+    if (pm.forfeited) { summary.skippedForfeited++; continue }
+    summary.checked++
+
+    const rawDeadline = addHours(addDays(new Date(pm.scheduledDate), settings.cycleLengthDays), -settings.deadlineHoursBeforeCycleEnd)
+    const expectedDeadline = extendDeadlineForBlackouts(new Date(pm.scheduledDate), rawDeadline, blackouts)
+    const currentDeadline = new Date(pm.deadlineAt)
+
+    // Tolérance d'une minute pour ignorer les écarts d'arrondi.
+    if (Math.abs(expectedDeadline.getTime() - currentDeadline.getTime()) > 60 * 1000) {
+      await prisma.plannedMatch.update({ where: { id: pm.id }, data: { deadlineAt: expectedDeadline } })
+      const label = `${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName}`
+      summary.corrected++
+      summary.corrections.push({ plannedMatchId: pm.id, phase, players: label, before: currentDeadline, after: expectedDeadline })
+    }
+  }
+  return summary
+}
+
+// ── Nettoyage / correction : deadlines vs périodes de non-jeu (Point 3, BUG 1) ──
+// Root cause du bug remonté : quand une période de non-jeu (vacances) est
+// ajoutée APRÈS que des matchs aient déjà été planifiés (save_blackout ne fait
+// que prévenir l'admin — voir commentaire sur cette action), leurs deadlineAt
+// ne sont jamais recalculées. Relancer le calcul complet ne corrige pas non
+// plus ces matchs existants : le round-robin exclut les paires déjà jouées ou
+// déjà planifiées (voir getExistingPairKeys / filteredRounds), donc ces
+// matchs ne sont simplement jamais retouchés. Résultat concret pour l'admin :
+// les jours de vacances sont purement soustraits de la fenêtre de jeu au lieu
+// d'être compensés en repoussant la deadline (« coupe en deux ») — d'où
+// l'impression que « la deuxième moitié de la période a été enlevée ».
+//
+// Cette fonction audite tous les PlannedMatch programmés (scheduledDate +
+// deadlineAt renseignés, non forfaits) et recalcule la deadline attendue à
+// partir des périodes de non-jeu ACTUELLES de leur phase. Si elle diffère de
+// la deadline en base, elle est corrigée et l'écart est journalisé.
+// Limite assumée : le recalcul suppose que cycleLengthDays et
+// deadlineHoursBeforeCycleEnd n'ont pas changé depuis la génération initiale
+// du match (on ne connaît que la deadline finale en base, pas la deadline
+// "brute" d'origine) — c'est le même calcul que celui utilisé partout
+// ailleurs pour générer une deadline à partir d'une scheduledDate.
+async function fixBlackoutDeadlines(req, res) {
+  const requestedPhase = req.body?.phase
+  const phases = ['PHASE1', 'PHASE2'].includes(requestedPhase) ? [requestedPhase] : ['PHASE1', 'PHASE2']
+  const combined = { checked: 0, corrected: 0, skippedForfeited: 0, skippedNoSchedule: 0, corrections: [] }
+
+  try {
+    for (const phase of phases) {
+      const summary = await runFixBlackoutDeadlines(phase)
+      combined.checked += summary.checked
+      combined.corrected += summary.corrected
+      combined.skippedForfeited += summary.skippedForfeited
+      combined.skippedNoSchedule += summary.skippedNoSchedule
+      combined.corrections.push(...summary.corrections)
+      for (const c of summary.corrections) {
+        const message = `Match #${c.plannedMatchId} (${c.players}) : deadline corrigée de ${fmtDateTime(c.before)} à ${fmtDateTime(c.after)} (période de non-jeu non compensée).`
+        await prisma.schedulingLog.create({ data: { phase, type: 'action', message } }).catch(() => {})
+      }
+    }
+
+    const finalMessage = combined.corrected > 0
+      ? `Vérification des deadlines terminée : ${combined.corrected} match(s) corrigé(s) sur ${combined.checked} vérifié(s).`
+      : `Vérification des deadlines terminée : aucune correction nécessaire (${combined.checked} match(s) vérifié(s)).`
+    for (const phase of phases) {
+      await prisma.schedulingLog.create({ data: { phase, type: 'info', message: finalMessage } }).catch(() => {})
+    }
+
+    return res.status(200).json({ ok: true, ...combined, message: finalMessage })
+  } catch (err) {
+    console.error('[fixBlackoutDeadlines]', err)
+    return res.status(500).json({ error: 'Erreur serveur.' })
+  }
+}
+
 function fmtDateTime(d) {
   return new Date(d).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
@@ -4421,7 +4523,7 @@ async function handleConsoleCommand(req, res) {
     // ── aide ──
     if (cmd === 'aide' || cmd === 'help') {
       await say('info', [
-        'Diagnostic  : verifier · deadlines · alerte · liste · joueur <pseudo> · poule <nom>',
+        'Diagnostic  : verifier · deadlines · corriger deadlines · alerte · liste · joueur <pseudo> · poule <nom>',
         'Actions     : annuler <id> · forfait <id> · deadline <id> <heures> · deplacer <id> <jj/mm/aaaa>',
         'Notifs      : notifier <id>',
         'Calcul      : statut · calculer · calculer poule <nom> (Phase 1) · recalculer ronde <n> (Phase 2) · supprimer matchs · verrouiller · deverrouiller',
@@ -4514,7 +4616,7 @@ async function handleConsoleCommand(req, res) {
       for (const pm of planned) {
         if (!pm.scheduledDate) continue
         const bp = blackouts.find(b => pm.scheduledDate >= b.dateStart && pm.scheduledDate <= b.dateEnd)
-        if (bp) { issues++; await say('avertissement', `Match #${pm.id} (${pm.player1.firstName} vs ${pm.player2.firstName}) planifié le ${fmtDate(pm.scheduledDate)}, dans la période de non-jeu « ${bp.label} » (probablement ajoutée après coup).`) }
+        if (bp) { issues++; await say('avertissement', `Match #${pm.id} (${pm.player1.firstName} vs ${pm.player2.firstName}) planifié le ${fmtDate(pm.scheduledDate)}, dans la période de non-jeu « ${bp.label} » (probablement ajoutée après coup — lancez "corriger deadlines").`) }
       }
       const countByUser = new Map()
       for (const pm of planned) {
@@ -4540,6 +4642,23 @@ async function handleConsoleCommand(req, res) {
       if (overdue.length === 0) { await say('info', 'Aucun match en dépassement de deadline.'); return res.status(200).json({ ok: true }) }
       for (const pm of overdue) await say('avertissement', `Match #${pm.id} : ${pm.player1.firstName} ${pm.player1.lastName} vs ${pm.player2.firstName} ${pm.player2.lastName} — deadline dépassée le ${fmtDateTime(pm.deadlineAt)}, score non saisi.`)
       await say('info', `${overdue.length} forfait(s) potentiel(s) — utilisez "forfait <id>" pour trancher.`)
+      return res.status(200).json({ ok: true })
+    }
+
+    // ── corriger deadlines ── nettoyage : recalcule la deadline de chaque
+    // match planifié (non forfait) par rapport aux périodes de non-jeu
+    // ACTUELLES de la phase, et corrige celles qui n'ont pas été compensées
+    // (typiquement une période de non-jeu ajoutée après coup — cf. "verifier").
+    if (cmd === 'corriger deadlines') {
+      const summary = await runFixBlackoutDeadlines(ph)
+      if (summary.corrected === 0) {
+        await say('info', `Aucune correction nécessaire (${summary.checked} match(s) vérifié(s), ${summary.skippedForfeited} forfait(s) ignoré(s)).`)
+        return res.status(200).json({ ok: true })
+      }
+      for (const c of summary.corrections) {
+        await say('action', `Match #${c.plannedMatchId} (${c.players}) : deadline corrigée de ${fmtDateTime(c.before)} à ${fmtDateTime(c.after)}.`)
+      }
+      await say('info', `${summary.corrected} match(s) corrigé(s) sur ${summary.checked} vérifié(s).`)
       return res.status(200).json({ ok: true })
     }
 
