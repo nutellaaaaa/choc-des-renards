@@ -313,35 +313,110 @@ function normName(s) {
 
 // Récupère la liste des joueurs du club sur MYFFBAD et renvoie { scraped, logs }.
 //
-// BUG FIX : cette fonction plantait à chaque appel (ReferenceError sur
-// MYFFBAD_BASE, une variable qui n'existe nulle part dans ce fichier). Le
-// commentaire au-dessus de MYFFBAD_CLUB_URL décrivait déjà la migration vers
-// la nouvelle page club + JSON __NEXT_DATA__ suite à la refonte 2026 du site,
-// mais le corps de cette fonction n'avait jamais été réécrit en conséquence —
-// il scrapait toujours l'ancienne recherche paginée (table HTML), qui n'existe
-// plus. Réécrite ci-dessous pour correspondre à ce que le commentaire décrit.
-//
-// La page club étant rendue par Next.js, on récupère le JSON embarqué dans
-// <script id="__NEXT_DATA__"> (pas besoin d'exécuter le JS, ce bloc est dans
-// le HTML servi tel quel) puis on cherche dedans, de façon heuristique plutôt
-// que par un chemin fixe (props.pageProps.xxx.yyy — trop fragile face à la
-// moindre réorganisation), le tableau d'objets qui ressemble à une liste de
-// joueurs (au moins un champ nom + un champ prénom, sous un des noms de clé
-// usuels — la structure exacte n'a pas pu être vérifiée en amont, le site
-// bloquant les accès automatisés génériques y compris pour du diagnostic).
-// Si rien n'est trouvé, un log de diagnostic liste les clés disponibles dans
-// props.pageProps pour pouvoir ajuster précisément au besoin.
-async function scrapeMyffbadClub() {
-  const logs = []
-  const scraped = []
-  const FETCH_TIMEOUT_MS = 15000
+// Le site a été refondu en 2026 et sa structure exacte n'a jamais pu être vérifiée depuis le
+// serveur (accès automatisés bloqués). Le scraper essaie donc plusieurs stratégies, de la plus
+// fiable à la plus tolérante, et explique précisément où il échoue :
+//   1. JSON Next.js « pages router » (<script id="__NEXT_DATA__">), puis sa route de données
+//      /_next/data/<buildId>/club/<id>.json ;
+//   2. données Next.js « app router » (self.__next_f.push([...])) ;
+//   3. autres blocs <script type="application/json"> / ld+json ;
+//   4. tableau HTML (<table>) ou lignes de liste, en dernier recours.
+// Si le serveur est bloqué (anti-bot), l'admin peut fournir le code source de la page (paramètre
+// `pastedHtml`), enregistré depuis son navigateur : la même analyse s'applique alors.
+const RANK_TOKEN_RE = /^(NC|[NRDP]\s?\d{1,2})$/i
+const NAME_KEYS = ['nom', 'lastname', 'last_name', 'nomfamille', 'nomdefamille', 'surname', 'family_name', 'familyname']
+const FIRSTNAME_KEYS = ['prenom', 'prénom', 'firstname', 'first_name', 'givenname', 'given_name']
+const FULLNAME_KEYS = ['fullname', 'full_name', 'nomcomplet', 'nom_complet', 'displayname', 'name', 'joueur', 'player']
 
-  // fetch() de Node (undici) ne renvoie qu'un message générique "fetch failed"
-  // en cas d'échec réseau — la vraie raison (DNS, TLS, connexion refusée/coupée,
-  // blocage anti-bot en amont, etc.) est dans err.cause. On la fait remonter
-  // explicitement pour pouvoir diagnostiquer (voir historique : la FFBaD a
-  // annoncé une mise à jour de sécurité de ses outils MyFFBaD/ICBad courant
-  // 2026, qui a pu ajouter une protection bloquant les requêtes serveur-à-serveur).
+function _lcKeyGet(obj, candidates) {
+  for (const k of Object.keys(obj)) {
+    if (candidates.includes(k.toLowerCase())) return obj[k]
+  }
+  return undefined
+}
+// Cherche le classement SIMPLE d'une fiche joueur, quelle que soit sa forme.
+function _findRankToken(p) {
+  const norm = v => (typeof v === 'string' ? v.trim().replace(/\s+/g, ' ') : '')
+  const isRank = v => RANK_TOKEN_RE.test(norm(v))
+  let fallback = ''
+  function scan(o, depth, inSimple) {
+    if (!o || typeof o !== 'object' || depth > 3) return ''
+    for (const [k, v] of Object.entries(o)) {
+      const kl = k.toLowerCase()
+      const simpleHere = inSimple || /simple|sdm|^s$/.test(kl)
+      if (typeof v === 'string' && isRank(v)) {
+        if (simpleHere) return norm(v)
+        if (!fallback && /class|rank|level|niveau|serie|série|cote/.test(kl)) fallback = norm(v)
+      } else if (v && typeof v === 'object' && !Array.isArray(v)) {
+        const r = scan(v, depth + 1, simpleHere)
+        if (r) return r
+      }
+    }
+    return ''
+  }
+  return scan(p, 0, false) || fallback
+}
+function _playerFromObject(p) {
+  if (!p || typeof p !== 'object' || Array.isArray(p)) return null
+  let nom = _lcKeyGet(p, NAME_KEYS), prenom = _lcKeyGet(p, FIRSTNAME_KEYS)
+  let fullName = ''
+  if (typeof nom === 'string' && typeof prenom === 'string' && nom.trim() && prenom.trim()) {
+    fullName = `${prenom} ${nom}`
+  } else {
+    const full = _lcKeyGet(p, FULLNAME_KEYS)
+    if (typeof full === 'string' && /\S+\s+\S+/.test(full.trim())) fullName = full
+  }
+  if (!fullName) return null
+  const rank = _findRankToken(p)
+  return { fullName: fullName.toString().trim().replace(/\s+/g, ' '), simpleToken: rank.replace(/\s+/g, '') }
+}
+// Recherche récursive du plus grand tableau d'objets qui ressemblent à des joueurs.
+function _findPlayersIn(root) {
+  let best = []
+  const seen = new Set()
+  function walk(node, depth) {
+    if (!node || typeof node !== 'object' || seen.has(node) || depth > 14) return
+    seen.add(node)
+    if (Array.isArray(node)) {
+      const found = node.map(_playerFromObject).filter(Boolean)
+      // Un vrai tableau de joueurs : la majorité des éléments sont des fiches joueur
+      if (found.length >= 2 && found.length >= node.length * 0.6 && found.length > best.length) best = found
+      for (const it of node) walk(it, depth + 1)
+    } else {
+      for (const k of Object.keys(node)) walk(node[k], depth + 1)
+    }
+  }
+  walk(root, 0)
+  return best
+}
+// Extrait les tableaux JSON « [{...}, ...] » contenus dans un texte quelconque (flux Next.js app router).
+function _extractJsonArrays(text, maxArrays = 400) {
+  const out = []
+  let pos = 0
+  while (out.length < maxArrays) {
+    const start = text.indexOf('[{', pos)
+    if (start === -1) break
+    let depth = 0, inStr = false, esc = false, end = -1
+    for (let i = start; i < text.length; i++) {
+      const c = text[i]
+      if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false; continue }
+      if (c === '"') inStr = true
+      else if (c === '[' || c === '{') depth++
+      else if (c === ']' || c === '}') { depth--; if (depth === 0) { end = i; break } }
+    }
+    if (end === -1) break
+    try { out.push(JSON.parse(text.slice(start, end + 1))) } catch {}
+    pos = end > start ? end + 1 : start + 2
+  }
+  return out
+}
+
+async function scrapeMyffbadClub(pastedHtml) {
+  const logs = []
+  let scraped = []
+  const FETCH_TIMEOUT_MS = 15000
+  const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+
   function describeFetchError(err) {
     if (err.name === 'AbortError') return `délai dépassé (${FETCH_TIMEOUT_MS / 1000}s)`
     const cause = err.cause
@@ -352,105 +427,126 @@ async function scrapeMyffbadClub() {
     }
     return err.message || String(err)
   }
+  async function fetchText(url, accept) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+    try {
+      const r = await fetch(url, {
+        signal: controller.signal,
+        headers: { 'User-Agent': UA, 'Accept': accept, 'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8', 'Referer': 'https://myffbad.fr/', 'Cache-Control': 'no-cache' },
+      })
+      const text = await r.text()
+      return { ok: r.ok, status: r.status, text }
+    } finally { clearTimeout(timer) }
+  }
 
-  let html
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
-  try {
-    const r = await fetch(MYFFBAD_CLUB_URL, {
-      signal: controller.signal,
-      headers: {
-        // En-têtes proches d'un vrai navigateur : certains WAF/anti-bot
-        // rejettent (ou coupent la connexion avant même la réponse HTTP,
-        // d'où un "fetch failed" sans code de statut) les requêtes dont le
-        // User-Agent est trop clairement un script.
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
-        'Referer': 'https://myffbad.fr/recherche/club',
-      },
-    })
-    if (!r.ok) {
-      logs.push({ ok: false, message: `Échec HTTP ${r.status} sur la page du club.` })
+  let html = ''
+  if (pastedHtml && typeof pastedHtml === 'string') {
+    html = pastedHtml
+    logs.push({ ok: true, message: `Analyse du code source fourni manuellement (${Math.round(html.length / 1024)} ko).` })
+  } else {
+    // Jusqu'à 3 tentatives (erreurs réseau ou 5xx passagères)
+    let lastErr = ''
+    for (let attempt = 1; attempt <= 3 && !html; attempt++) {
+      try {
+        const r = await fetchText(MYFFBAD_CLUB_URL, 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8')
+        if (r.ok) html = r.text
+        else {
+          lastErr = `HTTP ${r.status}`
+          if (r.status === 403 || r.status === 429 || /just a moment|cf-chl|captcha|attention required/i.test(r.text.slice(0, 4000))) {
+            logs.push({ ok: false, message: `Accès refusé par myffbad.fr (HTTP ${r.status}) : protection anti-robot probable. Utilisez l'option « code source de la page » ci-dessous.` })
+            return { scraped, logs }
+          }
+          if (r.status < 500) break
+        }
+      } catch (e) { lastErr = describeFetchError(e) }
+      if (!html && attempt < 3) await new Promise(r => setTimeout(r, 800 * attempt))
+    }
+    if (!html) {
+      logs.push({ ok: false, message: `Impossible de charger la page du club (${lastErr || 'erreur inconnue'}).` })
+      logs.push({ ok: false, message: "Réessayez dans quelques minutes, ou utilisez l'option « code source de la page »." })
       return { scraped, logs }
     }
-    html = await r.text()
-  } catch (e) {
-    const reason = describeFetchError(e)
-    logs.push({ ok: false, message: `Erreur réseau (${reason}).` })
-    logs.push({ ok: false, message: "Vérifiez que myffbad.fr est bien accessible (le site a connu des incidents/mises à jour de sécurité en 2026) et réessayez dans quelques minutes." })
-    return { scraped, logs }
-  } finally {
-    clearTimeout(timer)
+    if (/just a moment|cf-chl|captcha-delivery|attention required/i.test(html.slice(0, 6000)) && !/__NEXT_DATA__|__next_f/.test(html)) {
+      logs.push({ ok: false, message: "La page reçue est un écran anti-robot, pas la liste des joueurs. Utilisez l'option « code source de la page »." })
+      return { scraped, logs }
+    }
   }
 
   const $ = cheerio.load(html)
+  const strategies = []
+
+  // 1. __NEXT_DATA__ (pages router)
   const nextDataRaw = $('#__NEXT_DATA__').html()
-  if (!nextDataRaw) {
-    logs.push({ ok: false, message: "Bloc __NEXT_DATA__ introuvable dans la page — la structure du site a peut-être encore changé depuis la dernière vérification." })
-    return { scraped, logs }
+  let nextData = null
+  if (nextDataRaw) {
+    try { nextData = JSON.parse(nextDataRaw) } catch (e) { logs.push({ ok: false, message: `__NEXT_DATA__ illisible : ${e.message}` }) }
   }
-
-  let nextData
-  try {
-    nextData = JSON.parse(nextDataRaw)
-  } catch (e) {
-    logs.push({ ok: false, message: `__NEXT_DATA__ trouvé mais illisible (JSON invalide) : ${e.message}` })
-    return { scraped, logs }
-  }
-
-  const NAME_KEYS = ['nom', 'lastname', 'lastName', 'nomFamille']
-  const FIRSTNAME_KEYS = ['prenom', 'prénom', 'firstname', 'firstName']
-  const RANK_KEYS = ['classementSimple', 'classement_simple', 'classementsdm', 'sdm', 'classement', 'classements']
-
-  function findKey(obj, candidates) {
-    const keys = Object.keys(obj)
-    const found = keys.find(k => candidates.some(c => c.toLowerCase() === k.toLowerCase()))
-    return found !== undefined ? obj[found] : undefined
-  }
-  function looksLikePlayer(obj) {
-    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false
-    return findKey(obj, NAME_KEYS) !== undefined && findKey(obj, FIRSTNAME_KEYS) !== undefined
-  }
-
-  // Recherche récursive du premier tableau dont TOUS les éléments ressemblent
-  // à des fiches joueur, peu importe où il se trouve dans l'arbre JSON.
-  let playerArray = null
-  const seen = new Set()
-  function walk(node) {
-    if (playerArray || !node || typeof node !== 'object' || seen.has(node)) return
-    seen.add(node)
-    if (Array.isArray(node)) {
-      if (node.length > 0 && node.every(looksLikePlayer)) { playerArray = node; return }
-      for (const item of node) walk(item)
-    } else {
-      for (const key of Object.keys(node)) walk(node[key])
+  if (nextData) {
+    const found = _findPlayersIn(nextData)
+    if (found.length) { scraped = found; strategies.push('__NEXT_DATA__') }
+    else if (!pastedHtml && nextData.buildId) {
+      // Route de données Next.js : parfois plus complète que le JSON embarqué.
+      try {
+        const r = await fetchText(`https://myffbad.fr/_next/data/${nextData.buildId}/club/${MYFFBAD_CLUB_ID}.json`, 'application/json')
+        if (r.ok) { const f2 = _findPlayersIn(JSON.parse(r.text)); if (f2.length) { scraped = f2; strategies.push('route /_next/data') } }
+      } catch {}
     }
   }
-  walk(nextData)
 
-  if (!playerArray) {
+  // 2. App router : self.__next_f.push([1,"..."])
+  if (!scraped.length) {
+    let flight = ''
+    const re = /self\.__next_f\.push\((\[[\s\S]*?\])\)\s*(?:;|<\/script>|$)/g
+    let m
+    while ((m = re.exec(html)) !== null) {
+      try { const arr = JSON.parse(m[1]); if (typeof arr[1] === 'string') flight += arr[1] } catch {}
+    }
+    if (flight) {
+      let best = []
+      for (const arr of _extractJsonArrays(flight)) { const f = _findPlayersIn(arr); if (f.length > best.length) best = f }
+      if (best.length) { scraped = best; strategies.push('flux Next.js (app router)') }
+    }
+  }
+
+  // 3. Autres blocs JSON
+  if (!scraped.length) {
+    $('script[type="application/json"], script[type="application/ld+json"]').each((_, el) => {
+      if (scraped.length) return
+      try { const f = _findPlayersIn(JSON.parse($(el).html())); if (f.length) { scraped = f; strategies.push('bloc JSON') } } catch {}
+    })
+  }
+
+  // 4. Tableau HTML / lignes
+  if (!scraped.length) {
+    const rows = []
+    $('table tr, [role="row"], li').each((_, el) => {
+      const cells = $(el).find('td, th, [role="cell"], [role="gridcell"]').map((__, c) => $(c).text().replace(/\s+/g, ' ').trim()).get().filter(Boolean)
+      const texts = cells.length ? cells : [$(el).text().replace(/\s+/g, ' ').trim()]
+      const rank = texts.map(t => t.replace(/\s+/g, '')).find(t => RANK_TOKEN_RE.test(t))
+      const nameCell = texts.find(t => /[A-Za-zÀ-ÿ]{2,}\s+[A-Za-zÀ-ÿ'-]{2,}/.test(t) && !RANK_TOKEN_RE.test(t.replace(/\s+/g, '')) && t.length < 60)
+      if (rank && nameCell) rows.push({ fullName: nameCell.replace(/\b(NC|[NRDP]\d{1,2})\b/gi, '').replace(/\s+/g, ' ').trim(), simpleToken: rank.replace(/\s+/g, '') })
+    })
+    if (rows.length >= 2) { scraped = rows; strategies.push('tableau HTML') }
+  }
+
+  // Dédoublonnage (même nom → premier classement rencontré)
+  const dedup = new Map()
+  for (const p of scraped) if (!dedup.has(p.fullName.toLowerCase())) dedup.set(p.fullName.toLowerCase(), p)
+  scraped = [...dedup.values()]
+
+  if (!scraped.length) {
+    const title = ($('title').first().text() || '').trim().slice(0, 80)
     const pageProps = nextData?.props?.pageProps
-    const hint = pageProps && typeof pageProps === 'object' ? Object.keys(pageProps).join(', ') : 'introuvable'
-    logs.push({ ok: false, message: `__NEXT_DATA__ lu, mais aucun tableau de joueurs reconnu à l'intérieur. Clés disponibles dans props.pageProps : ${hint}. Merci de transmettre cette ligne pour ajuster le scraper.` })
+    const keys = pageProps && typeof pageProps === 'object' ? Object.keys(pageProps).slice(0, 20).join(', ') : null
+    logs.push({ ok: false, message: `Aucun joueur reconnu dans la page (titre : « ${title || '—'} », ${Math.round(html.length / 1024)} ko, __NEXT_DATA__ : ${nextData ? 'oui' : 'non'}, flux app router : ${/__next_f/.test(html) ? 'oui' : 'non'}, tableaux HTML : ${$('table').length}).` })
+    if (keys) logs.push({ ok: false, message: `Clés de props.pageProps : ${keys}.` })
+    if (!/__NEXT_DATA__|__next_f|<table/.test(html)) logs.push({ ok: false, message: "La liste est probablement chargée après coup par le navigateur (API interne) : utilisez l'option « code source de la page » depuis une page ouverte et complètement chargée (Ctrl+S), ou envoyez-moi une ligne de diagnostic." })
     return { scraped, logs }
   }
-
-  for (const p of playerArray) {
-    const nom = findKey(p, NAME_KEYS)
-    const prenom = findKey(p, FIRSTNAME_KEYS)
-    if (!nom || !prenom) continue
-    const fullName = `${prenom} ${nom}`.toString().trim().replace(/\s+/g, ' ')
-    let rankRaw = findKey(p, RANK_KEYS)
-    // Le classement peut être imbriqué (ex: { simple: 'P10', double: ..., mixte: ... })
-    if (rankRaw && typeof rankRaw === 'object') rankRaw = findKey(rankRaw, ['simple', 'simpleValue']) ?? Object.values(rankRaw)[0]
-    const sdmText = (rankRaw ?? '').toString().trim()
-    const tokens = sdmText.split(/\s+/).filter(Boolean)
-    const simpleToken = tokens[0] || ''
-    scraped.push({ fullName, simpleToken })
-  }
-
-  logs.push({ ok: true, message: `${scraped.length} joueur(s) récupéré(s) sur la page du club.` })
+  const withRank = scraped.filter(p => p.simpleToken).length
+  logs.push({ ok: true, message: `${scraped.length} joueur(s) récupéré(s) (méthode : ${strategies.join(', ')}), dont ${withRank} avec un classement simple.` })
+  if (withRank < scraped.length) logs.push({ ok: false, message: `${scraped.length - withRank} joueur(s) sans classement lisible : leur catégorie ne sera pas modifiée.` })
   return { scraped, logs }
 }
 
@@ -2240,8 +2336,13 @@ async function handleAction(req, res) {
         }
 
         case 'scrape_myffbad': {
-          const { scraped, logs } = await scrapeMyffbadClub()
+          const pastedHtml = data && typeof data.html === 'string' ? data.html.slice(0, 4_000_000) : null
+          const { scraped, logs } = await scrapeMyffbadClub(pastedHtml)
 
+          // Rien récupéré : on s'arrête là (inutile de comparer) et on propose la saisie manuelle du code source.
+          if (!scraped.length) {
+            return res.status(200).json({ ok: true, logs, results: [], totalScraped: 0, changedCount: 0, notFoundCount: 0, needsManualHtml: true, message: 'Aucun joueur récupéré.' })
+          }
           logs.push({ ok: true, message: `── Total récupéré sur MYFFBAD : ${scraped.length} joueur(s). ──` })
 
           const users = await prisma.user.findMany({

@@ -10372,15 +10372,15 @@ function myffbadLine(text, cls) {
   body.scrollTop = body.scrollHeight
 }
 
-async function runMyffbadUpdate() {
+async function runMyffbadUpdate(pastedHtml) {
   openMyffbadConsole()
   myffbadPendingChanges = []
-  myffbadLine('Connexion à MYFFBAD…', 'info')
+  myffbadLine(pastedHtml ? 'Analyse du code source fourni…' : 'Connexion à MYFFBAD…', 'info')
   await sleep(250)
 
   let data
   try {
-    const res = await fetch('/api/admin/action', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'scrape_myffbad' }) })
+    const res = await fetch('/api/admin/action', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'scrape_myffbad', data: pastedHtml ? { html: pastedHtml } : undefined }) })
     data = await res.json()
     if (!res.ok) {
       myffbadLine('✗ ' + (data.error || 'Erreur inconnue.'), 'err')
@@ -10395,6 +10395,8 @@ async function runMyffbadUpdate() {
     await sleep(160)
     myffbadLine((l.ok ? '✓ ' : '✗ ') + l.message, l.ok ? 'ok' : 'err')
   }
+
+  if (data.needsManualHtml) { myffbadShowManualHtmlPrompt(); return }
 
   await sleep(250)
   myffbadLine('── Comparaison avec les joueurs du site ──', 'title')
@@ -10423,6 +10425,26 @@ async function runMyffbadUpdate() {
   await sleep(300)
   myffbadLine(`Souhaitez-vous mettre à jour les ${myffbadPendingChanges.length} joueur(s) suivant(s) ? (Y/N)`, 'title')
   myffbadShowConfirmPrompt()
+}
+
+// Repli : l'admin fournit le code source de la page club (enregistrée depuis son navigateur).
+function myffbadShowManualHtmlPrompt() {
+  const body = document.getElementById('myffbad-console-body')
+  const box = document.createElement('div')
+  box.style.cssText = 'margin-top:0.8rem;padding:0.8rem;border:1px dashed var(--orange);border-radius:8px;font-family:inherit;color:var(--white)'
+  box.innerHTML = `<div style="margin-bottom:0.5rem;font-size:0.88rem">Le serveur n'a pas pu lire la liste. Ouvrez la page du club sur myffbad.fr dans votre navigateur, attendez qu'elle soit entièrement chargée, enregistrez-la (<strong>Ctrl+S</strong> / « Page web, HTML uniquement ») puis choisissez le fichier :</div>
+    <input type="file" id="myffbad-html-file" accept=".html,.htm,text/html" style="margin-bottom:0.5rem;max-width:100%">
+    <div><button class="btn-sm btn-edit" id="myffbad-html-go">Analyser ce fichier</button></div>`
+  body.appendChild(box)
+  body.scrollTop = body.scrollHeight
+  document.getElementById('myffbad-html-go').onclick = async () => {
+    const f = document.getElementById('myffbad-html-file').files[0]
+    if (!f) { myffbadLine('✗ Choisissez d\'abord un fichier .html.', 'err'); return }
+    if (f.size > 3.8 * 1024 * 1024) { myffbadLine('✗ Fichier trop volumineux (max 3,8 Mo). Enregistrez « HTML uniquement ».', 'err'); return }
+    const text = await f.text()
+    box.remove()
+    runMyffbadUpdate(text)
+  }
 }
 
 function myffbadShowConfirmPrompt() {
