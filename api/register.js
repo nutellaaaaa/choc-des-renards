@@ -28,7 +28,9 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' })
 
-  const { password, confirmPassword, firstName, lastName, phone } = req.body || {}
+  const { password, confirmPassword, firstName, lastName, phone, category: rawCategory } = req.body || {}
+  // Point 11 : niveau renseigné par le joueur à l'inscription (modifiable ensuite par l'admin)
+  const category = ['NC', 'P', 'D', 'R', 'N'].includes(rawCategory) ? rawCategory : 'NC'
 
   if (!password || !confirmPassword || !firstName || !lastName || !phone) {
     return res.status(400).json({ error: 'Tous les champs sont requis.' })
@@ -40,9 +42,12 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 8 caractères.' })
   }
 
-  // Pseudo auto = prénom en minuscule sans accents ni espaces
-  let username = slugify(firstName)
-  if (!username) username = 'joueur'
+  // Point 4 : prénom et nom formatés avec une majuscule (accents conservés), et pseudo par
+  // défaut = prénom EXACT (mêmes accents), avec une majuscule, que l'utilisateur l'ait tapée ou non.
+  const fmtFirst = capName(firstName.trim())
+  const fmtLast  = capName(lastName.trim())
+  let username = fmtFirst
+  if (!username) username = 'Joueur'
 
   // Vérifier unicité du pseudo, ajouter suffix si besoin
   try {
@@ -52,7 +57,7 @@ module.exports = async function handler(req, res) {
     const existing = await prisma.user.findFirst({ where: { username: { equals: username, mode: 'insensitive' } } })
     if (existing) {
       // Essayer avec le nom aussi
-      const alt = slugify(firstName + lastName)
+      const alt = capName(firstName.trim()) + capName(lastName.trim()).replace(/[\s-]/g, '')
       const existing2 = await prisma.user.findFirst({ where: { username: { equals: alt, mode: 'insensitive' } } })
       if (!existing2) {
         username = alt
@@ -85,10 +90,10 @@ module.exports = async function handler(req, res) {
       data: {
         username,
         passwordHash,
-        firstName: capName(firstName.trim()),
-        lastName: capName(lastName.trim()),
+        firstName: fmtFirst,
+        lastName: fmtLast,
         phone: phone.trim(),
-        category: 'NC',
+        category,
       },
     })
 
@@ -102,7 +107,7 @@ module.exports = async function handler(req, res) {
           <p><strong>Nom :</strong> ${lastName}</p>
           <p><strong>Prénom :</strong> ${firstName}</p>
           <p><strong>Téléphone :</strong> ${phone}</p>
-          <p><strong>Catégorie :</strong> NC (non-classé par défaut)</p>
+          <p><strong>Niveau déclaré :</strong> ${category}</p>
           <br><p>⏳ En attente de validation dans le panneau d'administration.</p>`,
       })
     } catch (mailError) { console.error('[EMAIL]', mailError) }

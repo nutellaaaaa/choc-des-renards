@@ -35,6 +35,9 @@ model User {
   firstName            String
   lastName             String
   phone                String
+  // Point 3/5 : numéro de licence, saisi manuellement par l'admin (0 = non renseigné).
+  // Dernier critère de départage dans les classements.
+  licenseNumber        Int       @default(0)
   category             Category  @default(NC)
   role                 Role      @default(USER)
   accepted             Boolean   @default(false)
@@ -428,6 +431,9 @@ model ContactMessage {
   subject   String
   message   String
   treated   Boolean  @default(false)
+  // Point 19 : réponse de l'admin, conservée avec la question (visible des deux côtés)
+  reply     String?
+  repliedAt DateTime?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -575,4 +581,13 @@ model SiteUpdateInstall {
 
   @@unique([updateId, userId])
   @@index([updateId])
+}
+
+// Point 10 : textes éditables par l'admin (titres et sous-titres des rubriques).
+// key = identifiant de l'élément (ex. "page-contact.title"), value = texte personnalisé.
+// Titres : les parties à mettre en couleur sont entourées d'accolades, ex. "Cont{act}".
+model SiteText {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }

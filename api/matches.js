@@ -19,20 +19,24 @@ function requireAuth(req, res) {
 }
 
 function computeStats(matches) {
-  let played = 0, wins = 0, losses = 0, setDiff = 0, setsWon = 0, points = 0
+  let played = 0, wins = 0, losses = 0, setDiff = 0, setsWon = 0, points = 0, pointsFor = 0, pointsAgainst = 0
   for (const m of matches) {
     const pw = m.sets.filter(s => s.playerScore > s.opponentScore).length
     const ow = m.sets.filter(s => s.opponentScore > s.playerScore).length
     played++
     setDiff += pw - ow
     setsWon += pw
+    for (const st of m.sets) { pointsFor += st.playerScore; pointsAgainst += st.opponentScore }
     // BUG FIX : un bye "comptabilisé comme une défaite" doit valoir 0 point
     // (c'est ce que l'UI annonce), pas 1 comme une défaite normale.
     const isByeLoss = m.opponentFirstName === 'Exempt' && m.opponentLastName === '(bye)' && !(pw > ow)
     if (pw > ow) { wins++; points += 3 }
     else { losses++; points += isByeLoss ? 0 : 1 }
   }
-  return { played, wins, losses, setDiff, setsWon, points }
+  // Point 3/5 : valeurs ABSOLUES utilisées par le classement (colonnes M, S, P)
+  //   matchDiff = victoires - défaites ; setDiff = sets gagnés - perdus ;
+  //   pointDiff = points marqués - points encaissés.
+  return { played, wins, losses, setDiff, setsWon, points, matchDiff: wins - losses, pointDiff: pointsFor - pointsAgainst, pointsFor, pointsAgainst }
 }
 
 // Stats limitées aux matchs d'une phase donnée.
@@ -40,18 +44,23 @@ function computeStatsForPhase(matches, phase) {
   return computeStats((matches || []).filter(m => m.phase === phase))
 }
 
-// Ordre demandé par l'admin : victoires DESC, sets gagnés DESC, puis niveau
-// (à score égal, le joueur le mieux classé passe devant) ; createdAt ASC en
-// tout dernier recours pour un ordre stable en cas d'égalité parfaite.
+// Règles de départage (FAQ, question 5), dans l'ordre :
+//   1. J : nombre de matchs joués (DESC)
+//   2. M : nombre absolu de matchs (victoires - défaites) (DESC)
+//   3. S : nombre absolu de sets (gagnés - perdus) (DESC)
+//   4. P : nombre absolu de points (marqués - encaissés) (DESC)
+//   5. numéro de licence (le plus petit d'abord ; 0 = non renseigné, passe après)
+//   6. createdAt ASC en dernier recours, pour un ordre stable.
 function sortPlayers(players) {
+  const lic = p => (p.licenseNumber && p.licenseNumber > 0 ? p.licenseNumber : Infinity)
   return [...players].sort((a, b) => {
-    if (b.wins !== a.wins) return b.wins - a.wins
-    if (b.setsWon !== a.setsWon) return b.setsWon - a.setsWon
-    // À score égal, le joueur le MOINS bien classé passe devant (celui qui a
-    // le mieux classé en face est déjà avantagé par son niveau) : ordre ASCENDANT sur le rang.
-    const rankA = CATEGORY_RANK[a.category] ?? 0
-    const rankB = CATEGORY_RANK[b.category] ?? 0
-    if (rankA !== rankB) return rankA - rankB
+    if (b.played !== a.played) return b.played - a.played
+    const mA = a.matchDiff ?? (a.wins - a.losses), mB = b.matchDiff ?? (b.wins - b.losses)
+    if (mB !== mA) return mB - mA
+    if (b.setDiff !== a.setDiff) return b.setDiff - a.setDiff
+    if ((b.pointDiff || 0) !== (a.pointDiff || 0)) return (b.pointDiff || 0) - (a.pointDiff || 0)
+    const lA = lic(a), lB = lic(b)
+    if (lA !== lB) return lA < lB ? -1 : 1
     return new Date(a.createdAt || 0) - new Date(b.createdAt || 0)
   })
 }
@@ -125,7 +134,14 @@ module.exports = async function handler(req, res) {
     const auth = requireAuth(req, res)
     if (!auth) return
     try {
-      const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+      // Point 13 : fenêtre = durée de la phase en cours (début de période de la phase),
+      // au lieu de 90 jours fixes. Repli sur 90 jours si la phase n'a pas de planification.
+      let since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+      const st = await prisma.tournamentState.findUnique({ where: { id: 1 } })
+      if (st && (st.currentPhase === 'PHASE1' || st.currentPhase === 'PHASE2')) {
+        const ss = await prisma.schedulingSettings.findUnique({ where: { phase: st.currentPhase } })
+        if (ss && ss.periodStart && new Date(ss.periodStart) <= new Date()) since = new Date(ss.periodStart)
+      }
       const matches = await prisma.match.findMany({
         where: { userId: auth.userId, createdAt: { gte: since } },
         orderBy: { matchDate: 'desc' },
@@ -226,7 +242,7 @@ module.exports = async function handler(req, res) {
       orderBy: { createdAt: 'asc' },
       select: {
         id: true, username: true, firstName: true, lastName: true,
-        category: true, createdAt: true, isBot: true, withdrawnAt: true,
+        category: true, createdAt: true, isBot: true, withdrawnAt: true, licenseNumber: true,
         matches: {
           where: { published: true },
           orderBy: { matchDate: 'desc' },
@@ -245,7 +261,7 @@ module.exports = async function handler(req, res) {
       include: {
         members: {
           where: { user: { active: true, accepted: true, banned: false } },
-          include: { user: { select: { id: true, firstName: true, lastName: true, username: true, category: true, createdAt: true } } },
+          include: { user: { select: { id: true, firstName: true, lastName: true, username: true, category: true, createdAt: true, licenseNumber: true } } },
         },
       },
     })
@@ -257,7 +273,7 @@ module.exports = async function handler(req, res) {
     const livePlayers = users.map(u => ({
       id: u.id, username: u.username,
       firstName: u.firstName, lastName: u.lastName,
-      category: u.category, createdAt: u.createdAt,
+      category: u.category, createdAt: u.createdAt, licenseNumber: u.licenseNumber,
       withdrawnAt: u.withdrawnAt,
       pouleId: userPouleMap[u.id] || null,
       ...computeStats(u.matches),
@@ -318,6 +334,7 @@ module.exports = async function handler(req, res) {
           username: pl.username, category: pl.category,
           points: pl.points, wins: pl.wins, losses: pl.losses,
           played: pl.played, setDiff: pl.setDiff, setsWon: pl.setsWon,
+          matchDiff: pl.matchDiff, pointDiff: pl.pointDiff,
         })),
       }
     })
@@ -331,7 +348,7 @@ module.exports = async function handler(req, res) {
         const u = m.user
         return {
           id: u.id, firstName: u.firstName, lastName: u.lastName,
-          username: u.username, category: u.category, createdAt: u.createdAt,
+          username: u.username, category: u.category, createdAt: u.createdAt, licenseNumber: u.licenseNumber,
           ...computeStatsForPhase(matchesByUserId[u.id], 'PHASE2'),
         }
       })

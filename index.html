@@ -714,6 +714,12 @@
   .form-group select option { background: var(--dark3); color: var(--white); }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
   .auth-error { font-size: 0.86rem; color: #ff6b6b; margin-bottom: 0.75rem; min-height: 1.25em; line-height: 1.4; }
+  /* Point 16 : pas de flèches (spinners) dans les champs numériques, nulle part */
+  input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+  input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  /* Point 21 : retirer l'œil natif du navigateur (Edge/IE), on garde uniquement le nôtre */
+  input::-ms-reveal, input::-ms-clear { display: none; }
+  input[type=password]::-webkit-credentials-auto-fill-button { visibility: hidden; display: none !important; pointer-events: none; }
   .pw-wrap { position: relative; }
   .pw-wrap input { width: 100%; padding-right: 2.6rem; }
   .pw-toggle { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 0.3rem; line-height: 1; display: flex; align-items: center; justify-content: center; color: var(--gray-light); opacity: 0.75; transition: opacity 0.15s, color 0.15s; }
@@ -829,6 +835,10 @@
   .k-notif-toggle .k-nt-label-show { display: inline; }
   .k-notif-toggle .k-nt-label-hide { display: none; }
   #kingdom-hub.k-hide-info-badges .k-badge.info { display: none !important; }
+  /* Point 18 : pas de pastilles grises (compteurs informatifs) dans le panneau admin en version mobile */
+  @media (max-width: 768px) {
+    #kingdom-hub .k-badge.info, #admin-panel .admin-tab .badge.badge-info { display: none !important; }
+  }
   #kingdom-hub.k-hide-info-badges .k-notif-toggle .k-nt-label-show { display: none; }
   #kingdom-hub.k-hide-info-badges .k-notif-toggle .k-nt-label-hide { display: inline; }
 
@@ -2299,6 +2309,16 @@
         <input type="tel" id="reg-phone" placeholder="06 12 34 56 78" autocomplete="tel">
       </div>
       <div class="form-group">
+        <label for="reg-category">Votre niveau (classement FFBaD)</label>
+        <select id="reg-category">
+          <option value="NC">NC — Non classé / je ne sais pas</option>
+          <option value="P">P — Promotion</option>
+          <option value="D">D — Départemental</option>
+          <option value="R">R — Régional</option>
+          <option value="N">N — National</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label for="reg-password">Mot de passe</label>
         <div class="pw-wrap">
           <input type="password" id="reg-password" placeholder="8 caractères minimum" autocomplete="new-password">
@@ -2556,6 +2576,10 @@
         <span class="k-node-orb"><svg viewBox="0 0 24 24"><path d="M4 4.5A2.5 2.5 0 016.5 2H20v17H6.5A2.5 2.5 0 004 21.5v-17z"/><path d="M20 19H6.5A2.5 2.5 0 004 21.5"/></svg></span>
         <span class="k-node-label">Charte</span>
       </button>
+      <button class="k-node size-sm" style="left:57%;top:93%" data-tab="texts">
+        <span class="k-node-orb"><svg viewBox="0 0 24 24"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg></span>
+        <span class="k-node-label">Textes du site</span>
+      </button>
       <button class="k-node size-sm" style="left:50%;top:93%" data-tab="site-update" data-badge-id="badge-site-update" data-badge-type="info">
         <span class="k-node-orb"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-2.6-6.4"/><path d="M21 4v5h-5"/></svg></span>
         <span class="k-node-label">Mise à jour du site</span>
@@ -2599,6 +2623,7 @@
           <button class="k-node size-md" data-tab="contact" data-badge-id="badge-contact" data-badge-type="urgent"><span class="k-node-orb"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></span><span class="k-node-label">Contacts</span></button>
           <button class="k-node size-sm" data-tab="faq" data-badge-id="badge-faq" data-badge-type="info"><span class="k-node-orb"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .5c0 1.5-2 1.8-2 3.3"/><circle cx="12" cy="17" r="0.4" fill="currentColor" stroke="none"/></svg></span><span class="k-node-label">FAQ</span></button>
           <button class="k-node size-sm" data-tab="charte" data-badge-id="badge-charte" data-badge-type="info"><span class="k-node-orb"><svg viewBox="0 0 24 24"><path d="M4 4.5A2.5 2.5 0 016.5 2H20v17H6.5A2.5 2.5 0 004 21.5v-17z"/><path d="M20 19H6.5A2.5 2.5 0 004 21.5"/></svg></span><span class="k-node-label">Charte</span></button>
+          <button class="k-node size-sm" data-tab="texts"><span class="k-node-orb"><svg viewBox="0 0 24 24"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg></span><span class="k-node-label">Textes du site</span></button>
           <button class="k-node size-sm" data-tab="site-update" data-badge-id="badge-site-update" data-badge-type="info"><span class="k-node-orb"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-2.6-6.4"/><path d="M21 4v5h-5"/></svg></span><span class="k-node-label">Mise à jour du site</span></button>
         </div>
       </div>
@@ -2619,6 +2644,7 @@
     <button class="admin-tab" onclick="adminTab('publication',this)">Publication matchs <span class="badge" id="badge-pending-matches" hidden>–</span></button>
     <button class="admin-tab" onclick="adminTab('notifications-list',this)">Notifications <span class="badge" id="badge-notifs" hidden>–</span></button>
     <button class="admin-tab" onclick="adminTab('faq',this)">FAQ <span class="badge badge-info" id="badge-faq">–</span></button>
+    <button class="admin-tab" onclick="adminTab('texts',this)">Textes du site</button>
     <button class="admin-tab" onclick="adminTab('charte',this)">Charte <span class="badge badge-info" id="badge-charte">–</span></button>
     <button class="admin-tab" onclick="adminTab('site-update',this)">Mise à jour du site <span class="badge badge-info" id="badge-site-update">–</span></button>
     <button class="admin-tab" onclick="adminTab('contact',this)">Contacts <span class="badge" id="badge-contact" hidden>–</span></button>
@@ -2637,9 +2663,10 @@
           <span>🤖 Afficher les bots dans ce tableau (<strong id="users-bots-count" style="color:var(--orange)">0</strong> actuellement)</span>
         </label>
       </div>
+      <div style="margin-bottom:1rem"><button class="btn-sm btn-edit" onclick="openLicensesModal()">🪪 Saisir les numéros de licence</button></div>
       <div class="admin-table-wrap">
         <table class="admin-table">
-          <thead><tr><th>Pseudo</th><th>Nom</th><th>Prénom</th><th>Tél.</th><th>Cat.</th><th>Statut</th><th>Actif</th><th>Inscrit le</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Pseudo</th><th>Nom</th><th>Prénom</th><th>Tél.</th><th>Licence</th><th>Cat.</th><th>Statut</th><th>Actif</th><th>Inscrit le</th><th>Actions</th></tr></thead>
           <tbody id="tbl-users"></tbody>
         </table>
         <div id="users-empty" class="admin-empty" style="display:none">Aucun utilisateur.</div>
@@ -2764,7 +2791,7 @@
           <div class="form-group"><label>Début de la période</label><input type="date" id="ps-period-start"></div>
           <div class="form-group"><label>Fin de la période</label><input type="date" id="ps-period-end"></div>
           <div class="form-group"><label>Durée d'un cycle (jours)</label><input type="number" id="ps-cycle-length" min="1" value="14"></div>
-          <div class="form-group"><label>Deadline avant fin de cycle (heures)</label><input type="number" id="ps-deadline-hours" min="0" value="24"></div>
+          <div class="form-group"><label>Heures avant le samedi 23h59 (0 = samedi 23h59)</label><input type="number" id="ps-deadline-hours" min="0" value="0"></div>
         </div>
         <div id="planning-settings-error" class="modal-error"></div>
         <button class="btn-modal-save" onclick="saveSchedulingSettings()">Enregistrer les paramètres</button>
@@ -2947,6 +2974,12 @@
     </div>
 
     <!-- Charte -->
+    <div id="admin-texts" class="admin-section">
+      <div class="admin-section-header"><h3>Textes du site</h3></div>
+      <p style="font-size:0.85rem;color:var(--gray);margin:0 0 1rem">Modifiez les titres, sous-titres, paragraphes et libellés des pages. Mise en forme : <strong>{accolades}</strong> = partie en orange (ex. <em>Cont{act}</em>), <strong>**double astérisque**</strong> = gras. Laisser vide ou « Rétablir » remet le texte d'origine.</p>
+      <div id="texts-admin-list"></div>
+    </div>
+
     <div id="admin-charte" class="admin-section">
       <div class="admin-section-header">
         <h3>Articles de la Charte</h3>
@@ -3443,6 +3476,22 @@
 </div>
 
 <!-- MODAL ÉDITION UTILISATEUR -->
+<div id="licenses-modal" class="admin-modal-bg">
+  <div class="admin-modal" style="max-width:560px;width:95%">
+    <h3>Numéros de licence</h3>
+    <p style="font-size:0.82rem;color:var(--gray);margin:0 0 0.6rem">Dernier critère de départage des classements (le plus petit numéro passe devant). Laisser 0 si inconnu.</p>
+    <input type="text" id="licenses-filter" placeholder="Filtrer par nom ou pseudo…" oninput="filterLicensesRows()" style="width:100%;margin-bottom:0.6rem">
+    <div style="max-height:55vh;overflow:auto">
+      <table class="admin-table" style="width:100%"><thead><tr><th>Joueur</th><th>Pseudo</th><th>Licence</th></tr></thead><tbody id="licenses-body"></tbody></table>
+    </div>
+    <div id="licenses-msg" style="min-height:1.3rem;margin-top:0.6rem;font-size:0.88rem"></div>
+    <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:0.6rem">
+      <button class="btn-sm" onclick="closeLicensesModal()">Fermer</button>
+      <button class="btn-sm btn-accept" id="licenses-save" onclick="saveLicenses()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 <div id="edit-modal" class="admin-modal-bg">
   <div class="admin-modal">
     <h3>Modifier <span id="modal-title-name"></span></h3>
@@ -3451,6 +3500,7 @@
     <div class="form-group"><label>Nom</label><input type="text" id="modal-lastname"></div>
     <div class="form-group"><label>Pseudo</label><input type="text" id="modal-username"></div>
     <div class="form-group"><label>Téléphone</label><input type="tel" id="modal-phone"></div>
+    <div class="form-group"><label>Numéro de licence (0 = non renseigné)</label><input type="number" id="modal-license" min="0" value="0"></div>
     <div class="form-group">
       <label>Catégorie fédérale</label>
       <select id="modal-category">
@@ -4033,6 +4083,8 @@
       <div id="contact-error" class="modal-error"></div>
       <div id="contact-success" class="modal-success"></div>
       <button class="btn-modal-save" style="width:100%" onclick="submitContactForm()">Envoyer le message</button>
+      <h2 style="margin:2rem 0 0.8rem;font-size:1.1rem">Mes messages</h2>
+      <div id="contact-history"><div class="admin-empty">Chargement…</div></div>
     </div>
   </div>
 </div>
@@ -4372,6 +4424,7 @@ function showPage(id, btn) {
   if (id === 'reglement') ensureCharteRendered()
   if (id === 'reglement') loadCharte()
   if (id === 'classement') loadClassement()
+  if (id === 'contact') loadContactHistory()
   if (id === 'performances') loadPerformances()
   if (id === 'souvenirs') loadGallery()
   if (id === 'mes-notifs') loadMesNotifs()
@@ -4836,6 +4889,14 @@ async function handleLogin() {
     localStorage.setItem('cdr_user', JSON.stringify(data.user))
     if (data.loginEventId) localStorage.setItem('cdr_login_event_id', data.loginEventId)
     currentUser = data.user; pendingNotifications = data.pendingNotifications || []
+    // Point 12 : on masque tout de suite le site avec l'écran noir du générique, sans attendre
+    // la vérification réseau de la mise à jour (sinon le site restait visible quelques instants
+    // avant le début du générique). La page de mise à jour (z-index supérieur) passe devant.
+    if (currentUser.role !== 'ADMIN') {
+      const introOv = document.getElementById('intro-overlay')
+      introOv.classList.remove('hidden'); introOv.style.opacity = ''
+      document.querySelectorAll('#intro-overlay .intro-stage').forEach(st => st.classList.remove('visible'))
+    }
     showApp()
     // Avant l'intro cinématique (et avant tout le reste) : si une mise à jour du
     // site est déployée et n'a pas encore été "installée" par ce joueur, on le
@@ -5140,7 +5201,7 @@ async function handleRegister() {
   if (password.length < 8) { errorEl.textContent = 'Le mot de passe doit contenir au moins 8 caractères.'; return }
   btn.disabled = true; btn.textContent = 'Création…'
   try {
-    const res  = await fetch('/api/register', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({firstName, lastName, phone, password, confirmPassword: confirm}) })
+    const res  = await fetch('/api/register', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({firstName, lastName, phone, password, confirmPassword: confirm, category: document.getElementById('reg-category').value}) })
     const data = await res.json()
     if (!res.ok) { errorEl.textContent = data.error || "Erreur lors de l'inscription."; return }
     showPendingMessage()
@@ -5627,7 +5688,7 @@ async function loadScoreMatch() {
         const oppName   = c.opponent ? `${esc(capName(c.opponent.firstName))} ${esc(capName(c.opponent.lastName))}` : 'Adversaire inconnu'
         const typeLabel = c.type === 'special' ? '🗓 Rencontre spéciale' : '📋 Match planifié'
         const deadlineLine = c.deadline
-          ? `<div style="margin-top:0.25rem">⏰ ${c.type === 'special' ? 'Date limite' : 'Date prévue'} : <strong>${fmtDateOnly(c.deadline)}</strong></div>`
+          ? `<div style="margin-top:0.25rem">⏰ ${'Date limite'} : <strong>${fmtDateOnly(c.deadline)}</strong></div>`
           : ''
         const reasonLine = c.reason ? `<div style="margin-top:0.2rem">📌 <strong>${esc(c.reason)}</strong></div>` : ''
      const malusLine = c.malus
@@ -5669,7 +5730,7 @@ async function loadScoreMatch() {
         ).join(' · ')
         const pubLine = m.published
           ? `<div style="font-size:0.78rem;color:#4caf84;margin-top:0.3rem">✅ Publié au classement</div>`
-          : `<div style="font-size:0.78rem;color:var(--gray);margin-top:0.3rem">⏳ En attente de publication par l'administrateur</div>`
+          : `<div style="font-size:0.78rem;color:var(--gray);margin-top:0.3rem">⏳ En attente de validation</div>`
         return `
         <div class="notif-history-card" style="opacity:0.75;border-left:3px solid var(--dark5)">
           <div class="notif-history-title" style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem">
@@ -5737,6 +5798,8 @@ async function submitScoreMatch() {
     const os = parseInt(row.querySelector('input:nth-of-type(2)').value, 10)
     sets.push({ setNumber: i+1, playerScore: ps, opponentScore: os })
   })
+  const scoreErr = validateSetScores(sets)
+  if (scoreErr) { errorEl.textContent = scoreErr; return }
   // Vérification côté client : le soumettant doit être le gagnant
   const mySetWins  = sets.filter(s => s.playerScore > s.opponentScore).length
   const oppSetWins = sets.filter(s => s.opponentScore > s.playerScore).length
@@ -5744,6 +5807,8 @@ async function submitScoreMatch() {
     errorEl.textContent = "D'après ce score, vous n'avez pas gagné le match. Seul le gagnant renseigne le score — si vous avez perdu, attendez que votre adversaire le saisisse."
     return
   }
+  const oppLabel = (document.getElementById('sc-players').textContent || '').replace(/^.*?contre\s*/i, '').trim()
+  if (!confirmSetScores(sets, oppLabel)) return
   try {
     const res = await fetch('/api/public?resource=convocations', {
       method: 'POST', headers: authHeaders(),
@@ -6108,7 +6173,8 @@ async function loadClassement() {
 
     // Pas de classement général : uniquement Poules (Phase 1) ou Rondes suisses (Phase 2).
     // L'onglet par défaut suit la phase en cours.
-    const hasPoules = phase === 'PHASE1' && poules && poules.length > 0
+    // Point 14 : les poules (Phase 1) restent consultables pendant la Phase 2
+    const hasPoules = poules && poules.length > 0
     const hasGroups = phase2Groups && phase2Groups.length > 0
     const defaultTab = phase === 'PHASE2' && hasGroups ? 'groups' : (hasPoules ? 'poules' : 'groups')
 
@@ -6116,7 +6182,7 @@ async function loadClassement() {
 
     if (hasPoules || hasGroups) {
       html += `<div class="phase-tabs">`
-      if (hasPoules) html += `<button class="phase-tab${defaultTab === 'poules' ? ' active' : ''}" onclick="switchClassTab('poules',this)">Poules</button>`
+      if (hasPoules) html += `<button class="phase-tab${defaultTab === 'poules' ? ' active' : ''}" onclick="switchClassTab('poules',this)">${phase === 'PHASE2' ? 'Poules (Phase 1)' : 'Poules'}</button>`
       if (hasGroups) html += `<button class="phase-tab${defaultTab === 'groups' ? ' active' : ''}" onclick="switchClassTab('groups',this)">Rondes suisses</button>`
       html += `</div>`
     }
@@ -6204,18 +6270,20 @@ function bindPlayerRows(seasonOnly) {
 }
 
 function renderRankingTable(sorted) {
-  let html = `<table><thead><tr><th>#</th><th>Pseudo</th><th>Cat.</th><th>Matches</th><th>Sets</th><th>Points</th></tr></thead><tbody>`
+  // Points 3/5/7 : colonnes J (joués), M, S, P en valeurs absolues, sans signe « + »
+  let html = `<table><thead><tr><th>#</th><th>Pseudo</th><th>Cat.</th><th title="Matchs joués">J</th><th title="Matchs : victoires − défaites">M</th><th title="Sets : gagnés − perdus">S</th><th title="Points : marqués − encaissés">P</th></tr></thead><tbody>`
   sorted.forEach((p, i) => {
     const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : ''
     const winnerClass = i < 2 ? 'winner' : ''
-    const netMatches = p.wins - p.losses
+    const netMatches = p.matchDiff ?? (p.wins - p.losses)
     html += `<tr class="clickable-row ${winnerClass}" data-player-id="${p.id}">
       <td class="rank ${rankClass}">${i+1}</td>
       <td class="player-name">${esc(p.username)}${p.withdrawnAt ? ' <span class="status-badge status-banned" style="font-size:0.68rem;vertical-align:middle" title="Forfait déclaré pour la saison">🚩 Forfait</span>' : ''}</td>
       <td><span class="player-level level-${p.category || 'NC'}">${p.category || 'NC'}</span></td>
-      <td>${netMatches > 0 ? '+' : ''}${netMatches}</td>
-      <td>${p.setDiff > 0 ? '+' : ''}${p.setDiff}</td>
-      <td class="pts">${p.points}</td>
+      <td>${p.played ?? 0}</td>
+      <td>${netMatches}</td>
+      <td>${p.setDiff}</td>
+      <td class="pts">${p.pointDiff ?? 0}</td>
     </tr>`
   })
   html += '</tbody></table>'
@@ -6923,6 +6991,23 @@ async function faqVote(topicId, useful, btn) {
 }
 
 /* ══════════════ FORMULAIRE DE CONTACT (public) ══════════════ */
+async function loadContactHistory() {
+  const box = document.getElementById('contact-history')
+  if (!box) return
+  try {
+    const res = await fetch('/api/contact', { headers: authHeaders() })
+    if (!res.ok) { box.innerHTML = ''; return }
+    const { messages } = await res.json()
+    if (!messages || !messages.length) { box.innerHTML = '<div class="admin-empty">Aucun message envoyé pour l\'instant.</div>'; return }
+    box.innerHTML = messages.map(m => `<div style="border:1px solid var(--dark4);border-radius:10px;padding:0.8rem 1rem;margin-bottom:0.8rem;background:var(--dark3)">
+      <div style="font-size:0.78rem;color:var(--gray)">${esc(m.nature)} · ${fmtDate(m.createdAt)}</div>
+      <div style="font-weight:600;margin:0.2rem 0">${esc(m.subject)}</div>
+      <div style="white-space:pre-wrap;color:var(--gray-light);font-size:0.9rem">${esc(m.message)}</div>
+      ${m.reply ? `<div style="margin-top:0.7rem;padding:0.6rem 0.8rem;border-left:3px solid var(--orange);background:rgba(255,255,255,0.03)"><div style="font-size:0.75rem;color:var(--orange);margin-bottom:0.2rem">Réponse de l'organisation · ${fmtDate(m.repliedAt)}</div><div style="white-space:pre-wrap;font-size:0.9rem">${esc(m.reply)}</div></div>` : '<div style="margin-top:0.5rem;font-size:0.78rem;color:var(--gray)">⏳ En attente de réponse</div>'}
+    </div>`).join('')
+  } catch { box.innerHTML = '' }
+}
+
 async function submitContactForm() {
   const errorEl = document.getElementById('contact-error')
   const successEl = document.getElementById('contact-success')
@@ -6945,6 +7030,7 @@ async function submitContactForm() {
     document.getElementById('contact-subject').value = ''
     document.getElementById('contact-message').value = ''
     successEl.textContent = 'Votre message a bien été envoyé. L\'organisation reviendra vers vous si nécessaire.'
+    loadContactHistory()
   } catch (e) {
     errorEl.textContent = 'Erreur réseau. Réessayez.'
   }
@@ -6979,7 +7065,8 @@ function showPlayerDetail(player) {
   document.getElementById('pdm-name').innerHTML = `${esc(player.firstName)} <span>${esc(player.lastName)}</span>`
   document.getElementById('pdm-username').textContent = '@' + player.username + ' · ' + (player.category || 'NC')
   const pdmBadges = document.getElementById('pdm-badges')
-  if (pdmBadges) pdmBadges.innerHTML = playerBadgesHtml(player)
+  // Point 8 : plus de badges dans le détail joueur
+  if (pdmBadges) { pdmBadges.innerHTML = ''; pdmBadges.style.display = 'none' }
   const diff = player.setDiff
   document.getElementById('pdm-stats').innerHTML = `
     <div class="player-stat-card"><div class="val">${player.played}</div><div class="lbl">Matchs</div></div>
@@ -7018,7 +7105,7 @@ function showPlayerDetail(player) {
       </div>`
     }).join('')
   }
-  renderProgressionChart(player)
+  // Point 8 : plus de courbe de progression dans le détail joueur
   document.getElementById('player-detail-modal').classList.add('open')
 }
 function closePlayerDetail() { document.getElementById('player-detail-modal').classList.remove('open') }
@@ -7427,7 +7514,12 @@ function adminTab(name, btn) {
   if (name === 'phase') loadPhase()
   if (name === 'poules') loadPoules()
   if (name === 'planning') loadScheduling()
-  if (name === 'publication') loadPendingMatches()
+  if (name === 'publication') {
+    // Point 23 : atterrir directement sur « En attente »
+    const tabs = document.querySelectorAll('#admin-publication .admin-tabs .admin-tab')
+    if (tabs[0]) pubSubTab('pending-matches', tabs[0])
+    loadPendingMatches()
+  }
   if (name === 'planned') loadPlannedMatches()
   if (name === 'notifications-list') loadNotificationsList()
   if (name === 'notify') loadPlayersForNotify()
@@ -7435,6 +7527,7 @@ function adminTab(name, btn) {
   if (name === 'pending') loadRefused()
   if (name === 'faq') loadFaqAdmin()
   if (name === 'charte') loadCharteAdmin()
+  if (name === 'texts') loadTextsAdmin()
   if (name === 'site-update') loadSiteUpdateAdmin()
   if (name === 'contact') loadContactAdmin()
   if (name === 'other-actions') { loadDataVersions(); loadOtherActionsConfig() }
@@ -7607,6 +7700,7 @@ function renderUsersTable() {
       <tr${u.isBot ? ' style="opacity:0.75"' : ''}>
         <td><strong style="color:var(--white)">${esc(u.username)}</strong>${u.isBot ? ' <span style="font-size:0.7rem;font-weight:700;padding:1px 6px;border-radius:10px;background:rgba(130,180,255,0.15);color:#82B4FF;border:1px solid rgba(130,180,255,0.35);vertical-align:middle">🤖 BOT</span>' : ''}</td>
         <td>${esc(capName(u.lastName))}</td><td>${esc(capName(u.firstName))}</td><td>${esc(u.phone)}</td>
+        <td style="font-variant-numeric:tabular-nums">${u.licenseNumber ? u.licenseNumber : '<span style="color:var(--gray)">—</span>'}</td>
         <td><span class="player-level level-${u.category || 'NC'}">${u.category || 'NC'}</span></td>
         <td>${u.banned ? '<span class="status-badge status-banned">Banni</span>' : '<span class="status-badge status-ok">Accepté</span>'}</td>
         <td>${u.active
@@ -7745,6 +7839,42 @@ async function adminAction(action, userId) {
   } catch { alert('Erreur réseau.') }
 }
 
+/* ── Saisie en masse des numéros de licence (points 3/5) ── */
+function openLicensesModal() {
+  const players = (_lastUsersData || []).filter(u => !u.isBot && u.accepted && !u.banned && u.role !== 'ADMIN' && !['admin','root'].includes((u.username||'').toLowerCase()))
+    .sort((a, b) => (a.lastName || '').localeCompare(b.lastName || '', 'fr') || (a.firstName || '').localeCompare(b.firstName || '', 'fr'))
+  document.getElementById('licenses-body').innerHTML = players.map(u => `<tr data-search="${esc((u.firstName+' '+u.lastName+' '+u.username).toLowerCase())}">
+    <td>${esc(u.lastName)} ${esc(u.firstName)}</td><td>@${esc(u.username)}</td>
+    <td><input type="text" inputmode="numeric" pattern="[0-9]*" class="license-input" data-user-id="${u.id}" data-orig="${u.licenseNumber || 0}" value="${u.licenseNumber || 0}" style="width:7.5rem"></td></tr>`).join('')
+    || '<tr><td colspan="3" class="admin-empty">Aucun joueur.</td></tr>'
+  document.getElementById('licenses-filter').value = ''
+  document.getElementById('licenses-msg').textContent = ''
+  document.getElementById('licenses-modal').classList.add('open')
+}
+function closeLicensesModal() { document.getElementById('licenses-modal').classList.remove('open') }
+function filterLicensesRows() {
+  const q = document.getElementById('licenses-filter').value.trim().toLowerCase()
+  document.querySelectorAll('#licenses-body tr[data-search]').forEach(tr => { tr.style.display = !q || tr.dataset.search.includes(q) ? '' : 'none' })
+}
+async function saveLicenses() {
+  const msg = document.getElementById('licenses-msg'), btn = document.getElementById('licenses-save')
+  const changed = [...document.querySelectorAll('.license-input')].filter(i => i.value.trim() !== i.dataset.orig)
+    .map(i => ({ userId: parseInt(i.dataset.userId, 10), licenseNumber: i.value.trim() }))
+  if (changed.some(c => c.licenseNumber !== '' && !/^\d+$/.test(c.licenseNumber))) { msg.style.color = '#ff6b6b'; msg.textContent = 'Les numéros de licence ne doivent contenir que des chiffres.'; return }
+  if (!changed.length) { msg.style.color = 'var(--gray)'; msg.textContent = 'Aucune modification.'; return }
+  btn.disabled = true
+  try {
+    const res = await fetch('/api/admin/action', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'set_licenses', data:{ licenses: changed } }) })
+    const json = await res.json()
+    if (!res.ok) { msg.style.color = '#ff6b6b'; msg.textContent = json.error || 'Erreur.'; return }
+    msg.style.color = '#4cd964'; msg.textContent = '✅ ' + json.message
+    await loadUsers()
+    document.querySelectorAll('.license-input').forEach(i => { i.dataset.orig = String(parseInt(i.value, 10) || 0) })
+  } catch { msg.style.color = '#ff6b6b'; msg.textContent = 'Erreur réseau.' }
+  finally { btn.disabled = false }
+}
+document.getElementById('licenses-modal').addEventListener('click', function(e) { if (e.target===this) closeLicensesModal() })
+
 /* ── Edition utilisateur ── */
 function openEditModal(user) {
   document.getElementById('modal-user-id').value = user.id
@@ -7753,6 +7883,7 @@ function openEditModal(user) {
   document.getElementById('modal-lastname').value   = user.lastName
   document.getElementById('modal-username').value   = user.username
   document.getElementById('modal-phone').value      = user.phone
+  document.getElementById('modal-license').value    = user.licenseNumber || 0
   document.getElementById('modal-category').value   = user.category || 'NC'
   document.getElementById('modal-error').textContent = ''
   document.getElementById('edit-modal').classList.add('open')
@@ -7768,6 +7899,7 @@ async function saveEditModal() {
     username:  document.getElementById('modal-username').value.trim(),
     phone:     document.getElementById('modal-phone').value.trim(),
     category:  document.getElementById('modal-category').value,
+    licenseNumber: parseInt(document.getElementById('modal-license').value, 10) || 0,
   }
   if (!data.firstName || !data.lastName || !data.username || !data.phone || !data.category) { errorEl.textContent = 'Tous les champs sont requis.'; return }
   try {
@@ -7893,7 +8025,33 @@ function autoAddSetIfNeeded(containerId, addRowFn, maxSets = 5) {
   const lastRow = rows[rows.length - 1]
   const ps = parseInt(lastRow.querySelector('input:nth-of-type(1)').value, 10)
   const os = parseInt(lastRow.querySelector('input:nth-of-type(2)').value, 10)
-  if (!isNaN(ps) && !isNaN(os) && ps !== os) addRowFn()
+  // Point 9 : on ne crée le set suivant que lorsque le dernier set est terminé (un
+  // score atteint 11, l'autre est inférieur). Avant, un set partiellement saisi
+  // (ex. 0–5 pendant la frappe) suffisait à déclencher un 4e set inutile.
+  if (!isNaN(ps) && !isNaN(os) && ps !== os && Math.max(ps, os) === 11 && Math.min(ps, os) < 11) addRowFn()
+}
+
+// Point 9 : validation des scores. Retourne un message d'erreur, ou null si valide.
+function validateSetScores(sets) {
+  for (let i = 0; i < sets.length; i++) {
+    const { playerScore: ps, opponentScore: os } = sets[i]
+    if (!Number.isInteger(ps) || !Number.isInteger(os)) return `Scores non valides : le set ${i + 1} est incomplet.`
+    if (ps < 0 || os < 0 || ps > 11 || os > 11) return `Scores non valides : le set ${i + 1} (${ps}–${os}) dépasse 11 points. Chaque score doit être compris entre 0 et 11.`
+    if (ps === os) return `Scores non valides : le set ${i + 1} ne peut pas se terminer à égalité (${ps}–${os}).`
+  }
+  let pw = 0, ow = 0
+  for (let i = 0; i < sets.length; i++) {
+    if (pw >= 3 || ow >= 3) return `Scores non valides : le match était déjà décidé avant le set ${i + 1}.`
+    if (sets[i].playerScore > sets[i].opponentScore) pw++; else ow++
+  }
+  return null
+}
+// Point 9 : message de confirmation affichant les scores saisis avant l'envoi.
+function confirmSetScores(sets, opponentLabel) {
+  const lines = sets.map(s => `Set ${s.setNumber} : ${s.playerScore} – ${s.opponentScore}`).join('\n')
+  const pw = sets.filter(s => s.playerScore > s.opponentScore).length
+  const ow = sets.length - pw
+  return confirm(`Vérifiez les scores${opponentLabel ? ' contre ' + opponentLabel : ''} :\n\n${lines}\n\nRésultat : ${pw} set(s) à ${ow}.\n\nConfirmer l'envoi du score ?`)
 }
 
 function addSetRow() {
@@ -8001,7 +8159,8 @@ async function saveMatch() {
     if (isNaN(ps) || isNaN(os) || ps < 0 || os < 0) { valid = false; return }
     sets.push({ setNumber: i+1, playerScore: ps, opponentScore: os })
   })
-  if (!valid) { errorEl.textContent = 'Scores invalides.'; return }
+  if (!valid) { errorEl.textContent = 'Scores non valides.'; return }
+  { const e = validateSetScores(sets); if (e) { errorEl.textContent = e; return } }
   btn.disabled = true; btn.textContent = 'Enregistrement…'
   try {
     if (matchModalMode === 'edit') {
@@ -8159,7 +8318,7 @@ async function loadScheduling() {
   document.getElementById('ps-period-start').value = data.settings ? toDateInput(data.settings.periodStart) : ''
   document.getElementById('ps-period-end').value   = data.settings ? toDateInput(data.settings.periodEnd) : ''
   document.getElementById('ps-cycle-length').value  = data.settings ? data.settings.cycleLengthDays : 14
-  document.getElementById('ps-deadline-hours').value = data.settings ? data.settings.deadlineHoursBeforeCycleEnd : 24
+  document.getElementById('ps-deadline-hours').value = data.settings ? data.settings.deadlineHoursBeforeCycleEnd : 0
 
   const locked = !!data.locked
   document.getElementById('planning-lock-badge').hidden = !locked
@@ -8199,6 +8358,15 @@ async function saveSchedulingSettings() {
   const data = await res.json()
   if (!res.ok) { errorEl.textContent = data.error || 'Erreur.'; return }
   await loadScheduling()
+  // Point 17 : message de confirmation visible après l'enregistrement
+  let ok = document.getElementById('planning-settings-ok')
+  if (!ok) {
+    ok = document.createElement('div'); ok.id = 'planning-settings-ok'
+    ok.style.cssText = 'margin-top:0.5rem;font-size:0.9rem;color:#4cd964;font-weight:600'
+    errorEl.parentNode.insertBefore(ok, errorEl.nextSibling)
+  }
+  ok.textContent = '✅ Paramètres enregistrés.' + ((data.warnings && data.warnings.length) ? ' ⚠️ ' + data.warnings.join(' ') : '')
+  clearTimeout(ok._t); ok._t = setTimeout(() => { ok.textContent = '' }, 6000)
 }
 
 async function addBlackout() {
@@ -8498,7 +8666,7 @@ async function removeMember(pouleId, userId) {
   await loadPoules()
 }
 async function fillRandom(pouleId) {
-  const countStr = prompt('Combien de joueurs ajouter ?', '4')
+  const countStr = prompt('Combien de joueurs ajouter ?', '8')
   const count = parseInt(countStr, 10); if (!count || count < 1) return
   const res = await fetch('/api/admin/poules', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'fill_random', pouleId, count }) })
   const data = await res.json()
@@ -8721,10 +8889,11 @@ async function sendNotification() {
   }
 
   if (!title)  { errorEl.textContent = 'Titre requis.'; return }
-  const res = await fetch('/api/admin/notifications', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'send', userIds: selected, title, message }) })
+  const res = await fetch('/api/admin/notifications', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'send', userIds: selected, title, message, contactId: _replyContactId }) })
   const data = await res.json()
   if (!res.ok) { errorEl.textContent = data.error||'Erreur.'; return }
   successEl.textContent = `✓ Notification envoyée à ${data.count} joueur(s).`
+  if (_replyContactId) { _replyContactId = null; const c = document.getElementById('notify-reply-context'); if (c) c.remove() }
   document.getElementById('notify-title').value = ''
   document.getElementById('notify-message').value = ''
   notifySelectAll(false)
@@ -9644,7 +9813,7 @@ async function loadContactAdmin() {
         <td><strong style="color:var(--white)">${esc(m.user?.username || '—')}</strong><br><span style="font-size:0.78rem;color:var(--gray)">${esc(m.user?.firstName || '')} ${esc(m.user?.lastName || '')}</span></td>
         <td style="color:var(--gray-light);font-size:0.85rem">${esc(m.nature)}</td>
         <td style="color:var(--gray-light)">${esc(m.subject)}</td>
-        <td style="color:var(--gray-light);font-size:0.85rem;max-width:260px;white-space:pre-wrap">${esc(m.message)}</td>
+        <td style="color:var(--gray-light);font-size:0.85rem;max-width:260px;white-space:pre-wrap">${esc(m.message)}${m.reply ? `<div style="margin-top:0.5rem;padding:0.4rem 0.6rem;border-left:3px solid var(--orange);color:var(--white)"><div style="font-size:0.72rem;color:var(--orange)">Votre réponse · ${fmtDate(m.repliedAt)}</div>${esc(m.reply)}</div>` : ''}</td>
         <td style="color:var(--gray);font-size:0.82rem">${fmtDate(m.createdAt)}</td>
         <td>${m.treated ? '<span class="status-badge status-ok">Traité</span>' : '<span class="status-badge status-wait">Non traité</span>'}</td>
         <td style="white-space:nowrap">
@@ -9665,9 +9834,9 @@ async function toggleContactTreated(contactId, treated) {
   } catch (e) { console.error('[toggleContactTreated]', e) }
 }
 
+let _replyContactId = null
 async function replyToContact(userId, contactId, subject) {
-  // Marque directement la demande comme traitee puisqu on y repond
-  toggleContactTreated(contactId, true)
+  _replyContactId = contactId
 
   // IMPORTANT : on ne passe PAS par adminTab('notify') qui declencherait
   // un nouveau loadPlayersForNotify() asynchrone et creerait une race condition
@@ -9697,6 +9866,15 @@ async function replyToContact(userId, contactId, subject) {
   const titleInput = document.getElementById('notify-title')
   const msgInput = document.getElementById('notify-message')
   if (titleInput) titleInput.value = `Réponse à ${subject}`
+  // Point 19 : le message initial reste affiché pendant la rédaction de la réponse
+  const orig = (contactAdminMessages || []).find(m => m.id === contactId)
+  let ctx = document.getElementById('notify-reply-context')
+  if (!ctx && msgInput) {
+    ctx = document.createElement('div'); ctx.id = 'notify-reply-context'
+    ctx.style.cssText = 'margin-bottom:0.8rem;padding:0.7rem 0.9rem;border-left:3px solid var(--orange);background:var(--dark3);border-radius:6px;font-size:0.88rem'
+    msgInput.parentNode.insertBefore(ctx, msgInput)
+  }
+  if (ctx && orig) ctx.innerHTML = `<div style="font-size:0.75rem;color:var(--orange);margin-bottom:0.25rem">Message de ${esc(orig.user?.username || '')} · ${esc(orig.nature)} · ${fmtDate(orig.createdAt)}</div><div style="font-weight:600">${esc(orig.subject)}</div><div style="white-space:pre-wrap;color:var(--gray-light)">${esc(orig.message)}</div>`
   if (msgInput) msgInput.focus()
 }
 
@@ -10058,6 +10236,7 @@ async function savePlannedScore() {
     const os = parseInt(row.querySelector('input:nth-of-type(2)').value, 10)
     sets.push({ setNumber: i+1, playerScore: ps, opponentScore: os })
   })
+  { const e = validateSetScores(sets); if (e) { errorEl.textContent = e; return } }
   try {
     const res = await fetch('/api/admin/match', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'planned_convert', plannedMatchId: pmid, matchDate: date, note: note||null, sets }) })
     const data = await res.json()
@@ -10129,6 +10308,7 @@ async function saveSpecialScore() {
     const os = parseInt(row.querySelector('input:nth-of-type(2)').value, 10)
     sets.push({ setNumber: i+1, playerScore: ps, opponentScore: os })
   })
+  { const e = validateSetScores(sets); if (e) { errorEl.textContent = e; return } }
   try {
     const res = await fetch('/api/admin/match', { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'add_from_special', specialMatchId: smid, matchDate: date, note: note||null, sets }) })
     const data = await res.json()
@@ -11273,6 +11453,126 @@ function animateHero() {
     setTimeout(() => document.querySelector(s)?.classList.add('visible'), 200 + i * 250)
   })
 }
+/* ══════════════ TEXTES ÉDITABLES (point 10) ══════════════ */
+let _siteTexts = {}
+let _textsTagged = false
+const PAGE_LABELS = { accueil:'Accueil', reglement:'Charte', faq:'FAQ', contact:'Contact', classement:'Classement', performances:'Performances', souvenirs:'Souvenirs', vitrine:'Vitrine', 'mes-notifs':'Mes notifications', 'score-match':'Score du match', 'chat-match':'Communication', 'mon-profil':'Mon profil', confidentialite:'Confidentialité' }
+const TEXT_KIND_LABELS = { title:'titre', subtitle:'sous-titre', h2:'intertitre', h3:'intertitre', p:'paragraphe', label:'libellé', div:'texte', li:'élément de liste', small:'note' }
+// Formatage simple : **gras**, {partie en couleur}, retour à la ligne.
+function textToHtml(txt) {
+  return esc(txt).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\{([^}]*)\}/g, '<span>$1</span>').replace(/\n/g, '<br>')
+}
+function htmlToText(html) {
+  return html.replace(/<br\s*\/?>/gi, '\n').replace(/<(strong|b)>(.*?)<\/\1>/gi, '**$2**').replace(/<span>(.*?)<\/span>/gi, '{$1}')
+    .replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
+}
+function _textHash(str) { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return (h >>> 0).toString(36) }
+// Un élément est modifiable s'il ne contient que du texte et des balises simples (span/strong/b/br sans attribut) :
+// tout élément contenant un lien, un bouton, un champ ou un nœud identifié (rempli par le code) est ignoré.
+function _isPlainTextEl(el) {
+  if (el.id || el.querySelector('[id], a, button, input, select, textarea, svg, img')) return false
+  const html = el.innerHTML
+  if (/<(?!\/?(span|strong|b|br)\s*\/?>)/i.test(html)) return false
+  const txt = el.textContent.replace(/\s+/g, ' ').trim()
+  return txt.length >= 4 && !/chargement|^(\u2026|\.\.\.)/i.test(txt) && !/\$\{/.test(txt)
+}
+// Repère (une seule fois, avant que le code ne remplisse les pages) les textes modifiables.
+function tagEditableTexts() {
+  if (_textsTagged) return
+  _textsTagged = true
+  document.querySelectorAll('.page[id^="page-"]').forEach(page => {
+    const t = page.querySelector('h1.section-title')
+    if (t && !t.dataset.textKey) { t.dataset.textKey = page.id + '.title'; t.dataset.textKind = 'title'; t.dataset.defaultHtml = t.innerHTML }
+    const st = page.querySelector('.section-subtitle:not([id])')
+    if (st && !st.dataset.textKey && !st.querySelector('[id], a, button, input')) { st.dataset.textKey = page.id + '.subtitle'; st.dataset.textKind = 'subtitle'; st.dataset.defaultHtml = st.innerHTML }
+    // Textes plus longs : paragraphes, intertitres, libellés, courts textes d'information.
+    page.querySelectorAll('p, h2, h3, label, li, small, div').forEach(el => {
+      if (el.dataset.textKey || el.closest('[data-text-key]') || el.closest('.modal, .admin-modal, [class*="modal"]')) return
+      if (el.tagName === 'DIV' && el.children.length > 0 && !/^(span|strong|b|br)$/i.test(el.firstElementChild.tagName)) return
+      if (!_isPlainTextEl(el)) return
+      const def = el.innerHTML
+      const key = page.id + '.t-' + _textHash(def)
+      el.dataset.textKey = key; el.dataset.textKind = el.tagName.toLowerCase(); el.dataset.defaultHtml = def
+    })
+  })
+}
+function applySiteTexts() {
+  tagEditableTexts()
+  document.querySelectorAll('[data-text-key]').forEach(el => {
+    const v = _siteTexts[el.dataset.textKey]
+    if (v) { el.innerHTML = textToHtml(v); el.dataset.overridden = '1' }
+    else if (el.dataset.overridden) { el.innerHTML = el.dataset.defaultHtml; delete el.dataset.overridden }
+  })
+}
+async function loadSiteTexts() {
+  tagEditableTexts()
+  try {
+    const res = await fetch('/api/public?resource=texts')
+    if (!res.ok) return
+    const { texts } = await res.json()
+    _siteTexts = texts || {}
+    applySiteTexts()
+  } catch (e) { console.error('[loadSiteTexts]', e) }
+}
+async function loadTextsAdmin() {
+  const box = document.getElementById('texts-admin-list')
+  try {
+    const res = await fetch('/api/admin/texts', { headers: authHeaders() })
+    if (res.ok) _siteTexts = (await res.json()).texts || {}
+  } catch {}
+  const els = [...document.querySelectorAll('[data-text-key]')]
+  const groups = new Map()
+  for (const el of els) {
+    const pageId = el.dataset.textKey.split('.')[0]
+    if (!groups.has(pageId)) groups.set(pageId, [])
+    groups.get(pageId).push(el)
+  }
+  let html = ''
+  for (const [pageId, list] of groups) {
+    const slug = pageId.replace(/^page-/, '')
+    html += `<h4 style="margin:1.4rem 0 0.6rem;color:var(--orange)">${esc(PAGE_LABELS[slug] || slug)}</h4>`
+    for (const el of list) {
+      const key = el.dataset.textKey
+      const def = htmlToText(el.dataset.defaultHtml).trim()
+      const cur = _siteTexts[key] || def
+      const kind = TEXT_KIND_LABELS[el.dataset.textKind] || 'texte'
+      const long = cur.length > 70 || def.length > 70
+      html += `<div class="form-group" style="border-bottom:1px solid var(--dark4);padding-bottom:0.8rem">
+        <label>${esc(kind)}${_siteTexts[key] ? ' <span style="color:var(--orange);font-size:0.75rem">· modifié</span>' : ''}</label>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+          ${long
+            ? `<textarea class="text-edit-input" data-key="${esc(key)}" data-default="${esc(def)}" rows="${Math.min(8, Math.ceil(cur.length / 70) + 1)}" maxlength="2000" style="flex:1;min-width:220px">${esc(cur)}</textarea>`
+            : `<input type="text" class="text-edit-input" data-key="${esc(key)}" data-default="${esc(def)}" value="${esc(cur)}" maxlength="2000" style="flex:1;min-width:220px">`}
+          <button class="btn-sm btn-edit" onclick="saveSiteText('${esc(key)}', this)">Enregistrer</button>
+          <button class="btn-sm" onclick="resetSiteText('${esc(key)}', this)">Rétablir</button>
+          <span class="text-edit-msg" style="align-self:center;font-size:0.82rem"></span>
+        </div></div>`
+    }
+  }
+  box.innerHTML = html || '<div class="admin-empty">Aucun texte modifiable.</div>'
+}
+async function _sendSiteText(key, payload, btn) {
+  const msg = btn.parentNode.querySelector('.text-edit-msg')
+  try {
+    const res = await fetch('/api/admin/texts', { method:'POST', headers: authHeaders(), body: JSON.stringify({ key, ...payload }) })
+    const data = await res.json()
+    if (!res.ok) { msg.style.color = '#ff6b6b'; msg.textContent = data.error || 'Erreur.'; return false }
+    msg.style.color = '#4cd964'; msg.textContent = '✅ Enregistré'
+    setTimeout(() => { msg.textContent = '' }, 3000)
+    return true
+  } catch { msg.style.color = '#ff6b6b'; msg.textContent = 'Erreur réseau.'; return false }
+}
+async function saveSiteText(key, btn) {
+  const input = btn.parentNode.querySelector('.text-edit-input')
+  const v = input.value.trim()
+  if (!v || v === input.dataset.default) return resetSiteText(key, btn)
+  if (await _sendSiteText(key, { action:'set', value: v }, btn)) { _siteTexts[key] = v; applySiteTexts() }
+}
+async function resetSiteText(key, btn) {
+  const input = btn.parentNode.querySelector('.text-edit-input')
+  if (await _sendSiteText(key, { action:'reset' }, btn)) { delete _siteTexts[key]; input.value = input.dataset.default; applySiteTexts() }
+}
+window.addEventListener('load', loadSiteTexts)
 window.addEventListener('load', animateHero)
 
 /* ── Ex-menu mobile (hamburger) ── remplacé par le dock flottant : la navigation

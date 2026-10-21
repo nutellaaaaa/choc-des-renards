@@ -50,6 +50,21 @@ function requireAuth(req, res) {
   catch { res.status(401).json({ error: 'Session expirée ou invalide.' }); return null }
 }
 
+// Point 10 : textes personnalisés des rubriques (lecture publique, aucune donnée sensible)
+async function handleSiteTextsRead(req, res) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Méthode non autorisée' })
+  try {
+    const rows = await prisma.siteText.findMany()
+    const texts = {}
+    for (const r of rows) texts[r.key] = r.value
+    res.setHeader('Cache-Control', 'no-store')
+    return res.status(200).json({ texts })
+  } catch (err) {
+    console.error('[site texts]', err)
+    return res.status(200).json({ texts: {} })
+  }
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
@@ -77,6 +92,8 @@ module.exports = async function handler(req, res) {
       return handleSiteUpdate(req, res)
     case 'charte':
       return handleCharteRead(req, res)
+    case 'texts':
+      return handleSiteTextsRead(req, res)
     default:
       return res.status(400).json({ error: 'resource invalide ou manquant.' })
   }
@@ -168,6 +185,20 @@ async function handlePush(req, res) {
 async function handleContact(req, res) {
   const auth = requireAuth(req, res)
   if (!auth) return
+  // Point 19 : historique des messages du joueur, avec les réponses de l'admin
+  if (req.method === 'GET') {
+    try {
+      const messages = await prisma.contactMessage.findMany({
+        where: { userId: auth.userId },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, nature: true, subject: true, message: true, reply: true, repliedAt: true, createdAt: true },
+      })
+      return res.status(200).json({ messages })
+    } catch (err) {
+      console.error('[contact GET]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' })
 
   const { nature, subject, message } = req.body || {}
@@ -602,7 +633,7 @@ async function handleConvocations(req, res) {
           userId: loser.id,
           type: 'message',
           title: 'Score de votre match renseigné',
-          message: `${winner.firstName} ${winner.lastName} a renseigné le score de votre rencontre spéciale. Résultat (votre score) : ${loserScoreSummary}. En attente de publication.`,
+          message: `${winner.firstName} ${winner.lastName} a renseigné le score de votre rencontre spéciale. Résultat (votre score) : ${loserScoreSummary}. En attente de validation.`,
           opponentName: `${winner.firstName} ${winner.lastName}`,
         },
       })
@@ -612,7 +643,7 @@ async function handleConvocations(req, res) {
           if (await isTabVisible('score')) {
             await sendPushToUser(prisma, loser.id, {
               title: '🏸 Score renseigné par votre adversaire',
-              body: `${winner.firstName} ${winner.lastName} a saisi le score : ${loserScoreSummary} (votre côté). En attente de publication.`,
+              body: `${winner.firstName} ${winner.lastName} a saisi le score : ${loserScoreSummary} (votre côté). En attente de validation.`,
               tab: 'score',
             })
           }
@@ -624,7 +655,7 @@ async function handleConvocations(req, res) {
           if (await isTabVisible('score')) {
             await sendPushToUser(prisma, winner.id, {
               title: '✅ Score soumis avec succès',
-              body: `Le score de votre rencontre spéciale contre ${loser.firstName} ${loser.lastName} a été soumis. En attente de publication par l'admin.`,
+              body: `Le score de votre rencontre spéciale contre ${loser.firstName} ${loser.lastName} a été soumis. En attente de validation.`,
               tab: 'score',
             })
           }
@@ -640,7 +671,7 @@ async function handleConvocations(req, res) {
             chatId: specialChat.id,
             senderId: null,
             isAuto: true,
-            content: `🏸 Score renseigné par ${winner.firstName} ${winner.lastName} : ${winnerScoreSummary} (du point de vue de ${winner.firstName}). En attente de publication par l'administrateur.`,
+            content: `🏸 Score renseigné par ${winner.firstName} ${winner.lastName} : ${winnerScoreSummary} (du point de vue de ${winner.firstName}). En attente de validation.`,
           },
         })
         // Push fermeture du chat (rencontre spéciale) — await obligatoire (Vercel)
@@ -719,7 +750,7 @@ async function handleConvocations(req, res) {
         userId: loser.id,
         type: 'message',
         title: 'Score de votre match renseigné',
-        message: `${winner.firstName} ${winner.lastName} a renseigné le score de votre match. Résultat (votre score) : ${loserScoreSummary}. En attente de publication.`,
+        message: `${winner.firstName} ${winner.lastName} a renseigné le score de votre match. Résultat (votre score) : ${loserScoreSummary}. En attente de validation.`,
         opponentName: `${winner.firstName} ${winner.lastName}`,
       },
     })
@@ -729,12 +760,12 @@ async function handleConvocations(req, res) {
         if (await isTabVisible('score')) {
           await sendPushToUser(prisma, loser.id, {
             title: '🏸 Score renseigné par votre adversaire',
-            body: `${winner.firstName} ${winner.lastName} a saisi le score : ${loserScoreSummary} (votre côté). En attente de publication.`,
+            body: `${winner.firstName} ${winner.lastName} a saisi le score : ${loserScoreSummary} (votre côté). En attente de validation.`,
             tab: 'score',
           })
           await sendPushToUser(prisma, winner.id, {
             title: '✅ Score soumis avec succès',
-            body: `Score contre ${loser.firstName} ${loser.lastName} soumis. En attente de publication par l'admin.`,
+            body: `Score contre ${loser.firstName} ${loser.lastName} soumis. En attente de validation.`,
             tab: 'score',
           })
         }
@@ -758,7 +789,7 @@ async function handleConvocations(req, res) {
           chatId: plannedChat.id,
           senderId: null,
           isAuto: true,
-          content: `🏸 Score renseigné par ${winner.firstName} ${winner.lastName} : ${winnerScoreSummary} (du point de vue de ${winner.firstName}). En attente de publication par l'administrateur.`,
+          content: `🏸 Score renseigné par ${winner.firstName} ${winner.lastName} : ${winnerScoreSummary} (du point de vue de ${winner.firstName}). En attente de validation.`,
         },
       })
       // Push fermeture du chat — await obligatoire (Vercel)

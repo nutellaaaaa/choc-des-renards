@@ -273,28 +273,32 @@ function validateSetScores(sets) {
 }
 
 function computeStats(matches) {
-  let played = 0, wins = 0, losses = 0, setDiff = 0, setsWon = 0, points = 0
+  let played = 0, wins = 0, losses = 0, setDiff = 0, setsWon = 0, points = 0, pointsFor = 0, pointsAgainst = 0
   for (const m of matches) {
     const pw = m.sets.filter(s => s.playerScore > s.opponentScore).length
     const ow = m.sets.filter(s => s.opponentScore > s.playerScore).length
     played++; setDiff += pw - ow; setsWon += pw
+    for (const st of m.sets) { pointsFor += st.playerScore; pointsAgainst += st.opponentScore }
     // BUG FIX : bye "comptabilisé comme défaite" doit valoir 0 point pas 1.
     const isByeLoss = m.opponentFirstName === 'Exempt' && m.opponentLastName === '(bye)' && !(pw > ow)
     if (pw > ow) { wins++; points += 3 } else { losses++; points += isByeLoss ? 0 : 1 }
   }
-  return { played, wins, losses, setDiff, setsWon, points }
+  return { played, wins, losses, setDiff, setsWon, points, matchDiff: wins - losses, pointDiff: pointsFor - pointsAgainst, pointsFor, pointsAgainst }
 }
 
-// Même règle que matches.js (onglet classement) : victoires DESC, sets gagnés
-// DESC, puis niveau (à score égal, le MOINS bien classé passe devant — il
-// est déjà désavantagé par son niveau) ; createdAt ASC en dernier recours.
+// Même règle que matches.js (FAQ question 5) : J (matchs joués) DESC, M (victoires - défaites)
+// DESC, S (sets gagnés - perdus) DESC, P (points marqués - encaissés) DESC, puis numéro de
+// licence (le plus petit d'abord, 0 = non renseigné en dernier) ; createdAt ASC en dernier recours.
 function sortPlayers(players) {
+  const lic = p => (p.licenseNumber && p.licenseNumber > 0 ? p.licenseNumber : Infinity)
   return [...players].sort((a, b) => {
-    if (b.wins !== a.wins) return b.wins - a.wins
-    if (b.setsWon !== a.setsWon) return b.setsWon - a.setsWon
-    const rankA = CATEGORY_RANK[a.category] ?? 0
-    const rankB = CATEGORY_RANK[b.category] ?? 0
-    if (rankA !== rankB) return rankA - rankB
+    if (b.played !== a.played) return b.played - a.played
+    const mA = a.matchDiff ?? (a.wins - a.losses), mB = b.matchDiff ?? (b.wins - b.losses)
+    if (mB !== mA) return mB - mA
+    if (b.setDiff !== a.setDiff) return b.setDiff - a.setDiff
+    if ((b.pointDiff || 0) !== (a.pointDiff || 0)) return (b.pointDiff || 0) - (a.pointDiff || 0)
+    const lA = lic(a), lB = lic(b)
+    if (lA !== lB) return lA < lB ? -1 : 1
     return new Date(a.createdAt || 0) - new Date(b.createdAt || 0)
   })
 }
@@ -489,8 +493,49 @@ module.exports = async function handler(req, res) {
       return handleSiteUpdate(req, res)
     case 'charte':
       return handleCharte(req, res)
+    case 'texts':
+      return handleSiteTexts(req, res)
     default:
       return res.status(400).json({ error: 'resource invalide ou manquant.' })
+  }
+}
+
+/* ============================================================
+ * TEXTES DU SITE — titres / sous-titres modifiables par l'admin (point 10)
+ * ============================================================ */
+async function handleSiteTexts(req, res) {
+  const payload = requireAdmin(req, res)
+  if (!payload) return
+
+  if (req.method === 'GET') {
+    try {
+      const rows = await prisma.siteText.findMany()
+      const texts = {}
+      for (const r of rows) texts[r.key] = r.value
+      return res.status(200).json({ texts })
+    } catch (err) {
+      console.error('[admin/texts GET]', err)
+      return res.status(500).json({ error: 'Erreur serveur.' })
+    }
+  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' })
+
+  const { action, key, value } = req.body || {}
+  if (typeof key !== 'string' || !/^[a-z0-9_.-]{1,80}$/i.test(key)) return res.status(400).json({ error: 'Clé invalide.' })
+  try {
+    if (action === 'reset' || (action === 'set' && (typeof value !== 'string' || value.trim() === ''))) {
+      await prisma.siteText.deleteMany({ where: { key } })
+      return res.status(200).json({ ok: true, reset: true })
+    }
+    if (action === 'set') {
+      const v = value.trim().slice(0, 2000)
+      await prisma.siteText.upsert({ where: { key }, update: { value: v }, create: { key, value: v } })
+      return res.status(200).json({ ok: true, value: v })
+    }
+    return res.status(400).json({ error: 'Action invalide.' })
+  } catch (err) {
+    console.error('[admin/texts POST]', err)
+    return res.status(500).json({ error: 'Erreur serveur.' })
   }
 }
 
@@ -1113,7 +1158,7 @@ async function handleNotifications(req, res) {
   const { action } = req.body || {}
 
   if (action === 'send') {
-    const { userId, userIds, title, message } = req.body
+    const { userId, userIds, title, message, contactId } = req.body
     if (!title || !message)
       return res.status(400).json({ error: 'title et message requis.' })
 
@@ -1141,6 +1186,14 @@ async function handleNotifications(req, res) {
         // ⚠️ DOIT être await-é : Vercel termine la fonction dès que res.json() est appelé,
         // un fire-and-forget (.catch seul) serait tué avant que le push ne parte.
         await sendPushToUser(prisma, uid, { title: title.trim(), body: message.trim(), tab: 'notifications' }).catch(() => {})
+      }
+      // Point 19 : la réponse est sauvegardée avec le message initial (côté admin ET côté joueur)
+      const cid = parseInt(contactId, 10)
+      if (!isNaN(cid)) {
+        await prisma.contactMessage.update({
+          where: { id: cid },
+          data: { reply: message.trim(), repliedAt: new Date(), treated: true },
+        }).catch(() => {})
       }
       return res.status(201).json({ ok: true, count: created.length, notifications: created })
     } catch (err) {
@@ -1804,7 +1857,7 @@ async function handlePoules(req, res) {
             include: {
               user: {
                 select: {
-                  id: true, createdAt: true, category: true,
+                  id: true, createdAt: true, category: true, licenseNumber: true,
                   accepted: true, banned: true, active: true, withdrawnAt: true, username: true,
                   matches: { where: { published: true }, include: { sets: { orderBy: { setNumber: 'asc' } } } },
                 },
@@ -1823,7 +1876,7 @@ async function handlePoules(req, res) {
         const players = poule.members
           .map(m => m.user)
           .filter(u => u.accepted && !u.banned && u.active && !u.withdrawnAt && !ADMIN_USERNAMES.includes(u.username))
-        const ranked = sortPlayers(players.map(u => ({ id: u.id, createdAt: u.createdAt, category: u.category, ...computeStats(u.matches) })))
+        const ranked = sortPlayers(players.map(u => ({ id: u.id, createdAt: u.createdAt, category: u.category, licenseNumber: u.licenseNumber, ...computeStats(u.matches) })))
         const half = Math.ceil(ranked.length / 2)
         topHalf.push(...ranked.slice(0, half))
         bottomHalf.push(...ranked.slice(half))
@@ -1931,7 +1984,7 @@ async function handleAction(req, res) {
         orderBy: { createdAt: 'desc' },
         select: {
           id: true, username: true, firstName: true, lastName: true,
-          phone: true, category: true, role: true,
+          phone: true, category: true, role: true, licenseNumber: true,
           accepted: true, banned: true, active: true, createdAt: true, isBot: true,
           withdrawnAt: true, withdrawnReason: true,
         },
@@ -1956,12 +2009,30 @@ async function handleAction(req, res) {
     'toggle_faq_votes', 'toggle_forgot_username', 'toggle_app_popup', 'update_app_popup_config',
     'dedupe_planned_matches', 'cleanup_orphaned_notifications',
     'update_hidden_tabs', 'update_malus_config',
-    'generate_season_pdf',
+    'generate_season_pdf', 'set_licenses',
   ]
 
   if (globalActions.includes(action)) {
     try {
       switch (action) {
+        // Points 3/5 : saisie manuelle en masse des numéros de licence
+        // (data.licenses = [{ userId, licenseNumber }]). 0 = non renseigné.
+        case 'set_licenses': {
+          const list = Array.isArray(data && data.licenses) ? data.licenses : null
+          if (!list) return res.status(400).json({ error: 'Liste de licences manquante.' })
+          const clean = []
+          for (const it of list) {
+            const uid = parseInt(it.userId, 10)
+            const raw = String(it.licenseNumber ?? '').trim()
+            const ln = raw === '' ? 0 : parseInt(raw, 10)
+            if (Number.isNaN(uid)) continue
+            if (Number.isNaN(ln) || ln < 0 || !/^\d*$/.test(raw)) return res.status(400).json({ error: `Numéro de licence invalide (joueur #${uid}).` })
+            clean.push({ uid, ln })
+          }
+          await prisma.$transaction(clean.map(c => prisma.user.update({ where: { id: c.uid }, data: { licenseNumber: c.ln } })))
+          return res.status(200).json({ ok: true, updated: clean.length, message: `${clean.length} numéro(s) de licence enregistré(s).` })
+        }
+
         case 'suspend_site': {
           await prisma.tournamentState.upsert({
             where: { id: 1 },
@@ -2715,7 +2786,7 @@ async function handleAction(req, res) {
 
       case 'update': {
         if (!data) return res.status(400).json({ error: 'Données de mise à jour manquantes.' })
-        const { firstName, lastName, username, phone, category } = data
+        const { firstName, lastName, username, phone, category, licenseNumber } = data
         if (category && !VALID_CATEGORIES.includes(category))
           return res.status(400).json({ error: 'Catégorie invalide.' })
         if (username && username !== user.username) {
@@ -2731,11 +2802,15 @@ async function handleAction(req, res) {
         if (username)  updateData.username  = username
         if (phone)     updateData.phone     = phone
         if (category)  updateData.category  = category
+        if (licenseNumber !== undefined) {
+          const ln = parseInt(licenseNumber, 10)
+          updateData.licenseNumber = Number.isNaN(ln) || ln < 0 ? 0 : ln
+        }
         const updated = await prisma.user.update({
           where: { id }, data: updateData,
           select: {
             id: true, username: true, firstName: true, lastName: true,
-            phone: true, category: true, role: true,
+            phone: true, category: true, role: true, licenseNumber: true,
             accepted: true, banned: true, active: true, createdAt: true,
           },
         })
@@ -3680,6 +3755,37 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 function addDays(date, days) { return new Date(date.getTime() + days * MS_PER_DAY) }
 function addHours(date, hours) { return new Date(date.getTime() + hours * 60 * 60 * 1000) }
+
+// ── Fuseau Europe/Paris ───────────────────────────────────────────────────
+// Point 2 : un cycle va d'un DIMANCHE à un SAMEDI 23h59 (heure de Paris).
+function parisYMD(date) {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(date))
+  const get = t => parseInt(parts.find(p => p.type === t).value, 10)
+  return { y: get('year'), m: get('month'), d: get('day') }
+}
+function parisOffsetMinutes(atUtcMs) {
+  try {
+    const tz = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Paris', timeZoneName: 'shortOffset' })
+      .formatToParts(new Date(atUtcMs)).find(p => p.type === 'timeZoneName').value // ex: "GMT+2"
+    const m = tz.match(/GMT([+-])(\d+)(?::(\d+))?/)
+    if (!m) return 60
+    return (m[1] === '-' ? -1 : 1) * (parseInt(m[2], 10) * 60 + parseInt(m[3] || '0', 10))
+  } catch { return 60 }
+}
+// Instant UTC correspondant à y-m-d h:mi en heure de Paris.
+function parisWallClockToDate(y, m, d, h, mi) {
+  const guess = Date.UTC(y, m - 1, d, h, mi, 0)
+  return new Date(guess - parisOffsetMinutes(guess) * 60000)
+}
+// Deadline d'un cycle commençant à `start` : dernier jour du cycle (start + cycleLengthDays - 1 jour)
+// à 23h59 heure de Paris, moins éventuellement `deadlineHoursBeforeCycleEnd` heures (0 par défaut).
+// Pour un cycle commençant un dimanche, la deadline est donc le samedi à 23h59.
+function cycleDeadline(start, settings) {
+  const { y, m, d } = parisYMD(start)
+  const lastDay = new Date(Date.UTC(y, m - 1, d + settings.cycleLengthDays - 1))
+  const end = parisWallClockToDate(lastDay.getUTCFullYear(), lastDay.getUTCMonth() + 1, lastDay.getUTCDate(), 23, 59)
+  return addHours(end, -(settings.deadlineHoursBeforeCycleEnd || 0))
+}
 function fmtDate(d) { return new Date(d).toLocaleDateString('fr-FR') }
 
 // Décale une date après la fin de toute période de non-jeu qui la contiendrait (en cascade,
@@ -3739,7 +3845,37 @@ function extendDeadlineForBlackouts(windowStart, rawDeadline, blackouts) {
       }
     }
   }
+  // Point 1/2 : si la deadline d'origine est un samedi 23h59 (cycle dimanche → samedi), la
+  // deadline étendue reste alignée sur un samedi 23h59 (on avance au samedi suivant si besoin),
+  // pour que la période suivante recommence bien un dimanche.
+  if (counted.size > 0 && isSaturday2359(rawDeadline)) deadline = snapToSaturday2359(deadline)
   return deadline
+}
+
+function isSaturday2359(date) {
+  const { y, m, d } = parisYMD(date)
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(date))
+  return dow === 6 && parts === '23:59'
+}
+function snapToSaturday2359(date) {
+  const { y, m, d } = parisYMD(date)
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+  const t = new Date(Date.UTC(y, m - 1, d + ((6 - dow + 7) % 7)))
+  return parisWallClockToDate(t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate(), 23, 59)
+}
+
+// Point 1 : date de début de la ronde SUIVANTE. Si des vacances tombent au milieu d'une période,
+// la deadline est repoussée (la période est « coupée en deux ») : la ronde suivante doit
+// commencer APRÈS cette deadline étendue, et non à start + cycle (sinon elle mord sur la fin
+// de la période précédente).
+function nextRoundStart(prevStart, settings, blackouts) {
+  const dl = extendDeadlineForBlackouts(prevStart, cycleDeadline(prevStart, settings), blackouts)
+  const { y, m, d } = parisYMD(dl)
+  let next = new Date(Date.UTC(y, m - 1, d + 1))
+  const plain = addDays(prevStart, settings.cycleLengthDays)
+  if (next < plain) next = plain
+  return shiftPastBlackouts(next, blackouts)
 }
 
 // Génère un calendrier round-robin (méthode du cercle) pour une liste d'IDs joueurs.
@@ -3898,7 +4034,11 @@ async function handleScheduling(req, res) {
         update: { cycleLengthDays: cycle, deadlineHoursBeforeCycleEnd: deadlineH, periodStart: start, periodEnd: end },
         create: { phase, cycleLengthDays: cycle, deadlineHoursBeforeCycleEnd: deadlineH, periodStart: start, periodEnd: end },
       })
-      return res.status(200).json({ ok: true, settings })
+      // Point 2 : un cycle doit commencer un dimanche (et se terminer le samedi à 23h59).
+      const warnings = []
+      const startDow = new Date(Date.UTC(parisYMD(start).y, parisYMD(start).m - 1, parisYMD(start).d)).getUTCDay()
+      if (startDow !== 0) warnings.push('Le début de période n\'est pas un dimanche : les cycles ne seront pas alignés du dimanche au samedi.')
+      return res.status(200).json({ ok: true, settings, warnings })
     } catch (err) {
       console.error('[scheduling save_settings]', err)
       return res.status(500).json({ error: 'Erreur serveur.' })
@@ -4123,7 +4263,7 @@ async function computePhase1(req, res, answers) {
     const roundDates = []
     let cursor = new Date(settings.periodStart)
     for (let r = 0; r < maxRounds; r++) {
-      if (r > 0) cursor = addDays(cursor, settings.cycleLengthDays)
+      if (r > 0) cursor = nextRoundStart(cursor, settings, blackouts)
       const raw = new Date(cursor)
       const shifted = shiftPastBlackouts(cursor, blackouts)
       if (shifted.getTime() !== raw.getTime()) {
@@ -4135,7 +4275,8 @@ async function computePhase1(req, res, answers) {
       roundDates.push(new Date(cursor))
     }
 
-    const lastDeadline = addHours(addDays(roundDates[roundDates.length - 1], settings.cycleLengthDays), -settings.deadlineHoursBeforeCycleEnd)
+    const lastStart = roundDates[roundDates.length - 1]
+    const lastDeadline = extendDeadlineForBlackouts(lastStart, cycleDeadline(lastStart, settings), blackouts)
     if (lastDeadline > settings.periodEnd) {
       log('avertissement', `La deadline de la dernière ronde (${fmtDate(lastDeadline)}) dépasse la fin de période prévue (${fmtDate(settings.periodEnd)}).`)
       if (!answers.overrun) {
@@ -4166,7 +4307,7 @@ async function computePhase1(req, res, answers) {
     for (const { poule, byId, filteredRounds } of pouleData) {
       filteredRounds.forEach((roundPairs, rIdx) => {
         const scheduledDate = roundDates[rIdx]
-        const rawDeadline = addHours(addDays(scheduledDate, settings.cycleLengthDays), -settings.deadlineHoursBeforeCycleEnd)
+        const rawDeadline = cycleDeadline(scheduledDate, settings)
         const deadlineAt = extendDeadlineForBlackouts(scheduledDate, rawDeadline, blackouts)
         for (const [a, b] of roundPairs) {
           const p1 = byId.get(a), p2 = byId.get(b)
@@ -4336,12 +4477,13 @@ async function computePhase1Poule(req, res, pouleId) {
       if (idx < existingDates.length) {
         newRoundDates.push(new Date(existingDates[idx]))
       } else {
-        cursor = shiftPastBlackouts(addDays(cursor, settings.cycleLengthDays), blackouts)
+        cursor = nextRoundStart(cursor, settings, blackouts)
         newRoundDates.push(new Date(cursor))
       }
     }
 
-    const lastDeadline = addHours(addDays(newRoundDates[newRoundDates.length - 1], settings.cycleLengthDays), -settings.deadlineHoursBeforeCycleEnd)
+    const lastStartN = newRoundDates[newRoundDates.length - 1]
+    const lastDeadline = extendDeadlineForBlackouts(lastStartN, cycleDeadline(lastStartN, settings), blackouts)
     if (lastDeadline > settings.periodEnd) {
       await prisma.schedulingSettings.update({ where: { phase }, data: { periodEnd: lastDeadline } })
       log('avertissement', `La période de Phase 1 a dû être prolongée jusqu'au ${fmtDate(lastDeadline)} pour caser toutes les rondes de cette poule.`)
@@ -4350,7 +4492,7 @@ async function computePhase1Poule(req, res, pouleId) {
     const toCreate = []
     filteredRounds.forEach((roundPairs, rIdx) => {
       const scheduledDate = newRoundDates[rIdx]
-      const rawDeadline = addHours(addDays(scheduledDate, settings.cycleLengthDays), -settings.deadlineHoursBeforeCycleEnd)
+      const rawDeadline = cycleDeadline(scheduledDate, settings)
       const deadlineAt = extendDeadlineForBlackouts(scheduledDate, rawDeadline, blackouts)
       log('info', `Ronde ${currentRoundIndex + rIdx + 1} : ${fmtDate(scheduledDate)}.`)
       for (const [a, b] of roundPairs) {
@@ -4504,7 +4646,7 @@ async function runFixBlackoutDeadlines(phase) {
     if (pm.forfeited) { summary.skippedForfeited++; continue }
     summary.checked++
 
-    const rawDeadline = addHours(addDays(new Date(pm.scheduledDate), settings.cycleLengthDays), -settings.deadlineHoursBeforeCycleEnd)
+    const rawDeadline = cycleDeadline(new Date(pm.scheduledDate), settings)
     const expectedDeadline = extendDeadlineForBlackouts(new Date(pm.scheduledDate), rawDeadline, blackouts)
     const currentDeadline = new Date(pm.deadlineAt)
 
@@ -4667,7 +4809,7 @@ async function movePlannedMatchCore(pmid, newDate) {
   const wasNotified = !!pm.notifiedAt
   // BUG FIX : recalculer la deadline depuis la nouvelle date + invalider notifications.
   const newDeadlineAt = settings
-    ? addHours(addDays(target, settings.cycleLengthDays), -settings.deadlineHoursBeforeCycleEnd)
+    ? cycleDeadline(target, settings)
     : pm.deadlineAt
   const updated = await prisma.plannedMatch.update({
     where: { id: pmid },
@@ -5096,13 +5238,14 @@ async function computePhase2Round(req, res, answers, roundOverride) {
     log('info', `Calcul de la ronde ${round} — cycle de ${settings.cycleLengthDays} jour(s), deadline ${settings.deadlineHoursBeforeCycleEnd}h avant la fin du cycle.`)
 
     const blackouts = await prisma.blackoutPeriod.findMany({ where: { phase } })
-    let cursor = addDays(new Date(settings.periodStart), (round - 1) * settings.cycleLengthDays)
-    const rawDate = new Date(cursor)
-    cursor = shiftPastBlackouts(cursor, blackouts)
+    const rawDate = addDays(new Date(settings.periodStart), (round - 1) * settings.cycleLengthDays)
+    // Point 1 : on enchaîne les rondes depuis la première, en tenant compte des vacances en milieu de période
+    let cursor = shiftPastBlackouts(new Date(settings.periodStart), blackouts)
+    for (let r = 1; r < round; r++) cursor = nextRoundStart(cursor, settings, blackouts)
     if (cursor.getTime() !== rawDate.getTime()) log('avertissement', `Ronde ${round} initialement prévue le ${fmtDate(rawDate)} — décalée au ${fmtDate(cursor)} (période de non-jeu).`)
     else log('info', `Ronde ${round} : ${fmtDate(cursor)}.`)
     const scheduledDate = cursor
-    const rawDeadlineAt = addHours(addDays(scheduledDate, settings.cycleLengthDays), -settings.deadlineHoursBeforeCycleEnd)
+    const rawDeadlineAt = cycleDeadline(scheduledDate, settings)
     const deadlineAt = extendDeadlineForBlackouts(scheduledDate, rawDeadlineAt, blackouts)
 
     if (deadlineAt > settings.periodEnd) {
