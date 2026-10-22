@@ -50,6 +50,79 @@ function requireAuth(req, res) {
   catch { res.status(401).json({ error: 'Session expirée ou invalide.' }); return null }
 }
 
+// ── Statistiques de fréquentation (mesure d'audience anonyme) ───────────────
+const crypto = require('crypto')
+const TRACK_PAGES = new Set(['accueil','reglement','faq','contact','classement','performances','souvenirs','vitrine','mes-notifs','score-match','chat-match','mon-profil','confidentialite','connexion'])
+function parisDay(date = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date)
+}
+function parseUserAgent(ua) {
+  ua = ua || ''
+  let os = 'Autre'
+  if (/Android/i.test(ua)) os = 'Android'
+  else if (/iPhone|iPad|iPod/i.test(ua)) os = 'iOS'
+  else if (/Windows/i.test(ua)) os = 'Windows'
+  else if (/Mac OS X|Macintosh/i.test(ua)) os = 'macOS'
+  else if (/CrOS/i.test(ua)) os = 'ChromeOS'
+  else if (/Linux/i.test(ua)) os = 'Linux'
+  let browser = 'Autre'
+  if (/SamsungBrowser/i.test(ua)) browser = 'Samsung Internet'
+  else if (/Edg\//i.test(ua)) browser = 'Edge'
+  else if (/OPR\/|Opera/i.test(ua)) browser = 'Opera'
+  else if (/Firefox|FxiOS/i.test(ua)) browser = 'Firefox'
+  else if (/Chrome|CriOS/i.test(ua)) browser = 'Chrome'
+  else if (/Safari/i.test(ua)) browser = 'Safari'
+  let device = 'desktop'
+  if (/iPad|Tablet/i.test(ua) || (/Android/i.test(ua) && !/Mobile/i.test(ua))) device = 'tablet'
+  else if (/Mobi|iPhone|iPod|Android/i.test(ua)) device = 'mobile'
+  return { os, browser, device }
+}
+async function handleTrack(req, res) {
+  res.setHeader('Cache-Control', 'no-store')
+  // Toujours répondre vite et sans erreur visible : la mesure ne doit jamais gêner le site.
+  if (req.method !== 'POST') return res.status(204).end()
+  try {
+    const ua = req.headers['user-agent'] || ''
+    if (!ua || /bot|crawl|spider|slurp|preview|monitor|headless|lighthouse|uptime/i.test(ua)) return res.status(204).end()
+    const body = req.body || {}
+    const page = TRACK_PAGES.has(body.page) ? body.page : 'accueil'
+
+    // Membre connecté ? Les visites de l'admin ne sont pas comptées.
+    let isMember = false
+    const authHeader = req.headers['authorization'] || ''
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
+    if (token) {
+      try {
+        const p = jwt.verify(token, process.env.JWT_SECRET)
+        if (p.role === 'ADMIN' || ['admin', 'root'].includes((p.username || '').toLowerCase())) return res.status(204).end()
+        isMember = true
+      } catch {}
+    }
+
+    const parsed = parseUserAgent(ua)
+    let device = parsed.device
+    // iPadOS se présente comme un Mac : on s'appuie sur l'écran tactile
+    if (parsed.os === 'macOS' && body.touch) { parsed.os = 'iOS'; device = 'tablet' }
+    const day = parisDay()
+    const ip = getClientIp(req) || ''
+    const visitorHash = crypto.createHash('sha256').update(`${ip}|${ua}|${day}|${process.env.JWT_SECRET || 'cdr'}`).digest('hex').slice(0, 32)
+
+    await prisma.siteVisit.upsert({
+      where: { day_visitorHash: { day, visitorHash } },
+      update: { pageViews: { increment: 1 }, isMember: isMember || undefined, standalone: body.standalone ? true : undefined },
+      create: { day, visitorHash, device, os: parsed.os, browser: parsed.browser, standalone: !!body.standalone, isMember },
+    })
+    await prisma.pageHitDaily.upsert({
+      where: { day_page: { day, page } },
+      update: { hits: { increment: 1 } },
+      create: { day, page },
+    })
+  } catch (err) {
+    console.error('[track]', err)
+  }
+  return res.status(204).end()
+}
+
 // Point 10 : textes personnalisés des rubriques (lecture publique, aucune donnée sensible)
 async function handleSiteTextsRead(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Méthode non autorisée' })
@@ -94,6 +167,8 @@ module.exports = async function handler(req, res) {
       return handleCharteRead(req, res)
     case 'texts':
       return handleSiteTextsRead(req, res)
+    case 'track':
+      return handleTrack(req, res)
     default:
       return res.status(400).json({ error: 'resource invalide ou manquant.' })
   }

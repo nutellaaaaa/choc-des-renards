@@ -591,3 +591,31 @@ model SiteText {
   value     String
   updatedAt DateTime @updatedAt
 }
+
+// Statistiques de fréquentation (admin). Mesure d'audience anonyme : aucune adresse IP ni
+// identifiant persistant n'est stocké. `visitorHash` = empreinte salée de (IP + navigateur + jour),
+// qui change chaque jour et ne permet pas de suivre une personne d'un jour à l'autre.
+model SiteVisit {
+  id          Int      @id @default(autoincrement())
+  day         String   // "YYYY-MM-DD" (heure de Paris)
+  visitorHash String
+  device      String   // mobile | tablet | desktop
+  os          String
+  browser     String
+  standalone  Boolean  @default(false) // ouvert depuis l'application installée (PWA)
+  isMember    Boolean  @default(false) // connecté avec un compte joueur
+  pageViews   Int      @default(1)
+  firstAt     DateTime @default(now())
+  lastAt      DateTime @updatedAt
+
+  @@unique([day, visitorHash])
+  @@index([day])
+}
+
+model PageHitDaily {
+  day  String
+  page String
+  hits Int    @default(1)
+
+  @@id([day, page])
+}

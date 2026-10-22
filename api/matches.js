@@ -49,10 +49,10 @@ function computeStatsForPhase(matches, phase) {
 //   2. M : nombre absolu de matchs (victoires - défaites) (DESC)
 //   3. S : nombre absolu de sets (gagnés - perdus) (DESC)
 //   4. P : nombre absolu de points (marqués - encaissés) (DESC)
-//   5. numéro de licence (le plus petit d'abord ; 0 = non renseigné, passe après)
+//   5. numéro de licence (le plus GRAND d'abord = joueur le plus récent ; 0 = non renseigné, en dernier)
 //   6. createdAt ASC en dernier recours, pour un ordre stable.
 function sortPlayers(players) {
-  const lic = p => (p.licenseNumber && p.licenseNumber > 0 ? p.licenseNumber : Infinity)
+  const lic = p => (p.licenseNumber && p.licenseNumber > 0 ? p.licenseNumber : -1)
   return [...players].sort((a, b) => {
     if (b.played !== a.played) return b.played - a.played
     const mA = a.matchDiff ?? (a.wins - a.losses), mB = b.matchDiff ?? (b.wins - b.losses)
@@ -60,7 +60,7 @@ function sortPlayers(players) {
     if (b.setDiff !== a.setDiff) return b.setDiff - a.setDiff
     if ((b.pointDiff || 0) !== (a.pointDiff || 0)) return (b.pointDiff || 0) - (a.pointDiff || 0)
     const lA = lic(a), lB = lic(b)
-    if (lA !== lB) return lA < lB ? -1 : 1
+    if (lA !== lB) return lB - lA // numéro le plus GRAND d'abord (joueur le plus récent) ; 0 = non renseigné, en dernier
     return new Date(a.createdAt || 0) - new Date(b.createdAt || 0)
   })
 }

@@ -288,9 +288,9 @@ function computeStats(matches) {
 
 // Même règle que matches.js (FAQ question 5) : J (matchs joués) DESC, M (victoires - défaites)
 // DESC, S (sets gagnés - perdus) DESC, P (points marqués - encaissés) DESC, puis numéro de
-// licence (le plus petit d'abord, 0 = non renseigné en dernier) ; createdAt ASC en dernier recours.
+// licence (le plus GRAND d'abord = joueur le plus récent, 0 = non renseigné en dernier) ; createdAt ASC en dernier recours.
 function sortPlayers(players) {
-  const lic = p => (p.licenseNumber && p.licenseNumber > 0 ? p.licenseNumber : Infinity)
+  const lic = p => (p.licenseNumber && p.licenseNumber > 0 ? p.licenseNumber : -1)
   return [...players].sort((a, b) => {
     if (b.played !== a.played) return b.played - a.played
     const mA = a.matchDiff ?? (a.wins - a.losses), mB = b.matchDiff ?? (b.wins - b.losses)
@@ -298,7 +298,7 @@ function sortPlayers(players) {
     if (b.setDiff !== a.setDiff) return b.setDiff - a.setDiff
     if ((b.pointDiff || 0) !== (a.pointDiff || 0)) return (b.pointDiff || 0) - (a.pointDiff || 0)
     const lA = lic(a), lB = lic(b)
-    if (lA !== lB) return lA < lB ? -1 : 1
+    if (lA !== lB) return lB - lA // numéro le plus GRAND d'abord (joueur le plus récent) ; 0 = non renseigné, en dernier
     return new Date(a.createdAt || 0) - new Date(b.createdAt || 0)
   })
 }
@@ -530,6 +530,45 @@ async function scrapeMyffbadClub(pastedHtml) {
     if (rows.length >= 2) { scraped = rows; strategies.push('tableau HTML') }
   }
 
+  // 4b. Page « rendue » (fichier enregistré depuis le navigateur) : cartes / blocs quelconques.
+  // On part de chaque élément qui contient uniquement un classement (P10, D8, NC…) et on remonte
+  // jusqu'au plus petit bloc contenant aussi un nom (≥ 2 mots), sans mélanger plusieurs joueurs.
+  if (!scraped.length) {
+    const LABELS_RE = /\b(simple|double|mixte|classement|classements|points?|pts|licen[cs]e|licence|rang|cote|niveau|club|joueur|joueuse|s|d|m|dm|sd|dd|dx|sh|sd|n°|numéro|numero)\b/gi
+    const rows = []
+    const used = new Set()
+    // Texte d'un nœud avec une espace entre éléments voisins (cheerio .text() les colle : « SimpleP10 »)
+    const spacedText = n => n.find('*').addBack().contents().filter((i, c) => c.type === 'text').map((i, c) => c.data).get().join(' ').replace(/\s+/g, ' ').trim()
+    const LEAF_RANK_RE = /^(?:(?:simple|double|mixte|s|d|m)\W*)?(NC|[NRDP]\s?\d{1,2})$/i
+    $('body *').each((_, el) => {
+      const $el = $(el)
+      if ($el.children().length) return
+      const own = spacedText($el)
+      const lm = own.match(LEAF_RANK_RE)
+      if (!lm) return
+      let cur = $el
+      for (let depth = 0; depth < 6; depth++) {
+        cur = cur.parent()
+        if (!cur.length || cur.is('body, html')) break
+        const text = spacedText(cur)
+        const rankTokens = text.match(/\b(?:NC|[NRDP]\s?\d{1,2})\b/gi) || []
+        if (rankTokens.length > 4 || text.length > 160) break // bloc trop gros : plusieurs joueurs
+        const cleaned = text.replace(/\b(?:NC|[NRDP]\s?\d{1,2})\b/gi, ' ').replace(LABELS_RE, ' ').replace(/[\d.,:;|/()–—]+/g, ' ').replace(/\s+/g, ' ').trim()
+        const words = cleaned.split(' ').filter(w => /^[A-Za-zÀ-ÿ'’-]{2,}$/.test(w))
+        if (words.length >= 2 && words.length <= 5) {
+          const node = cur.get(0)
+          if (used.has(node)) return
+          used.add(node)
+          // Classement simple : celui qui suit le libellé « Simple » s'il existe, sinon le premier
+          const mSimple = text.match(/simple\W{0,3}((?:NC|[NRDP]\s?\d{1,2}))\b/i)
+          rows.push({ fullName: words.join(' '), simpleToken: (mSimple ? mSimple[1] : rankTokens[0] || lm[1]).replace(/\s+/g, '') })
+          return
+        }
+      }
+    })
+    if (rows.length >= 2) { scraped = rows; strategies.push('blocs de la page') }
+  }
+
   // Dédoublonnage (même nom → premier classement rencontré)
   const dedup = new Map()
   for (const p of scraped) if (!dedup.has(p.fullName.toLowerCase())) dedup.set(p.fullName.toLowerCase(), p)
@@ -591,8 +630,75 @@ module.exports = async function handler(req, res) {
       return handleCharte(req, res)
     case 'texts':
       return handleSiteTexts(req, res)
+    case 'stats':
+      return handleStats(req, res)
     default:
       return res.status(400).json({ error: 'resource invalide ou manquant.' })
+  }
+}
+
+/* ============================================================
+ * STATISTIQUES DE FRÉQUENTATION (admin)
+ * Données anonymes collectées par public.js (resource=track).
+ * ============================================================ */
+async function handleStats(req, res) {
+  const payload = requireAdmin(req, res)
+  if (!payload) return
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Méthode non autorisée' })
+  try {
+    const days = Math.min(365, Math.max(7, parseInt(req.query.days, 10) || 30))
+    const dayStr = d => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
+    const today = new Date()
+    const list = []
+    for (let i = days - 1; i >= 0; i--) list.push(dayStr(new Date(today.getTime() - i * 86400000)))
+    const since = list[0]
+
+    const visits = await prisma.siteVisit.findMany({
+      where: { day: { gte: since } },
+      select: { day: true, device: true, os: true, browser: true, standalone: true, isMember: true, pageViews: true },
+    })
+    const hits = await prisma.pageHitDaily.findMany({ where: { day: { gte: since } } })
+
+    const perDay = Object.fromEntries(list.map(d => [d, { day: d, visitors: 0, pageViews: 0, members: 0 }]))
+    const count = (key) => {
+      const m = {}
+      for (const v of visits) m[v[key]] = (m[v[key]] || 0) + 1
+      return Object.entries(m).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value)
+    }
+    let standalone = 0, members = 0, totalViews = 0
+    for (const v of visits) {
+      const d = perDay[v.day]; if (!d) continue
+      d.visitors++; d.pageViews += v.pageViews; if (v.isMember) d.members++
+      if (v.standalone) standalone++
+      if (v.isMember) members++
+      totalViews += v.pageViews
+    }
+    const pageMap = {}
+    for (const h of hits) pageMap[h.page] = (pageMap[h.page] || 0) + h.hits
+    const topPages = Object.entries(pageMap).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value)
+
+    const series = list.map(d => perDay[d])
+    const sum = n => series.slice(-n).reduce((a, d) => a + d.visitors, 0)
+    return res.status(200).json({
+      days,
+      series,
+      totals: {
+        today: series[series.length - 1].visitors,
+        last7: sum(7),
+        last30: sum(30),
+        visitVisitors: visits.length, // visiteurs-jours sur la période (un visiteur compte une fois par jour)
+        pageViews: totalViews,
+        avgPerDay: Math.round((visits.length / days) * 10) / 10,
+        standalone, members,
+      },
+      devices: count('device'),
+      os: count('os'),
+      browsers: count('browser'),
+      topPages,
+    })
+  } catch (err) {
+    console.error('[admin/stats]', err)
+    return res.status(500).json({ error: 'Erreur serveur.' })
   }
 }
 

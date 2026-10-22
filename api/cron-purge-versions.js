@@ -26,7 +26,12 @@ module.exports = async function handler(req, res) {
     const result = await prisma.dataVersion.deleteMany({
       where: { expiresAt: { lt: new Date() } },
     })
-    return res.status(200).json({ ok: true, purged: result.count })
+    // Statistiques de fréquentation : conservation limitée à 13 mois (recommandation CNIL)
+    const cutoff = new Date(Date.now() - 395 * 24 * 60 * 60 * 1000)
+    const cutoffDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(cutoff)
+    const purgedVisits = await prisma.siteVisit.deleteMany({ where: { day: { lt: cutoffDay } } }).catch(() => ({ count: 0 }))
+    await prisma.pageHitDaily.deleteMany({ where: { day: { lt: cutoffDay } } }).catch(() => {})
+    return res.status(200).json({ ok: true, purged: result.count, purgedVisits: purgedVisits.count })
   } catch (err) {
     console.error('[cron-purge-versions]', err)
     return res.status(500).json({ error: 'Erreur serveur.' })
