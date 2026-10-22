@@ -411,70 +411,36 @@ function _extractJsonArrays(text, maxArrays = 400) {
   return out
 }
 
-async function scrapeMyffbadClub(pastedHtml) {
-  const logs = []
+// Analyse UNE page HTML et renvoie { scraped, strategies, diag }.
+async function parseMyffbadHtml(html, logs, canFetch) {
   let scraped = []
-  const FETCH_TIMEOUT_MS = 15000
-  const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-
-  function describeFetchError(err) {
-    if (err.name === 'AbortError') return `délai dépassé (${FETCH_TIMEOUT_MS / 1000}s)`
-    const cause = err.cause
-    if (cause) {
-      const code = cause.code || cause.errno
-      const causeMsg = cause.message || String(cause)
-      return code ? `${causeMsg} [${code}]` : causeMsg
-    }
-    return err.message || String(err)
-  }
-  async function fetchText(url, accept) {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
-    try {
-      const r = await fetch(url, {
-        signal: controller.signal,
-        headers: { 'User-Agent': UA, 'Accept': accept, 'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8', 'Referer': 'https://myffbad.fr/', 'Cache-Control': 'no-cache' },
-      })
-      const text = await r.text()
-      return { ok: r.ok, status: r.status, text }
-    } finally { clearTimeout(timer) }
-  }
-
-  let html = ''
-  if (pastedHtml && typeof pastedHtml === 'string') {
-    html = pastedHtml
-    logs.push({ ok: true, message: `Analyse du code source fourni manuellement (${Math.round(html.length / 1024)} ko).` })
-  } else {
-    // Jusqu'à 3 tentatives (erreurs réseau ou 5xx passagères)
-    let lastErr = ''
-    for (let attempt = 1; attempt <= 3 && !html; attempt++) {
-      try {
-        const r = await fetchText(MYFFBAD_CLUB_URL, 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8')
-        if (r.ok) html = r.text
-        else {
-          lastErr = `HTTP ${r.status}`
-          if (r.status === 403 || r.status === 429 || /just a moment|cf-chl|captcha|attention required/i.test(r.text.slice(0, 4000))) {
-            logs.push({ ok: false, message: `Accès refusé par myffbad.fr (HTTP ${r.status}) : protection anti-robot probable. Utilisez l'option « code source de la page » ci-dessous.` })
-            return { scraped, logs }
-          }
-          if (r.status < 500) break
-        }
-      } catch (e) { lastErr = describeFetchError(e) }
-      if (!html && attempt < 3) await new Promise(r => setTimeout(r, 800 * attempt))
-    }
-    if (!html) {
-      logs.push({ ok: false, message: `Impossible de charger la page du club (${lastErr || 'erreur inconnue'}).` })
-      logs.push({ ok: false, message: "Réessayez dans quelques minutes, ou utilisez l'option « code source de la page »." })
-      return { scraped, logs }
-    }
-    if (/just a moment|cf-chl|captcha-delivery|attention required/i.test(html.slice(0, 6000)) && !/__NEXT_DATA__|__next_f/.test(html)) {
-      logs.push({ ok: false, message: "La page reçue est un écran anti-robot, pas la liste des joueurs. Utilisez l'option « code source de la page »." })
-      return { scraped, logs }
-    }
-  }
-
-  const $ = cheerio.load(html)
   const strategies = []
+  const $ = cheerio.load(html)
+
+  // 0. Tableau des joueurs de MyFFBad (structure réelle, vérifiée sur la page du club) :
+  // une ligne par joueur : « Prénom NOM » | licence | club | … | trois pastilles de classement
+  // (simple, double, mixte, dans cet ordre) | sexe | catégorie d'âge.
+  {
+    const rows = []
+    $('tr').each((_, tr) => {
+      const $tr = $(tr)
+      const tds = $tr.find('td')
+      if (tds.length < 3) return
+      const ranks = []
+      let licence = ''
+      $tr.find('*').each((__, el) => {
+        const $e = $(el)
+        if ($e.children().length) return
+        const t = $e.text().replace(/\s+/g, ' ').trim()
+        if (RANK_TOKEN_RE.test(t.replace(/\s+/g, ''))) ranks.push(t.replace(/\s+/g, '').toUpperCase())
+        else if (!licence && /^\d{6,9}$/.test(t)) licence = t
+      })
+      const name = $(tds[0]).text().replace(/\s+/g, ' ').trim()
+      // Joueurs non classés : pastilles « - » (pas de rang) mais licence présente → on les garde quand même
+      if ((ranks.length || licence) && /[A-Za-zÀ-ÿ]{2,}\s+[A-Za-zÀ-ÿ'’-]{2,}/.test(name) && name.length < 60) rows.push({ fullName: name, simpleToken: ranks[0] || '', licence })
+    })
+    if (rows.length >= 2) { scraped = rows; strategies.push('tableau des joueurs MyFFBad') }
+  }
 
   // 1. __NEXT_DATA__ (pages router)
   const nextDataRaw = $('#__NEXT_DATA__').html()
@@ -482,10 +448,10 @@ async function scrapeMyffbadClub(pastedHtml) {
   if (nextDataRaw) {
     try { nextData = JSON.parse(nextDataRaw) } catch (e) { logs.push({ ok: false, message: `__NEXT_DATA__ illisible : ${e.message}` }) }
   }
-  if (nextData) {
+  if (nextData && !scraped.length) {
     const found = _findPlayersIn(nextData)
-    if (found.length) { scraped = found; strategies.push('__NEXT_DATA__') }
-    else if (!pastedHtml && nextData.buildId) {
+    if (found.some(p => p.simpleToken)) { scraped = found; strategies.push('__NEXT_DATA__') }
+    else if (canFetch && nextData.buildId) {
       // Route de données Next.js : parfois plus complète que le JSON embarqué.
       try {
         const r = await fetchText(`https://myffbad.fr/_next/data/${nextData.buildId}/club/${MYFFBAD_CLUB_ID}.json`, 'application/json')
@@ -505,7 +471,8 @@ async function scrapeMyffbadClub(pastedHtml) {
     if (flight) {
       let best = []
       for (const arr of _extractJsonArrays(flight)) { const f = _findPlayersIn(arr); if (f.length > best.length) best = f }
-      if (best.length) { scraped = best; strategies.push('flux Next.js (app router)') }
+      // Un tableau de « joueurs » sans aucun classement n'est pas la liste cherchée (faux positif) : on continue.
+      if (best.some(p => p.simpleToken)) { scraped = best; strategies.push('flux Next.js (app router)') }
     }
   }
 
@@ -513,7 +480,7 @@ async function scrapeMyffbadClub(pastedHtml) {
   if (!scraped.length) {
     $('script[type="application/json"], script[type="application/ld+json"]').each((_, el) => {
       if (scraped.length) return
-      try { const f = _findPlayersIn(JSON.parse($(el).html())); if (f.length) { scraped = f; strategies.push('bloc JSON') } } catch {}
+      try { const f = _findPlayersIn(JSON.parse($(el).html())); if (f.some(p => p.simpleToken)) { scraped = f; strategies.push('bloc JSON') } } catch {}
     })
   }
 
@@ -572,19 +539,127 @@ async function scrapeMyffbadClub(pastedHtml) {
   // Dédoublonnage (même nom → premier classement rencontré)
   const dedup = new Map()
   for (const p of scraped) if (!dedup.has(p.fullName.toLowerCase())) dedup.set(p.fullName.toLowerCase(), p)
+  const withLicence = [...dedup.values()].filter(p => p.licence).length
   scraped = [...dedup.values()]
 
+  const title = ($('title').first().text() || '').trim().slice(0, 80)
+  const pageProps = nextData && nextData.props && nextData.props.pageProps
+  const keys = pageProps && typeof pageProps === 'object' ? Object.keys(pageProps).slice(0, 20).join(', ') : null
+  // Pagination MyFFBad : numéro de la page courante et nombre total de pages
+  let currentPage = null, totalPages = null
+  const cur = $('[data-testid^="pagination-page-"][aria-current="page"]').first()
+  if (cur.length) currentPage = parseInt((cur.attr('data-testid') || '').replace('pagination-page-', ''), 10) || null
+  $('[data-testid^="pagination-page-"]').each((_, el) => {
+    const n = parseInt(($(el).attr('data-testid') || '').replace('pagination-page-', ''), 10)
+    if (n && (!totalPages || n > totalPages)) totalPages = n
+  })
+  return { scraped, strategies, diag: { title, keys, kb: Math.round(html.length / 1024), hasNextData: !!nextData, hasFlight: /__next_f/.test(html), tables: $('table').length }, currentPage, totalPages }
+}
+
+async function scrapeMyffbadClub(pastedHtml) {
+  const logs = []
+  const FETCH_TIMEOUT_MS = 15000
+  const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+  const searchUrl = p => `https://myffbad.fr/recherche/joueur?league=12&committee=67&club=${MYFFBAD_CLUB_ID}&isFirstLoad=false&page=${p}`
+
+  function describeFetchError(err) {
+    if (err.name === 'AbortError') return `délai dépassé (${FETCH_TIMEOUT_MS / 1000}s)`
+    const cause = err.cause
+    if (cause) {
+      const code = cause.code || cause.errno
+      const causeMsg = cause.message || String(cause)
+      return code ? `${causeMsg} [${code}]` : causeMsg
+    }
+    return err.message || String(err)
+  }
+  async function fetchText(url, accept) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+    try {
+      const r = await fetch(url, {
+        signal: controller.signal,
+        headers: { 'User-Agent': UA, 'Accept': accept, 'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8', 'Referer': 'https://myffbad.fr/', 'Cache-Control': 'no-cache' },
+      })
+      const text = await r.text()
+      return { ok: r.ok, status: r.status, text }
+    } finally { clearTimeout(timer) }
+  }
+  const looksBlocked = (status, text) => status === 403 || status === 429 || (/just a moment|cf-chl|captcha-delivery|attention required/i.test(text.slice(0, 6000)) && !/__NEXT_DATA__|__next_f|<table/.test(text))
+
+  const all = new Map()        // nom normalisé → joueur (fusion des pages)
+  const strategiesUsed = new Set()
+  let lastDiag = null
+  const addPage = (res, label) => {
+    let added = 0
+    for (const p of res.scraped) {
+      const k = p.fullName.toLowerCase()
+      if (!all.has(k)) { all.set(k, p); added++ }
+    }
+    res.strategies.forEach(x => strategiesUsed.add(x))
+    lastDiag = res.diag
+    logs.push({ ok: true, message: `${label} : ${res.scraped.length} joueur(s) lu(s)${res.currentPage ? ` (page ${res.currentPage}${res.totalPages ? ' sur ' + res.totalPages : ''})` : ''}.` })
+    return added
+  }
+
+  if (pastedHtml) {
+    // Une ou plusieurs pages fournies par l'admin (fichiers enregistrés ou code copié depuis le navigateur)
+    const list = Array.isArray(pastedHtml) ? pastedHtml : [pastedHtml]
+    logs.push({ ok: true, message: `Analyse de ${list.length} page(s) fournie(s) manuellement.` })
+    const pages = []
+    for (let i = 0; i < list.length; i++) {
+      const res = await parseMyffbadHtml(list[i], logs, false)
+      pages.push({ cur: res.currentPage, total: res.totalPages })
+      addPage(res, `Page fournie n°${i + 1}`)
+    }
+    // Pages de la recherche manquantes ? (ex. seule la page 2 sur 2 a été fournie)
+    const total = Math.max(0, ...pages.map(p => p.total || 0))
+    if (total > 1) {
+      const given = new Set(pages.map(p => p.cur).filter(Boolean))
+      const missing = []
+      for (let p = 1; p <= total; p++) if (!given.has(p)) missing.push(p)
+      if (missing.length) logs.push({ ok: false, message: `⚠ La liste MyFFBad compte ${total} pages : il manque la/les page(s) ${missing.join(', ')}. Ouvrez-les, enregistrez-les, puis envoyez tous les fichiers ensemble (sélection multiple) pour ne rater aucun joueur : ${missing.map(p => searchUrl(p)).join('  ')}` })
+    }
+  } else {
+    // Récupération directe : toutes les pages de la recherche « club » (50 joueurs par page)
+    let totalPages = 1, fetched = 0, lastErr = ''
+    for (let p = 1; p <= Math.min(totalPages, 10); p++) {
+      let html = ''
+      for (let attempt = 1; attempt <= 3 && !html; attempt++) {
+        try {
+          const r = await fetchText(searchUrl(p), 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8')
+          if (looksBlocked(r.status, r.text)) {
+            logs.push({ ok: false, message: `Accès refusé par myffbad.fr (HTTP ${r.status}) : protection anti-robot probable. Utilisez l'option « page enregistrée » ci-dessous.` })
+            return { scraped: [...all.values()], logs }
+          }
+          if (r.ok) html = r.text
+          else { lastErr = `HTTP ${r.status}`; if (r.status < 500) break }
+        } catch (e) { lastErr = describeFetchError(e) }
+        if (!html && attempt < 3) await new Promise(r => setTimeout(r, 800 * attempt))
+      }
+      if (!html) { logs.push({ ok: false, message: `Page ${p} de la recherche MyFFBad illisible (${lastErr || 'erreur inconnue'}).` }); break }
+      const res = await parseMyffbadHtml(html, logs, true)
+      if (res.totalPages) totalPages = res.totalPages
+      addPage(res, `Page ${p}`)
+      fetched++
+      if (!res.scraped.length) break
+    }
+    if (!fetched) {
+      logs.push({ ok: false, message: "Impossible de charger la liste MyFFBad. Utilisez l'option « page enregistrée »." })
+      return { scraped: [], logs }
+    }
+  }
+
+  const scraped = [...all.values()]
   if (!scraped.length) {
-    const title = ($('title').first().text() || '').trim().slice(0, 80)
-    const pageProps = nextData?.props?.pageProps
-    const keys = pageProps && typeof pageProps === 'object' ? Object.keys(pageProps).slice(0, 20).join(', ') : null
-    logs.push({ ok: false, message: `Aucun joueur reconnu dans la page (titre : « ${title || '—'} », ${Math.round(html.length / 1024)} ko, __NEXT_DATA__ : ${nextData ? 'oui' : 'non'}, flux app router : ${/__next_f/.test(html) ? 'oui' : 'non'}, tableaux HTML : ${$('table').length}).` })
-    if (keys) logs.push({ ok: false, message: `Clés de props.pageProps : ${keys}.` })
-    if (!/__NEXT_DATA__|__next_f|<table/.test(html)) logs.push({ ok: false, message: "La liste est probablement chargée après coup par le navigateur (API interne) : utilisez l'option « code source de la page » depuis une page ouverte et complètement chargée (Ctrl+S), ou envoyez-moi une ligne de diagnostic." })
+    const d = lastDiag || {}
+    logs.push({ ok: false, message: `Aucun joueur reconnu dans la page (titre : « ${d.title || '—'} », ${d.kb || 0} ko, __NEXT_DATA__ : ${d.hasNextData ? 'oui' : 'non'}, flux app router : ${d.hasFlight ? 'oui' : 'non'}, tableaux HTML : ${d.tables || 0}).` })
+    if (d.keys) logs.push({ ok: false, message: `Clés de props.pageProps : ${d.keys}.` })
+    logs.push({ ok: false, message: "Ouvrez la liste des joueurs du club sur myffbad.fr (page entièrement chargée), puis enregistrez-la (Ctrl+S, « Page web, complète ») ou copiez son code, et envoyez-la ici." })
     return { scraped, logs }
   }
   const withRank = scraped.filter(p => p.simpleToken).length
-  logs.push({ ok: true, message: `${scraped.length} joueur(s) récupéré(s) (méthode : ${strategies.join(', ')}), dont ${withRank} avec un classement simple.` })
+  const withLicence = scraped.filter(p => p.licence).length
+  logs.push({ ok: true, message: `${scraped.length} joueur(s) récupéré(s) au total (méthode : ${[...strategiesUsed].join(', ')}), dont ${withRank} avec un classement simple${withLicence ? ` et ${withLicence} avec un numéro de licence` : ''}.` })
   if (withRank < scraped.length) logs.push({ ok: false, message: `${scraped.length - withRank} joueur(s) sans classement lisible : leur catégorie ne sera pas modifiée.` })
   return { scraped, logs }
 }
@@ -2442,7 +2517,11 @@ async function handleAction(req, res) {
         }
 
         case 'scrape_myffbad': {
-          const pastedHtml = data && typeof data.html === 'string' ? data.html.slice(0, 4_000_000) : null
+          // Une ou plusieurs pages HTML fournies (limite globale ~4 Mo, plafond de Vercel à 4,5 Mo)
+          let pastedHtml = null
+          if (data && Array.isArray(data.htmls)) pastedHtml = data.htmls.filter(h => typeof h === 'string').slice(0, 8).map(h => h.slice(0, 2_000_000))
+          else if (data && typeof data.html === 'string') pastedHtml = data.html.slice(0, 4_000_000)
+          if (Array.isArray(pastedHtml) && !pastedHtml.length) pastedHtml = null
           const { scraped, logs } = await scrapeMyffbadClub(pastedHtml)
 
           // Rien récupéré : on s'arrête là (inutile de comparer) et on propose la saisie manuelle du code source.
@@ -2453,7 +2532,7 @@ async function handleAction(req, res) {
 
           const users = await prisma.user.findMany({
             where: { username: { notIn: ADMIN_USERNAMES }, isBot: false },
-            select: { id: true, firstName: true, lastName: true, category: true, username: true },
+            select: { id: true, firstName: true, lastName: true, category: true, username: true, licenseNumber: true },
           })
 
           const normedScraped = scraped.map(s => ({ ...s, norm: normName(s.fullName) }))
@@ -2476,29 +2555,34 @@ async function handleAction(req, res) {
             const m = match.simpleToken.match(/^([A-Z]+)/)
             const letter = m ? m[1] : null
 
+            // Numéro de licence officiel (MyFFBad) : proposé s'il diffère de celui enregistré.
+            const lic = match.licence ? parseInt(match.licence, 10) : 0
+            const licenseChanged = lic > 0 && lic !== (u.licenseNumber || 0)
+            const licNote = licenseChanged ? ` Licence ${u.licenseNumber ? u.licenseNumber + ' → ' : ''}${lic}.` : ''
+
+            let r
             if (!letter || !VALID_CATEGORIES.includes(letter)) {
-              results.push({
+              r = {
                 userId: u.id, name: displayName, found: true, changed: false,
                 message: `${displayName} : classement simple non disponible (« ${match.simpleToken || '—'} »), catégorie inchangée.`,
-              })
-              continue
-            }
-
-            if (letter === u.category) {
-              results.push({
+              }
+            } else if (letter === u.category) {
+              r = {
                 userId: u.id, name: displayName, found: true, changed: false,
                 message: `${displayName} : classement inchangé (${letter}).`,
-              })
+              }
             } else {
-              results.push({
+              r = {
                 userId: u.id, name: displayName, found: true, changed: true,
                 from: u.category, to: letter,
                 message: `${displayName} : classement ${u.category} → ${letter} (en attente de confirmation).`,
-              })
+              }
             }
+            if (licenseChanged) { r.licenseChanged = true; r.licenseTo = lic; r.message += licNote }
+            results.push(r)
           }
 
-          const changedCount = results.filter(r => r.changed).length
+          const changedCount = results.filter(r => r.changed || r.licenseChanged).length
           const notFoundCount = results.filter(r => !r.found).length
 
           return res.status(200).json({
@@ -2508,7 +2592,7 @@ async function handleAction(req, res) {
             totalScraped: scraped.length,
             changedCount,
             notFoundCount,
-            message: `Comparaison MYFFBAD terminée : ${changedCount} changement(s) proposé(s), ${notFoundCount} joueur(s) non trouvé(s).`,
+            message: `Comparaison MYFFBAD terminée : ${changedCount} joueur(s) à mettre à jour (classement et/ou licence), ${notFoundCount} joueur(s) non trouvé(s).`,
           })
         }
 
@@ -2521,14 +2605,18 @@ async function handleAction(req, res) {
           const applied = []
           for (const c of changes) {
             const uid = parseInt(c?.userId, 10)
-            const category = c?.category
-            if (isNaN(uid) || !VALID_CATEGORIES.includes(category)) continue
+            const category = VALID_CATEGORIES.includes(c?.category) ? c.category : null
+            const licenseNumber = Number.isInteger(c?.licenseNumber) && c.licenseNumber > 0 ? c.licenseNumber : null
+            if (isNaN(uid) || (!category && !licenseNumber)) continue
 
             const u = await prisma.user.findUnique({ where: { id: uid } })
             if (!u || ADMIN_USERNAMES.includes(u.username.toLowerCase())) continue
 
-            await prisma.user.update({ where: { id: uid }, data: { category } })
-            applied.push({ userId: uid, name: `${u.firstName} ${u.lastName}`, category })
+            const upd = {}
+            if (category) upd.category = category
+            if (licenseNumber) upd.licenseNumber = licenseNumber
+            await prisma.user.update({ where: { id: uid }, data: upd })
+            applied.push({ userId: uid, name: `${u.firstName} ${u.lastName}`, category, licenseNumber })
           }
 
           // BUG FIX (malus mal attribués) : une catégorie mise à jour ici pouvait
@@ -2537,7 +2625,7 @@ async function handleAction(req, res) {
           // voir runFixMalusAssignments. On recalcule donc systématiquement les
           // malus des deux phases dès qu'au moins une catégorie a changé.
           let malusFixSummary = null
-          if (applied.length > 0) {
+          if (applied.some(a => a.category)) {
             malusFixSummary = { removed: 0, added: 0, targetFixed: 0 }
             for (const phase of ['PHASE1', 'PHASE2']) {
               const s = await runFixMalusAssignments(phase)
@@ -2559,7 +2647,7 @@ async function handleAction(req, res) {
             appliedCount: applied.length,
             applied,
             malusFixSummary,
-            message: `${applied.length} classement(s) mis à jour.${malusFixCount > 0 ? ` ${malusFixCount} malus corrigé(s) sur les matchs déjà planifiés — voir la console de planification.` : ''}`,
+            message: `${applied.length} joueur(s) mis à jour (${applied.filter(a => a.category).length} classement(s), ${applied.filter(a => a.licenseNumber).length} licence(s)).${malusFixCount > 0 ? ` ${malusFixCount} malus corrigé(s) sur les matchs déjà planifiés — voir la console de planification.` : ''}`,
           })
         }
 

@@ -10395,12 +10395,13 @@ function myffbadLine(text, cls) {
 async function runMyffbadUpdate(pastedHtml, rawKo) {
   openMyffbadConsole()
   myffbadPendingChanges = []
-  myffbadLine(pastedHtml ? `Analyse de la page fournie (${rawKo ? rawKo + ' ko, allégée à ' : ''}${Math.round(pastedHtml.length / 1024)} ko)…` : 'Connexion à MYFFBAD…', 'info')
+  const pastedSize = pastedHtml ? [].concat(pastedHtml).reduce((a, t) => a + t.length, 0) : 0
+  myffbadLine(pastedHtml ? `Analyse de ${[].concat(pastedHtml).length} page(s) fournie(s) (${rawKo ? rawKo + ' ko, allégées à ' : ''}${Math.round(pastedSize / 1024)} ko)…` : 'Connexion à MYFFBAD…', 'info')
   await sleep(250)
 
   let data
   try {
-    const res = await fetch('/api/admin/action', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'scrape_myffbad', data: pastedHtml ? { html: pastedHtml } : undefined }) })
+    const res = await fetch('/api/admin/action', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action: 'scrape_myffbad', data: pastedHtml ? { htmls: [].concat(pastedHtml) } : undefined }) })
     const raw = await res.text()
     try { data = JSON.parse(raw) } catch { data = null }
     if (!res.ok || !data) {
@@ -10439,8 +10440,8 @@ async function runMyffbadUpdate(pastedHtml, rawKo) {
   myffbadLine('── ' + (data.message || 'Terminé.') + ' ──', 'title')
 
   myffbadPendingChanges = (data.results || [])
-    .filter(r => r.changed)
-    .map(r => ({ userId: r.userId, category: r.to }))
+    .filter(r => r.changed || r.licenseChanged)
+    .map(r => ({ userId: r.userId, category: r.changed ? r.to : undefined, licenseNumber: r.licenseChanged ? r.licenseTo : undefined }))
 
   if (myffbadPendingChanges.length === 0) {
     await sleep(150)
@@ -10464,7 +10465,7 @@ function slimMyffbadHtml(html) {
       if (!keep) sc.remove()
     })
     doc.querySelectorAll('*').forEach(el => {
-      for (const a of [...el.attributes]) if (!['id', 'type', 'role'].includes(a.name)) el.removeAttribute(a.name)
+      for (const a of [...el.attributes]) if (!['id', 'type', 'role', 'data-testid', 'aria-current'].includes(a.name)) el.removeAttribute(a.name)
     })
     return '<!doctype html>' + doc.documentElement.outerHTML.replace(/<!--[\s\S]*?-->/g, '')
   } catch { return html }
@@ -10476,23 +10477,26 @@ function myffbadShowManualHtmlPrompt() {
   const box = document.createElement('div')
   box.style.cssText = 'margin-top:0.8rem;padding:0.8rem;border:1px dashed var(--orange);border-radius:8px;font-family:inherit;color:var(--white)'
   box.innerHTML = `<div style="margin-bottom:0.6rem;font-size:0.88rem">Le serveur n'a pas pu lire la liste. Ouvrez la page du club sur myffbad.fr dans votre navigateur, <strong>attendez que les joueurs soient affichés</strong>, puis au choix :</div>
-    <div style="margin-bottom:0.6rem;font-size:0.84rem"><strong>A.</strong> enregistrez la page avec <strong>Ctrl+S</strong> en choisissant « Page web, complète » (et non « HTML uniquement »), puis sélectionnez le fichier .html :</div>
-    <input type="file" id="myffbad-html-file" accept=".html,.htm,text/html" style="margin-bottom:0.7rem;max-width:100%">
+    <div style="margin-bottom:0.6rem;font-size:0.84rem"><strong>A.</strong> enregistrez la page avec <strong>Ctrl+S</strong> en choisissant « Page web, complète » (et non « HTML uniquement »), puis sélectionnez le(s) fichier(s) .html. <strong>La liste du club compte plusieurs pages (50 joueurs par page) : enregistrez chaque page et sélectionnez tous les fichiers en une fois.</strong></div>
+    <input type="file" id="myffbad-html-file" accept=".html,.htm,text/html" multiple style="margin-bottom:0.7rem;max-width:100%">
     <div style="margin-bottom:0.4rem;font-size:0.84rem"><strong>B.</strong> ou appuyez sur F12, onglet « Console », tapez <code>copy(document.documentElement.outerHTML)</code> puis collez ici (Ctrl+V) :</div>
     <textarea id="myffbad-html-text" rows="3" placeholder="Collez ici le code de la page…" style="width:100%;margin-bottom:0.6rem;font-size:0.8rem"></textarea>
     <div><button class="btn-sm btn-edit" id="myffbad-html-go">Analyser</button></div>`
   body.appendChild(box)
   body.scrollTop = body.scrollHeight
   document.getElementById('myffbad-html-go').onclick = async () => {
-    const f = document.getElementById('myffbad-html-file').files[0]
-    let text = document.getElementById('myffbad-html-text').value
-    if (!f && !text.trim()) { myffbadLine('✗ Choisissez un fichier .html ou collez le code de la page.', 'err'); return }
-    if (f) { try { text = await f.text() } catch { myffbadLine('✗ Impossible de lire ce fichier.', 'err'); return } }
-    const rawKo = Math.round(text.length / 1024)
-    const slim = slimMyffbadHtml(text)
+    const files = [...document.getElementById('myffbad-html-file').files]
+    const pasted = document.getElementById('myffbad-html-text').value
+    if (!files.length && !pasted.trim()) { myffbadLine('✗ Choisissez un ou plusieurs fichiers .html, ou collez le code de la page.', 'err'); return }
+    const texts = []
+    for (const f of files) { try { texts.push(await f.text()) } catch { myffbadLine(`✗ Impossible de lire « ${f.name} ».`, 'err'); return } }
+    if (pasted.trim()) texts.push(pasted)
+    const rawKo = Math.round(texts.reduce((a, t) => a + t.length, 0) / 1024)
+    const slims = texts.map(slimMyffbadHtml)
+    const total = slims.reduce((a, t) => a + t.length, 0)
     box.remove()
-    if (slim.length > 3.8 * 1024 * 1024) { myffbadLine(`✗ Page trop volumineuse même allégée (${Math.round(slim.length / 1024)} ko). Réessayez depuis la page du club uniquement.`, 'err'); return }
-    await runMyffbadUpdate(slim, rawKo)
+    if (total > 3.8 * 1024 * 1024) { myffbadLine(`✗ Pages trop volumineuses même allégées (${Math.round(total / 1024)} ko). Envoyez moins de pages à la fois.`, 'err'); return }
+    await runMyffbadUpdate(slims, rawKo)
   }
 }
 
