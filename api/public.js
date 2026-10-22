@@ -86,6 +86,7 @@ async function handleTrack(req, res) {
     if (!ua || /bot|crawl|spider|slurp|preview|monitor|headless|lighthouse|uptime/i.test(ua)) return res.status(204).end()
     const body = req.body || {}
     const page = TRACK_PAGES.has(body.page) ? body.page : 'accueil'
+    const durationSec = Number.isFinite(body.seconds) ? Math.round(body.seconds) : null
 
     // Membre connecté ? Les visites de l'admin ne sont pas comptées.
     let isMember = false
@@ -97,6 +98,19 @@ async function handleTrack(req, res) {
         if (p.role === 'ADMIN' || ['admin', 'root'].includes((p.username || '').toLowerCase())) return res.status(204).end()
         isMember = true
       } catch {}
+    }
+
+    // Durée de consultation : temps ACTIF (onglet visible) passé sur une page, envoyé en quittant la page.
+    // Plafonné à 30 min par envoi ; ignoré s'il n'existe pas déjà une visite du jour pour ce visiteur.
+    if (durationSec !== null) {
+      if (durationSec < 1) return res.status(204).end()
+      const sec = Math.min(durationSec, 1800)
+      const dayD = parisDay()
+      const ipD = getClientIp(req) || ''
+      const hashD = crypto.createHash('sha256').update(`${ipD}|${ua}|${dayD}|${process.env.JWT_SECRET || 'cdr'}`).digest('hex').slice(0, 32)
+      const upd = await prisma.siteVisit.updateMany({ where: { day: dayD, visitorHash: hashD }, data: { seconds: { increment: sec } } })
+      if (upd.count > 0) await prisma.pageHitDaily.updateMany({ where: { day: dayD, page }, data: { seconds: { increment: sec } } })
+      return res.status(204).end()
     }
 
     const parsed = parseUserAgent(ua)

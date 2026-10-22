@@ -605,6 +605,7 @@ model SiteVisit {
   standalone  Boolean  @default(false) // ouvert depuis l'application installée (PWA)
   isMember    Boolean  @default(false) // connecté avec un compte joueur
   pageViews   Int      @default(1)
+  seconds     Int      @default(0) // temps actif total passé sur le site ce jour-là
   firstAt     DateTime @default(now())
   lastAt      DateTime @updatedAt
 
@@ -616,6 +617,7 @@ model PageHitDaily {
   day  String
   page String
   hits Int    @default(1)
+  seconds Int @default(0) // temps actif cumulé sur cette page (durée moyenne = seconds / hits)
 
   @@id([day, page])
 }

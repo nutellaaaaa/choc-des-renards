@@ -954,6 +954,13 @@
     100% { box-shadow: 0 0 0 0   rgba(255,109,0,0); }
   }
 
+  /* sélecteur de période (statistiques) */
+  .stats-range { display: inline-flex; padding: 4px; gap: 2px; background: var(--dark3); border: 1px solid var(--dark4); border-radius: 999px; }
+  .stats-range button { background: none; border: 0; color: var(--gray-light); font-family: var(--font-heading); font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.45rem 1rem; border-radius: 999px; cursor: pointer; transition: background 0.2s, color 0.2s; white-space: nowrap; }
+  .stats-range button:hover { color: var(--white); }
+  .stats-range button.active { background: var(--orange); color: #000; font-weight: 700; }
+  .stats-range button:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+
   /* bouton retour au royaume */
   .back-to-kingdom {
     display: inline-flex; align-items: center; gap: 0.5rem;
@@ -2982,12 +2989,12 @@
     <!-- Charte -->
     <div id="admin-stats" class="admin-section">
       <div class="admin-section-header" style="display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:0.5rem">
-        <select id="stats-days" onchange="loadStatsAdmin()" style="max-width:180px">
-          <option value="7">7 derniers jours</option>
-          <option value="30" selected>30 derniers jours</option>
-          <option value="90">90 derniers jours</option>
-          <option value="365">12 derniers mois</option>
-        </select>
+        <div class="stats-range" id="stats-range" role="group" aria-label="Période">
+          <button type="button" data-days="7" onclick="setStatsRange(7)">7 jours</button>
+          <button type="button" data-days="30" class="active" onclick="setStatsRange(30)">30 jours</button>
+          <button type="button" data-days="90" onclick="setStatsRange(90)">90 jours</button>
+          <button type="button" data-days="365" onclick="setStatsRange(365)">12 mois</button>
+        </div>
       </div>
       <p style="font-size:0.8rem;color:var(--gray);margin:0 0 1rem">Mesure anonyme : aucune adresse IP ni identifiant persistant n'est conservé. Un visiteur est compté une fois par jour. Vos propres visites (admin) ne sont pas comptées. Données conservées 13 mois.</p>
       <div id="stats-admin-body"><div class="admin-empty">Chargement…</div></div>
@@ -11531,29 +11538,68 @@ function animateHero() {
 /* ══════════════ STATISTIQUES DE FRÉQUENTATION ══════════════ */
 // Mesure d'audience anonyme : n'envoie que la page vue ; le serveur ne conserve ni IP ni identifiant.
 let _lastTrackedPage = null
-function trackVisit(page) {
+let _durPage = null, _durAcc = 0, _durSince = null
+function _trackPost(payload) {
   try {
-    if (!page || page === _lastTrackedPage) return
-    _lastTrackedPage = page
     const headers = { 'Content-Type': 'application/json' }
     const tok = localStorage.getItem('cdr_token')
     if (tok) headers['Authorization'] = 'Bearer ' + tok
-    fetch('/api/public?resource=track', {
-      method: 'POST', headers, keepalive: true,
-      body: JSON.stringify({ page, touch: (navigator.maxTouchPoints || 0) > 1, standalone: window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true }),
-    }).catch(() => {})
+    fetch('/api/public?resource=track', { method: 'POST', headers, keepalive: true, body: JSON.stringify(payload) }).catch(() => {})
+  } catch {}
+}
+// Durée de consultation : temps ACTIF (onglet visible) passé sur la page courante, envoyé quand on la quitte,
+// quand l'onglet passe en arrière-plan ou à la fermeture.
+function _flushDuration() {
+  if (!_durPage) return
+  const ms = _durAcc + (_durSince ? Date.now() - _durSince : 0)
+  const sec = Math.round(ms / 1000)
+  _durAcc = 0
+  _durSince = document.hidden ? null : Date.now()
+  if (sec >= 1) _trackPost({ page: _durPage, seconds: Math.min(sec, 1800) })
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { if (_durSince) { _durAcc += Date.now() - _durSince; _durSince = null } _flushDuration() }
+  else if (_durPage) _durSince = Date.now()
+})
+window.addEventListener('pagehide', _flushDuration)
+function trackVisit(page) {
+  try {
+    if (!page || page === _lastTrackedPage) return
+    _flushDuration()
+    _lastTrackedPage = page
+    _durPage = page; _durAcc = 0; _durSince = document.hidden ? null : Date.now()
+    _trackPost({ page, touch: (navigator.maxTouchPoints || 0) > 1, standalone: window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true })
   } catch {}
 }
 window.addEventListener('load', () => trackVisit(localStorage.getItem('cdr_token') ? (document.querySelector('.page.active')?.id || 'page-accueil').replace(/^page-/, '') : 'connexion'))
 
 const STATS_LABELS = { mobile:'Mobile', tablet:'Tablette', desktop:'Ordinateur' }
+// Arrondi « au plus fort reste » : les pourcentages affichés totalisent toujours 100 %.
+function _pcts(values) {
+  const total = values.reduce((a, v) => a + v, 0)
+  if (!total) return values.map(() => 0)
+  const raw = values.map(v => v / total * 100)
+  const out = raw.map(Math.floor)
+  let rest = 100 - out.reduce((a, v) => a + v, 0)
+  raw.map((r, i) => [r - Math.floor(r), i]).sort((a, b) => b[0] - a[0]).forEach(([, i]) => { if (rest > 0) { out[i]++; rest-- } })
+  return out
+}
+// Garde les `limit` premiers éléments et regroupe le reste dans une ligne « Autres (N) » pour que le total reste lisible.
+function _withOthers(items, limit) {
+  if (items.length <= limit) return items
+  const shown = items.slice(0, limit - 1), rest = items.slice(limit - 1)
+  const value = rest.reduce((a, i) => a + i.value, 0)
+  const seconds = rest.reduce((a, i) => a + (i.avgSeconds || 0) * i.value, 0)
+  return [...shown, { label: '__others__', othersCount: rest.length, value, avgSeconds: value ? Math.round(seconds / value) : 0 }]
+}
 function _statsBars(items, labelFn) {
-  const total = items.reduce((a, i) => a + i.value, 0) || 1
   if (!items.length) return '<div class="admin-empty">Pas encore de données.</div>'
-  const max = Math.max(...items.map(i => i.value))
-  return items.slice(0, 8).map(i => `<div style="margin-bottom:0.45rem">
-    <div style="display:flex;justify-content:space-between;font-size:0.82rem"><span>${esc(labelFn ? labelFn(i.label) : i.label)}</span><span style="color:var(--gray)">${i.value} · ${Math.round(i.value / total * 100)} %</span></div>
-    <div style="height:6px;border-radius:3px;background:var(--dark4)"><div style="height:6px;border-radius:3px;background:var(--orange);width:${Math.max(3, i.value / max * 100)}%"></div></div></div>`).join('')
+  const list = _withOthers(items, 8)
+  const pcts = _pcts(list.map(i => i.value))
+  const max = Math.max(...list.map(i => i.value))
+  return list.map((i, k) => `<div style="margin-bottom:0.45rem">
+    <div style="display:flex;justify-content:space-between;font-size:0.82rem"><span>${i.label === '__others__' ? `Autres (${i.othersCount})` : esc(labelFn ? labelFn(i.label) : i.label)}</span><span style="color:var(--gray)">${i.value} · ${pcts[k]} %</span></div>
+    <div style="height:6px;border-radius:3px;background:var(--dark4)"><div style="height:6px;border-radius:3px;background:${i.label === '__others__' ? 'var(--gray)' : 'var(--orange)'};width:${Math.max(3, i.value / max * 100)}%"></div></div></div>`).join('')
 }
 function _statsChart(series) {
   const W = 720, H = 190, padL = 30, padB = 22, padT = 8
@@ -11574,9 +11620,32 @@ function _statsChart(series) {
   const ticks = series.map((d, i) => i % step === 0 ? `<text x="${(padL + i * bw + bw / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="var(--gray)">${d.day.slice(8)}/${d.day.slice(5, 7)}</text>` : '').join('')
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img" aria-label="Visiteurs par jour">${grid}${bars}${ticks}</svg>`
 }
+let _statsDays = 30
+function setStatsRange(d) {
+  _statsDays = d
+  document.querySelectorAll('#stats-range button').forEach(b => b.classList.toggle('active', parseInt(b.dataset.days, 10) === d))
+  loadStatsAdmin()
+}
+function fmtDuration(sec) {
+  if (!sec || sec < 1) return '—'
+  if (sec < 60) return sec + ' s'
+  const m = Math.floor(sec / 60), s = sec % 60
+  return m + ' min' + (s ? ' ' + String(s).padStart(2, '0') + ' s' : '')
+}
+// Liste des pages : nombre de vues, part, et durée moyenne de consultation
+function _statsPagesList(items) {
+  if (!items.length) return '<div class="admin-empty">Pas encore de données.</div>'
+  const list = _withOthers(items, 10)
+  const pcts = _pcts(list.map(i => i.value))
+  const max = Math.max(...list.map(i => i.value))
+  const label = l => PAGE_LABELS[l] || (l === 'connexion' ? 'Connexion / inscription (non connecté)' : l)
+  return list.map((i, k) => `<div style="margin-bottom:0.55rem">
+    <div style="display:flex;justify-content:space-between;gap:0.6rem;font-size:0.82rem"><span>${i.label === '__others__' ? `Autres pages (${i.othersCount})` : esc(label(i.label))}</span><span style="color:var(--gray);white-space:nowrap">${i.value} vue${i.value > 1 ? 's' : ''} · ${pcts[k]} % · ⏱ ${fmtDuration(i.avgSeconds)}</span></div>
+    <div style="height:6px;border-radius:3px;background:var(--dark4)"><div style="height:6px;border-radius:3px;background:${i.label === '__others__' ? 'var(--gray)' : 'var(--orange)'};width:${Math.max(3, i.value / max * 100)}%"></div></div></div>`).join('')
+}
 async function loadStatsAdmin() {
   const box = document.getElementById('stats-admin-body')
-  const days = document.getElementById('stats-days').value
+  const days = _statsDays
   try {
     const res = await fetch('/api/admin?resource=stats&days=' + days, { headers: authHeaders() })
     const d = await res.json()
@@ -11587,7 +11656,7 @@ async function loadStatsAdmin() {
     const pctApp = t.visitVisitors ? Math.round(t.standalone / t.visitVisitors * 100) : 0
     box.innerHTML = `
       <div style="display:flex;gap:0.7rem;flex-wrap:wrap;margin-bottom:1.2rem">
-        ${card("Visiteurs aujourd'hui", t.today)}${card('7 derniers jours', t.last7, 'visiteurs-jours')}${card('30 derniers jours', t.last30, 'visiteurs-jours')}${card('Moyenne / jour', t.avgPerDay)}${card('Pages vues', t.pageViews, 'sur la période')}
+        ${card("Visiteurs aujourd'hui", t.today)}${card('7 derniers jours', t.last7, 'visiteurs-jours')}${card('30 derniers jours', t.last30, 'visiteurs-jours')}${card('Moyenne / jour', t.avgPerDay)}${card('Pages vues', t.pageViews, 'sur la période')}${card('Durée moyenne', fmtDuration(t.avgVisitSeconds), 'd\'une visite')}
       </div>
       <h4 style="margin:0 0 0.4rem">Visiteurs par jour</h4>
       <div style="background:var(--dark3);border:1px solid var(--dark4);border-radius:10px;padding:0.6rem;margin-bottom:1.4rem">${_statsChart(d.series)}</div>
@@ -11595,7 +11664,7 @@ async function loadStatsAdmin() {
         <div><h4 style="margin:0 0 0.6rem">Appareil</h4>${_statsBars(d.devices, l => STATS_LABELS[l] || l)}</div>
         <div><h4 style="margin:0 0 0.6rem">Système</h4>${_statsBars(d.os)}</div>
         <div><h4 style="margin:0 0 0.6rem">Navigateur</h4>${_statsBars(d.browsers)}</div>
-        <div><h4 style="margin:0 0 0.6rem">Pages les plus vues</h4>${_statsBars(d.topPages, l => PAGE_LABELS[l] || (l === 'connexion' ? 'Connexion / inscription' : l))}</div>
+        <div style="grid-column:1/-1"><h4 style="margin:0 0 0.6rem">Pages les plus vues <span style="font-weight:400;font-size:0.78rem;color:var(--gray)">(⏱ = temps moyen passé sur la page)</span></h4>${_statsPagesList(d.topPages)}<p style="margin:0.7rem 0 0;font-size:0.76rem;color:var(--gray);line-height:1.5"><strong>Connexion / inscription</strong> : l'écran plein écran affiché à toute personne <em>non connectée</em> qui ouvre le site (formulaire de connexion et d'inscription). <strong>Accueil</strong> : la page d'accueil, visible seulement une fois connecté. Un joueur qui se connecte compte donc d'abord pour « Connexion », puis pour « Accueil ». Durées : temps où l'onglet est réellement visible, plafonné à 30 min par consultation.</p></div>
       </div>
       <p style="margin-top:1.2rem;font-size:0.85rem;color:var(--gray-light)">Connectés avec un compte : <strong>${pctMembers} %</strong> des visites · Application installée : <strong>${pctApp} %</strong></p>`
   } catch { box.innerHTML = '<div class="admin-empty">Erreur réseau.</div>' }

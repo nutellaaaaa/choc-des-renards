@@ -730,7 +730,7 @@ async function handleStats(req, res) {
 
     const visits = await prisma.siteVisit.findMany({
       where: { day: { gte: since } },
-      select: { day: true, device: true, os: true, browser: true, standalone: true, isMember: true, pageViews: true },
+      select: { day: true, device: true, os: true, browser: true, standalone: true, isMember: true, pageViews: true, seconds: true },
     })
     const hits = await prisma.pageHitDaily.findMany({ where: { day: { gte: since } } })
 
@@ -749,8 +749,16 @@ async function handleStats(req, res) {
       totalViews += v.pageViews
     }
     const pageMap = {}
-    for (const h of hits) pageMap[h.page] = (pageMap[h.page] || 0) + h.hits
-    const topPages = Object.entries(pageMap).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value)
+    for (const h of hits) {
+      const e = pageMap[h.page] || (pageMap[h.page] = { hits: 0, seconds: 0 })
+      e.hits += h.hits; e.seconds += h.seconds || 0
+    }
+    // avgSeconds = temps actif moyen par consultation de la page (0 si pas encore mesuré)
+    const topPages = Object.entries(pageMap)
+      .map(([label, e]) => ({ label, value: e.hits, avgSeconds: e.hits ? Math.round(e.seconds / e.hits) : 0 }))
+      .sort((a, b) => b.value - a.value)
+    const timedVisits = visits.filter(v => v.seconds > 0)
+    const avgVisitSeconds = timedVisits.length ? Math.round(timedVisits.reduce((a, v) => a + v.seconds, 0) / timedVisits.length) : 0
 
     const series = list.map(d => perDay[d])
     const sum = n => series.slice(-n).reduce((a, d) => a + d.visitors, 0)
@@ -764,7 +772,7 @@ async function handleStats(req, res) {
         visitVisitors: visits.length, // visiteurs-jours sur la période (un visiteur compte une fois par jour)
         pageViews: totalViews,
         avgPerDay: Math.round((visits.length / days) * 10) / 10,
-        standalone, members,
+        standalone, members, avgVisitSeconds,
       },
       devices: count('device'),
       os: count('os'),
